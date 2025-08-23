@@ -136,7 +136,7 @@ export default function Home() {
                 <span className="text-xl font-bold">BGHS Alumni</span>
               </div>
               <p className="text-gray-400">
-                Connecting alumni from Barasat Govt. High School since 1856
+                Connecting alumni from Barasat Govt. High School (Now Barasat Peary Charan Sarkar Government High School) since 1856
               </p>
             </div>
             <div>
