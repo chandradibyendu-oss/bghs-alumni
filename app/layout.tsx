@@ -6,9 +6,9 @@ import { Toaster } from 'react-hot-toast'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'BGHS Alumni - Barasat Govt. High School',
-  description: 'Connect with fellow alumni, stay updated with school events, and contribute to your alma mater.',
-  keywords: 'BGHS, Barasat Govt. High School, Alumni, Events, Donations',
+  title: 'BGHS Alumni Association - Barasat Govt. High School',
+  description: 'Connect with fellow alumni from Barasat Govt. High School, stay updated with school events, and contribute to your alma mater.',
+  keywords: 'BGHS, Barasat Govt. High School, Alumni Association, Events, Directory, Donations, Barasat, West Bengal',
   authors: [{ name: 'BGHS Alumni Association' }],
   viewport: 'width=device-width, initial-scale=1',
 }

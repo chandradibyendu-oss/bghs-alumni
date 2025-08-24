@@ -1,0 +1,637 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { 
+  GraduationCap, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Search, 
+  Filter,
+  User,
+  Mail,
+  Calendar,
+  Building,
+  MapPin,
+  Save,
+  X,
+  Eye,
+  EyeOff
+} from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+
+interface UserProfile {
+  id: string
+  email: string
+  full_name: string
+  batch_year: number
+  profession: string
+  company: string
+  location: string
+  bio: string
+  avatar_url: string
+  linkedin_url: string
+  website_url: string
+  created_at: string
+  updated_at: string
+}
+
+export default function AdminUsersPage() {
+  const [users, setUsers] = useState<UserProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [searchTerm, setSearchTerm] = useState('')
+  const [filterYear, setFilterYear] = useState('')
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
+  const [formData, setFormData] = useState({
+    email: '',
+    full_name: '',
+    batch_year: '',
+    profession: '',
+    company: '',
+    location: '',
+    bio: '',
+    linkedin_url: '',
+    website_url: ''
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [password, setPassword] = useState('')
+  const router = useRouter()
+
+  useEffect(() => {
+    checkAdminAuth()
+    fetchUsers()
+  }, [])
+
+  const checkAdminAuth = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        router.push('/login')
+        return
+      }
+      // You can add role-based check here later
+    } catch (error) {
+      console.error('Auth error:', error)
+      router.push('/login')
+    }
+  }
+
+  const fetchUsers = async () => {
+    try {
+      setLoading(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users')
+      }
+
+      const { users } = await response.json()
+      setUsers(users || [])
+    } catch (error) {
+      console.error('Error fetching users:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: password,
+          full_name: formData.full_name,
+          batch_year: formData.batch_year,
+          profession: formData.profession,
+          company: formData.company,
+          location: formData.location,
+          bio: formData.bio,
+          linkedin_url: formData.linkedin_url,
+          website_url: formData.website_url
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to create user')
+      }
+
+      // Reset form and refresh users
+      resetForm()
+      fetchUsers()
+      setShowAddForm(false)
+      alert('User created successfully!')
+    } catch (error) {
+      console.error('Error adding user:', error)
+      alert(`Error adding user: ${error instanceof Error ? error.message : 'Please try again.'}`)
+    }
+  }
+
+  const handleEditUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingUser) return
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          id: editingUser.id,
+          full_name: formData.full_name,
+          batch_year: formData.batch_year,
+          profession: formData.profession,
+          company: formData.company,
+          location: formData.location,
+          bio: formData.bio,
+          linkedin_url: formData.linkedin_url,
+          website_url: formData.website_url
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update user')
+      }
+
+      resetForm()
+      setEditingUser(null)
+      fetchUsers()
+      alert('User updated successfully!')
+    } catch (error) {
+      console.error('Error updating user:', error)
+      alert(`Error updating user: ${error instanceof Error ? error.message : 'Please try again.'}`)
+    }
+  }
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
+      return
+    }
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch(`/api/admin/users?id=${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to delete user')
+      }
+
+      fetchUsers()
+      alert('User deleted successfully!')
+    } catch (error) {
+      console.error('Error deleting user:', error)
+      alert(`Error deleting user: ${error instanceof Error ? error.message : 'Please try again.'}`)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      email: '',
+      full_name: '',
+      batch_year: '',
+      profession: '',
+      company: '',
+      location: '',
+      bio: '',
+      linkedin_url: '',
+      website_url: ''
+    })
+    setPassword('')
+  }
+
+  const startEdit = (user: UserProfile) => {
+    setEditingUser(user)
+    setFormData({
+      email: user.email,
+      full_name: user.full_name,
+      batch_year: user.batch_year.toString(),
+      profession: user.profession || '',
+      company: user.company || '',
+      location: user.location || '',
+      bio: user.bio || '',
+      linkedin_url: user.linkedin_url || '',
+      website_url: user.website_url || ''
+    })
+  }
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         user.profession?.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesYear = !filterYear || user.batch_year.toString() === filterYear
+    return matchesSearch && matchesYear
+  })
+
+  const batchYears = Array.from(new Set(users.map(u => u.batch_year))).sort((a, b) => b - a)
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading users...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-3">
+                             <img 
+                 src="/bghs-logo.jpg" 
+                 alt="BGHS Alumni Association" 
+                 className="h-10 w-auto"
+               />
+              <span className="text-xl font-bold text-gray-900">Admin - User Management</span>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Link href="/dashboard" className="text-gray-600 hover:text-gray-800 transition-colors">
+                ← Back to Dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
+            <p className="text-gray-600 mt-2">Manage BGHS Alumni user profiles</p>
+          </div>
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="btn-primary flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add New User</span>
+          </button>
+        </div>
+
+        {/* Search and Filters */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Users</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or profession..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="input-field pl-10"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Batch Year</label>
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="input-field"
+              >
+                <option value="">All Years</option>
+                {batchYears.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Add/Edit User Form */}
+        {(showAddForm || editingUser) && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900">
+                {editingUser ? 'Edit User' : 'Add New User'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAddForm(false)
+                  setEditingUser(null)
+                  resetForm()
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={editingUser ? handleEditUser : handleAddUser} className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                    disabled={!!editingUser}
+                    required
+                    className="input-field"
+                    placeholder="user@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <input
+                    type="text"
+                    value={formData.full_name}
+                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                    required
+                    className="input-field"
+                    placeholder="John Doe"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year *</label>
+                  <input
+                    type="number"
+                    value={formData.batch_year}
+                    onChange={(e) => setFormData({...formData, batch_year: e.target.value})}
+                    required
+                    min="1950"
+                    max="2030"
+                    className="input-field"
+                    placeholder="2000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Profession</label>
+                  <input
+                    type="text"
+                    value={formData.profession}
+                    onChange={(e) => setFormData({...formData, profession: e.target.value})}
+                    className="input-field"
+                    placeholder="Software Engineer"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
+                  <input
+                    type="text"
+                    value={formData.company}
+                    onChange={(e) => setFormData({...formData, company: e.target.value})}
+                    className="input-field"
+                    placeholder="Tech Corp"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Location</label>
+                  <input
+                    type="text"
+                    value={formData.location}
+                    onChange={(e) => setFormData({...formData, location: e.target.value})}
+                    className="input-field"
+                    placeholder="Kolkata, West Bengal"
+                  />
+                </div>
+              </div>
+
+              {!editingUser && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <div className="relative">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      className="input-field pr-10"
+                      placeholder="Enter password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Bio</label>
+                <textarea
+                  value={formData.bio}
+                  onChange={(e) => setFormData({...formData, bio: e.target.value})}
+                  rows={3}
+                  className="input-field"
+                  placeholder="Tell us about yourself..."
+                />
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn URL</label>
+                  <input
+                    type="url"
+                    value={formData.linkedin_url}
+                    onChange={(e) => setFormData({...formData, linkedin_url: e.target.value})}
+                    className="input-field"
+                    placeholder="https://linkedin.com/in/username"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                  <input
+                    type="url"
+                    value={formData.website_url}
+                    onChange={(e) => setFormData({...formData, website_url: e.target.value})}
+                    className="input-field"
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddForm(false)
+                    setEditingUser(null)
+                    resetForm()
+                  }}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary flex items-center space-x-2"
+                >
+                  <Save className="h-5 w-5" />
+                  <span>{editingUser ? 'Update User' : 'Add User'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Users Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">
+              Users ({filteredUsers.length})
+            </h3>
+          </div>
+          
+          {filteredUsers.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <User className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No users found matching your criteria.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Batch Year
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Profession
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Location
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Joined
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredUsers.map((user) => (
+                    <tr key={user.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10">
+                            {user.avatar_url ? (
+                              <img
+                                className="h-10 w-10 rounded-full"
+                                src={user.avatar_url}
+                                alt={user.full_name}
+                              />
+                            ) : (
+                              <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                                <User className="h-6 w-6 text-primary-600" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">
+                              {user.full_name}
+                            </div>
+                            <div className="text-sm text-gray-500">
+                              {user.email}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                          {user.batch_year}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.profession || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.location || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(user.created_at).toLocaleDateString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => startEdit(user)}
+                            className="text-primary-600 hover:text-primary-900 transition-colors"
+                          >
+                            <Edit className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

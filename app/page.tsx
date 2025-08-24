@@ -8,8 +8,12 @@ export default function Home() {
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <GraduationCap className="h-8 w-8 text-primary-600" />
+            <div className="flex items-center space-x-4">
+              <img 
+                src="/bghs-logo.jpg" 
+                alt="BGHS Alumni Association" 
+                className="h-12 w-auto object-contain"
+              />
               <span className="text-xl font-bold text-gray-900">BGHS Alumni</span>
             </div>
             <div className="hidden md:flex items-center space-x-8">
@@ -46,7 +50,7 @@ export default function Home() {
             <span className="bg-gradient-to-r from-white to-accent-200 bg-clip-text text-transparent">BGHS Alumni</span>
           </h1>
           <p className="text-xl text-primary-100 mb-8 max-w-3xl mx-auto drop-shadow-md">
-            Connect with fellow alumni from Barasat Govt. High School. Stay updated with school events, 
+            Connect with fellow alumni from Barasat Peary Charan Sarkar Government High School (Formerly Barasat Govt. High School). Stay updated with school events, 
             network with former classmates, and contribute to your alma mater's legacy.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -71,7 +75,7 @@ export default function Home() {
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Barasat Govt. High School</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Established in 1856, BGHS has been shaping young minds and building character for over 165 years. 
-              Our alumni network spans across the globe, representing excellence in various fields.
+              Our alumni network spans across the globe, representing excellence in various fields. Barasat Government High School's name was officially changed to Barasat Peary Charan Sarkar Government High School in 1996 to honor its founder, Peary Charan Sarkar. The change was made by the order of the Governor, to immortalize his contribution to the school, and it coincided with the institution's 150th anniversary
             </p>
           </div>
           <div className="grid md:grid-cols-3 gap-8">
@@ -150,10 +154,14 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-3 mb-4">
-                <GraduationCap className="h-8 w-8 text-primary-400" />
-                <span className="text-xl font-bold">BGHS Alumni</span>
-              </div>
+              {/* <div className="flex items-center space-x-3 mb-4">
+                <img 
+                  src="/bghs-logo.jpg" 
+                  alt="BGHS Alumni Association" 
+                  className="h-10 w-auto object-contain"
+                />
+              </div> */}
+              <h3 className="text-lg font-semibold mb-4">BGHS Alumni Association</h3>
               <p className="text-gray-400">
                 Connecting alumni from Barasat Govt. High School (Now Barasat Peary Charan Sarkar Government High School) since 1856
               </p>
