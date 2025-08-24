@@ -21,6 +21,7 @@ import {
   EyeOff
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
 
 interface UserProfile {
   id: string
@@ -34,6 +35,7 @@ interface UserProfile {
   avatar_url: string
   linkedin_url: string
   website_url: string
+  role: string
   created_at: string
   updated_at: string
 }
@@ -58,11 +60,14 @@ export default function AdminUsersPage() {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [password, setPassword] = useState('')
+  const [availableRoles, setAvailableRoles] = useState<UserRole[]>([])
+  const [selectedRole, setSelectedRole] = useState('alumni_member')
   const router = useRouter()
 
   useEffect(() => {
     checkAdminAuth()
     fetchUsers()
+    fetchAvailableRoles()
   }, [])
 
   const checkAdminAuth = async () => {
@@ -76,6 +81,15 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error('Auth error:', error)
       router.push('/login')
+    }
+  }
+
+  const fetchAvailableRoles = async () => {
+    try {
+      const roles = await getAvailableRoles()
+      setAvailableRoles(roles)
+    } catch (error) {
+      console.error('Error fetching roles:', error)
     }
   }
 
@@ -195,6 +209,25 @@ export default function AdminUsersPage() {
     } catch (error) {
       console.error('Error updating user:', error)
       alert(`Error updating user: ${error instanceof Error ? error.message : 'Please try again.'}`)
+    }
+  }
+
+  const handleUpdateUserRole = async (userId: string, newRole: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const success = await updateUserRole(userId, newRole, user.id)
+      if (success) {
+        // Refresh users list
+        fetchUsers()
+        alert('User role updated successfully!')
+      } else {
+        alert('Failed to update user role')
+      }
+    } catch (error) {
+      console.error('Error updating user role:', error)
+      alert('Error updating user role')
     }
   }
 
@@ -388,6 +421,21 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                  <select
+                    value={selectedRole}
+                    onChange={(e) => setSelectedRole(e.target.value)}
+                    className="input-field"
+                    required
+                  >
+                    {availableRoles.map((role) => (
+                      <option key={role.name} value={role.name}>
+                        {role.description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                   <input
                     type="text"
@@ -559,6 +607,9 @@ export default function AdminUsersPage() {
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Role
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -604,6 +655,20 @@ export default function AdminUsersPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {user.location || '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center space-x-2">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {user.role || 'alumni_member'}
+                          </span>
+                          <button
+                            onClick={() => handleUpdateUserRole(user.id, user.role === 'alumni_member' ? 'alumni_premium' : 'alumni_member')}
+                            className="text-blue-600 hover:text-blue-800 transition-colors"
+                            title="Toggle role"
+                          >
+                            <Shield className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.created_at).toLocaleDateString()}
