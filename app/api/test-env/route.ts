@@ -16,3 +16,4 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to check environment variables' }, { status: 500 })
   }
 }
+

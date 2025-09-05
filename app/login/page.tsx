@@ -33,11 +33,11 @@ export default function LoginPage() {
       }
 
       if (data.user) {
+        const mustChange = (data.user.user_metadata as any)?.must_change_password
         setSuccess('Login successful! Redirecting...')
-        // Redirect to dashboard or home page
         setTimeout(() => {
-          router.push('/dashboard')
-        }, 1500)
+          router.push(mustChange ? '/reset-initial-password' : '/dashboard')
+        }, 800)
       }
     } catch (err) {
       setError('An unexpected error occurred')
@@ -55,7 +55,7 @@ export default function LoginPage() {
                          <img 
                src="/bghs-logo.jpg" 
                alt="BGHS Alumni Association" 
-               className="h-16 w-auto"
+               className="h-10 w-auto"
              />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">

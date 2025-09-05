@@ -1,7 +1,136 @@
+'use client'
+
 import Link from 'next/link'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin } from 'lucide-react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+
+// Slideshow data
+const slideshowData = [
+  {
+    id: 1,
+    type: 'welcome',
+    title: 'Welcome to BGHS Alumni',
+    subtitle: 'Connect with fellow alumni from Barasat Peary Charan Sarkar Government High School',
+    description: 'Stay updated with school events, network with former classmates, and contribute to your alma mater\'s legacy.',
+    backgroundImage: '/school-building.jpg',
+    cta: {
+      primary: { text: 'Join Our Community', href: '/register' },
+      secondary: { text: 'Learn More', href: '/about' }
+    }
+  },
+  {
+    id: 2,
+    type: 'event',
+    title: 'Annual Alumni Reunion 2024',
+    subtitle: 'Save the Date: December 15, 2024',
+    description: 'Join us for our biggest reunion event of the year. Reconnect with old friends, meet new alumni, and celebrate our shared memories.',
+    backgroundImage: '/school-building.jpg',
+    icon: Calendar,
+    cta: {
+      primary: { text: 'Register Now', href: '/events' },
+      secondary: { text: 'View Details', href: '/events' }
+    }
+  },
+  {
+    id: 3,
+    type: 'hall-of-fame',
+    title: 'Hall of Fame',
+    subtitle: 'Celebrating Our Distinguished Alumni',
+    description: 'Meet our alumni who have made significant contributions in their fields - from science and technology to arts and social service.',
+    backgroundImage: '/school-building.jpg',
+    icon: Trophy,
+    cta: {
+      primary: { text: 'View Hall of Fame', href: '/hall-of-fame' },
+      secondary: { text: 'Nominate Alumni', href: '/nominate' }
+    }
+  },
+  {
+    id: 4,
+    type: 'achievement',
+    title: 'Recent Achievements',
+    subtitle: 'Alumni Making Headlines',
+    description: 'Dr. Rajesh Kumar (Batch 1995) receives the prestigious Padma Shri award for his contributions to medical research.',
+    backgroundImage: '/school-building.jpg',
+    icon: Award,
+    cta: {
+      primary: { text: 'Read More', href: '/blog' },
+      secondary: { text: 'Share Achievement', href: '/share' }
+    }
+  }
+];
 
 export default function Home() {
+  const [currentSlide, setCurrentSlide] = useState(0);
+  const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
+
+  // Auto-rotate slides
+  useEffect(() => {
+    if (!isAutoPlaying) return;
+    
+    const interval = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % slideshowData.length);
+    }, 5000); // Change slide every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying]);
+
+  const goToSlide = (index: number) => {
+    setCurrentSlide(index);
+    setIsAutoPlaying(false);
+    // Resume auto-play after 10 seconds
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const goToPrevious = () => {
+    setCurrentSlide((prev) => (prev - 1 + slideshowData.length) % slideshowData.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const goToNext = () => {
+    setCurrentSlide((prev) => (prev + 1) % slideshowData.length);
+    setIsAutoPlaying(false);
+    setTimeout(() => setIsAutoPlaying(true), 10000);
+  };
+
+  const currentSlideData = slideshowData[currentSlide];
+  const IconComponent = currentSlideData.icon;
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserEmail(user?.email ?? null)
+      if (user) {
+        try {
+          const perms = await getUserPermissions(user.id)
+          setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+        } catch {
+          // ignore if RPC not available
+        }
+      } else {
+        setIsAdmin(false)
+      }
+    }
+    init()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserEmail(session?.user?.email ?? null)
+      setIsAdmin(false)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setUserEmail(null)
+    window.location.href = '/'
+  }
+
   return (
     <div className="min-h-screen">
       {/* Navigation */}
@@ -9,58 +138,174 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-4">
+              <button className="md:hidden p-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
+                <MenuIcon className="h-6 w-6 text-gray-700" />
+              </button>
               <img 
                 src="/bghs-logo.jpg" 
                 alt="BGHS Alumni Association" 
-                className="h-12 w-auto object-contain"
+                className="h-8 w-auto object-contain"
               />
-              <span className="text-xl font-bold text-gray-900">BGHS Alumni</span>
+              <div className="flex flex-col">
+                <span className="text-2xl font-bold text-gray-900">BGHS Alumni</span>
+                <span className="text-sm text-gray-600">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
+              </div>
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
               <Link href="/donate" className="text-gray-700 hover:text-primary-600 transition-colors">Donate</Link>
-              <Link href="/login" className="btn-primary">Login</Link>
+              {userEmail ? (
+                <div className="relative">
+                  <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
+                    <UserIcon className="h-4 w-4" />
+                    <span className="text-sm">Account</span>
+                  </button>
+                  {accountOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                      <div className="px-4 py-3 text-sm text-gray-600 border-b">{userEmail}</div>
+                      <div className="py-1">
+                        <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
+                        <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
+                        {isAdmin && (
+                          <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Admin</Link>
+                        )}
+                        <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/login" className="btn-primary">Login</Link>
+              )}
             </div>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative py-20 overflow-hidden">
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
+          <div className="absolute top-0 left-0 h-full w-72 bg-white shadow-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-lg font-semibold">Menu</span>
+              <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
+            </div>
+            <nav className="space-y-2">
+              <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+              <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
+              <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
+              <Link href="/donate" className="block px-2 py-2 rounded hover:bg-gray-50">Donate</Link>
+              <div className="pt-2 border-t mt-2">
+                {userEmail ? (
+                  <>
+                    <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
+                    <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
+                    {isAdmin && (
+                      <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Admin</Link>
+                    )}
+                    <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
+                  </>
+                ) : (
+                  <Link href="/login" className="block px-2 py-2 rounded hover:bg-gray-50">Login</Link>
+                )}
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
+
+      {/* Hero Slideshow Section */}
+      <section className="relative h-[80vh] overflow-hidden">
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
           <div 
-            className="w-full h-full bg-cover bg-center bg-no-repeat opacity-90"
+            className="w-full h-full bg-cover bg-center bg-no-repeat opacity-90 transition-all duration-1000"
             style={{
-              backgroundImage: `url('/school-building.jpg')`,
+              backgroundImage: `url('${currentSlideData.backgroundImage}')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
           />
           {/* Elegant Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-primary-900/85 via-primary-800/75 to-accent-900/65"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-gray-600/70 via-gray-500/60 to-slate-600/70"></div>
         </div>
         
         {/* Content */}
-        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-6 drop-shadow-lg">
-            Welcome to{' '}
-            <span className="bg-gradient-to-r from-white to-accent-200 bg-clip-text text-transparent">BGHS Alumni</span>
-          </h1>
-          <p className="text-xl text-primary-100 mb-8 max-w-3xl mx-auto drop-shadow-md">
-            Connect with fellow alumni from Barasat Peary Charan Sarkar Government High School (Formerly Barasat Govt. High School). Stay updated with school events, 
-            network with former classmates, and contribute to your alma mater's legacy.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-              Join Our Community
-            </Link>
-            <Link href="/about" className="bg-transparent text-white border-2 border-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1">
-              Learn More
-            </Link>
+        <div className="relative z-10 h-full flex items-center">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
+            {/* Icon for non-welcome slides */}
+            {IconComponent && (
+              <div className="mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full">
+                  <IconComponent className="h-8 w-8 text-white" />
+                </div>
+              </div>
+            )}
+            
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 drop-shadow-lg">
+              <span className="bg-gradient-to-r from-white to-accent-200 bg-clip-text text-transparent">
+                {currentSlideData.title}
+              </span>
+            </h1>
+            
+            <h2 className="text-xl md:text-2xl text-primary-100 mb-6 drop-shadow-md">
+              {currentSlideData.subtitle}
+            </h2>
+            
+            <p className="text-lg text-primary-100 mb-8 max-w-3xl mx-auto drop-shadow-md">
+              {currentSlideData.description}
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link 
+                href={currentSlideData.cta.primary.href} 
+                className="bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              >
+                {currentSlideData.cta.primary.text}
+              </Link>
+              <Link 
+                href={currentSlideData.cta.secondary.href} 
+                className="bg-transparent text-white border-2 border-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+              >
+                {currentSlideData.cta.secondary.text}
+              </Link>
+            </div>
           </div>
+        </div>
+
+        {/* Navigation Arrows */}
+        <button
+          onClick={goToPrevious}
+          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-200"
+          aria-label="Previous slide"
+        >
+          <ChevronLeft className="h-6 w-6" />
+        </button>
+        
+        <button
+          onClick={goToNext}
+          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-200"
+          aria-label="Next slide"
+        >
+          <ChevronRight className="h-6 w-6" />
+        </button>
+
+        {/* Slide Indicators */}
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+          {slideshowData.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToSlide(index)}
+              className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                index === currentSlide 
+                  ? 'bg-white scale-125' 
+                  : 'bg-white/50 hover:bg-white/75'
+              }`}
+              aria-label={`Go to slide ${index + 1}`}
+            />
+          ))}
         </div>
         
         {/* Decorative Elements */}
@@ -136,45 +381,52 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-16 bg-primary-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">Ready to Reconnect?</h2>
-          <p className="text-xl text-primary-100 mb-8">
-            Join thousands of BGHS alumni who are already part of our growing community
-          </p>
-          <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
-            Get Started Today
-          </Link>
-        </div>
-      </section>
+             {/* CTA Section */}
+       <section className="py-16 bg-primary-600">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+           <h2 className="text-3xl font-bold text-white mb-4">Ready to Reconnect?</h2>
+           <p className="text-xl text-primary-100 mb-4">
+             Join thousands of BGHS alumni who are already part of our growing community
+           </p>
+           <p className="text-lg text-primary-200 mb-8">
+             বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি
+           </p>
 
-      {/* Footer */}
-      <footer className="bg-gray-900 text-white py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              {/* <div className="flex items-center space-x-3 mb-4">
-                <img 
-                  src="/bghs-logo.jpg" 
-                  alt="BGHS Alumni Association" 
-                  className="h-10 w-auto object-contain"
-                />
-              </div> */}
-              <h3 className="text-lg font-semibold mb-4">BGHS Alumni Association</h3>
-              <p className="text-gray-400">
-                Connecting alumni from Barasat Govt. High School (Now Barasat Peary Charan Sarkar Government High School) since 1856
-              </p>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
-              <ul className="space-y-2">
-                <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
-                <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
-                <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/donate" className="text-gray-400 hover:text-white transition-colors">Donate</Link></li>
-              </ul>
-            </div>
+           <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+             Get Started Today
+           </Link>
+         </div>
+       </section>
+
+             {/* Footer */}
+       <footer className="bg-gray-900 text-white py-12">
+         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+           <div className="grid md:grid-cols-4 gap-8">
+             <div>
+               <div className="flex items-center space-x-3 mb-4">
+                 <img 
+                   src="/bghs-logo.jpg" 
+                   alt="BGHS Alumni Association" 
+                   className="h-8 w-auto object-contain"
+                 />
+                 <div className="flex flex-col">
+                   <span className="text-lg font-semibold">BGHS Alumni</span>
+                   <span className="text-xs text-gray-400">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
+                 </div>
+               </div>
+               <p className="text-gray-400">
+                 Connecting alumni from Barasat Govt. High School (Now Barasat Peary Charan Sarkar Government High School) since 1856
+               </p>
+             </div>
+                         <div>
+               <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
+               <ul className="space-y-2">
+                 <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
+                 <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
+                 <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
+                 <li><Link href="/donate" className="text-gray-400 hover:text-white transition-colors">Donate</Link></li>
+               </ul>
+             </div>
             <div>
               <h3 className="text-lg font-semibold mb-4">Contact</h3>
               <ul className="space-y-2 text-gray-400">

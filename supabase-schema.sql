@@ -14,6 +14,8 @@ CREATE TABLE profiles (
     avatar_url TEXT,
     linkedin_url TEXT,
     website_url TEXT,
+    phone TEXT,
+    is_approved BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
@@ -115,6 +117,47 @@ CREATE TABLE newsletters (
     subscribed BOOLEAN DEFAULT true,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
 );
+
+-- Password Reset OTPs Table
+CREATE TABLE IF NOT EXISTS password_reset_otps (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  email TEXT,
+  phone TEXT,
+  otp_hash TEXT NOT NULL,
+  expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_password_reset_otps_email ON password_reset_otps(email);
+CREATE INDEX IF NOT EXISTS idx_password_reset_otps_phone ON password_reset_otps(phone);
+CREATE INDEX IF NOT EXISTS idx_password_reset_otps_expires ON password_reset_otps(expires_at);
+
+-- RLS Policies for password_reset_otps
+ALTER TABLE password_reset_otps ENABLE ROW LEVEL SECURITY;
+
+-- Allow insertion of OTPs (no auth required for password reset)
+CREATE POLICY "Allow OTP insertion" ON password_reset_otps
+  FOR INSERT WITH CHECK (true);
+
+-- Allow reading OTPs for verification (no auth required)
+CREATE POLICY "Allow OTP verification" ON password_reset_otps
+  FOR SELECT USING (true);
+
+-- Allow updating OTPs to mark as used
+CREATE POLICY "Allow OTP update" ON password_reset_otps
+  FOR UPDATE USING (true);
+
+-- Function to clean up expired OTPs
+CREATE OR REPLACE FUNCTION cleanup_expired_otps()
+RETURNS void AS $$
+BEGIN
+  DELETE FROM password_reset_otps 
+  WHERE expires_at < NOW() OR used = TRUE;
+END;
+$$ LANGUAGE plpgsql;
 
 -- Create RLS policies
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;

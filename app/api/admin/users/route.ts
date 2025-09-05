@@ -146,31 +146,48 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get the request body
-    const { id, full_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
+    const { id, full_name, batch_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
-    // Update the profile
+    // Build updates only with provided fields
+    const updates: Record<string, any> = { updated_at: new Date().toISOString() }
+    if (full_name !== undefined) updates.full_name = full_name
+    if (batch_year !== undefined) updates.batch_year = Number.parseInt(batch_year)
+    if (profession !== undefined) updates.profession = profession || null
+    if (company !== undefined) updates.company = company || null
+    if (location !== undefined) updates.location = location || null
+    if (bio !== undefined) updates.bio = bio || null
+    if (linkedin_url !== undefined) updates.linkedin_url = linkedin_url || null
+    if (website_url !== undefined) updates.website_url = website_url || null
+    if (role !== undefined) updates.role = role
+    if (typeof is_approved === 'boolean') updates.is_approved = is_approved
+
     const { error: updateError } = await supabaseAdmin
       .from('profiles')
-      .update({
-        full_name,
-        batch_year: parseInt(batch_year),
-        profession: profession || null,
-        company: company || null,
-        location: location || null,
-        bio: bio || null,
-        linkedin_url: linkedin_url || null,
-        website_url: website_url || null,
-        updated_at: new Date().toISOString()
-      })
+      .update(updates)
       .eq('id', id)
 
     if (updateError) {
       console.error('Error updating profile:', updateError)
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+    }
+
+    // If role provided, also update permissions from user_roles table (if exists)
+    if (role !== undefined) {
+      const { data: roleData } = await supabaseAdmin
+        .from('user_roles')
+        .select('permissions')
+        .eq('name', role)
+        .single()
+      if (roleData?.permissions) {
+        await supabaseAdmin
+          .from('profiles')
+          .update({ permissions: roleData.permissions })
+          .eq('id', id)
+      }
     }
 
     return NextResponse.json({ 

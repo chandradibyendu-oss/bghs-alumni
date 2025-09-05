@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart } from 'lucide-react'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  const [canManageUsers, setCanManageUsers] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -20,6 +22,14 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser(user)
+        try {
+          const perms = await getUserPermissions(user.id)
+          setCanManageUsers(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+        } catch {
+          // Fallback: allow only super_admin
+          const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          setCanManageUsers(data?.role === 'super_admin')
+        }
       } else {
         router.push('/login')
       }
@@ -62,14 +72,17 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
-                             <img 
-                 src="/bghs-logo.jpg" 
-                 alt="BGHS Alumni Association" 
-                 className="h-10 w-auto"
-               />
-              <span className="text-xl font-bold text-gray-900">Dashboard</span>
+              <Link href="/" className="flex items-center space-x-3 hover:opacity-90">
+                <img 
+                  src="/bghs-logo.jpg" 
+                  alt="BGHS Alumni Association" 
+                  className="h-8 w-auto"
+                />
+                <span className="text-xl font-bold text-gray-900">Dashboard</span>
+              </Link>
             </div>
             <div className="flex items-center space-x-4">
+              <Link href="/" className="btn-secondary hidden sm:inline-flex" title="Go to website home">Home</Link>
               <div className="flex items-center space-x-2">
                 <User className="h-5 w-5 text-gray-400" />
                 <span className="text-sm text-gray-700">{user.email}</span>
@@ -100,11 +113,13 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
-            <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
-            <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
-          </Link>
+          {canManageUsers && (
+            <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
+              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
+              <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
+            </Link>
+          )}
           
           <Link href="/events" className="card text-center hover:shadow-lg transition-shadow group">
             <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />

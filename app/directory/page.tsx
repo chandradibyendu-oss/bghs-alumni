@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { ArrowLeft, Search, Filter, MapPin, Briefcase, GraduationCap, Mail, Linkedin, Globe, User } from 'lucide-react'
 
@@ -20,27 +21,43 @@ interface UserProfile {
   updated_at: string
 }
 
+const anonymizeName = (fullName: string): string => {
+  if (!fullName) return 'Alumni Member'
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length === 1) return `${parts[0].slice(0, 1)}. Alumni`
+  const first = parts[0]
+  const lastInitial = parts[parts.length - 1].slice(0, 1)
+  return `${first} ${lastInitial}.`
+}
+
 export default function DirectoryPage() {
   const [alumni, setAlumni] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterBatch, setFilterBatch] = useState('All')
   const [filterProfession, setFilterProfession] = useState('All')
+  const [isAuthed, setIsAuthed] = useState(false)
 
   useEffect(() => {
-    fetchAlumni()
+    checkAuthAndLoad()
   }, [])
 
-  const fetchAlumni = async () => {
+  const checkAuthAndLoad = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/directory')
-      
+      const { data: { user } } = await supabase.auth.getUser()
+      setIsAuthed(!!user)
+      // Include access token for authorized users so the API can return full details
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+      const response = await fetch('/api/directory', {
+        method: 'GET',
+        headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : undefined,
+        cache: 'no-store'
+      })
       if (response.ok) {
         const { users } = await response.json()
         setAlumni(users || [])
-      } else {
-        console.error('Failed to fetch alumni')
       }
     } catch (error) {
       console.error('Error fetching alumni:', error)
@@ -173,7 +190,7 @@ export default function DirectoryPage() {
           </div>
         ) : (
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredAlumni.map((person) => (
+            {(isAuthed ? filteredAlumni : filteredAlumni.slice(0, 6)).map((person) => (
               <div key={person.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start space-x-4 mb-4">
                   <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
@@ -188,20 +205,20 @@ export default function DirectoryPage() {
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">{person.full_name}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{isAuthed ? person.full_name : anonymizeName(person.full_name)}</h3>
                     <p className="text-sm text-gray-600">Batch of {person.batch_year}</p>
-                    <p className="text-sm font-medium text-primary-600">{person.profession || 'Not specified'}</p>
+                    <p className="text-sm font-medium text-primary-600">{isAuthed ? (person.profession || 'Not specified') : 'BGHS Alumni'}</p>
                   </div>
                 </div>
 
                 <div className="space-y-2 mb-4">
-                  {person.company && (
+                  {isAuthed && person.company && (
                     <div className="flex items-center text-sm text-gray-600">
                       <Briefcase className="h-4 w-4 mr-2" />
                       <span className="truncate">{person.company}</span>
                     </div>
                   )}
-                  {person.location && (
+                  {isAuthed && person.location && (
                     <div className="flex items-center text-sm text-gray-600">
                       <MapPin className="h-4 w-4 mr-2" />
                       <span className="truncate">{person.location}</span>
@@ -217,48 +234,59 @@ export default function DirectoryPage() {
                 )}
 
                 <div className="flex gap-2 mb-4">
-                  <button className="btn-primary flex-1">Connect</button>
-                  <button className="btn-secondary">View Profile</button>
+                  {isAuthed ? (
+                    <>
+                      <button className="btn-primary flex-1">Connect</button>
+                      <button className="btn-secondary">View Profile</button>
+                    </>
+                  ) : (
+                    <Link href="/login" className="btn-primary w-full text-center">Login to Connect</Link>
+                  )}
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex space-x-3">
-                    {person.email && (
-                      <a href={`mailto:${person.email}`} className="text-gray-500 hover:text-primary-600">
-                        <Mail className="h-4 w-4" />
-                      </a>
-                    )}
-                    {person.linkedin_url && (
-                      <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
-                        <Linkedin className="h-4 w-4" />
-                      </a>
-                    )}
-                    {person.website_url && (
-                      <a href={person.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
-                        <Globe className="h-4 w-4" />
-                      </a>
-                    )}
+                {isAuthed && (
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex space-x-3">
+                      {person.email && (
+                        <a href={`mailto:${person.email}`} className="text-gray-500 hover:text-primary-600">
+                          <Mail className="h-4 w-4" />
+                        </a>
+                      )}
+                      {person.linkedin_url && (
+                        <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
+                          <Linkedin className="h-4 w-4" />
+                        </a>
+                      )}
+                      {person.website_url && (
+                        <a href={person.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
+                          <Globe className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))}
           </div>
         )}
 
-        {/* Join Directory CTA */}
+        {/* Join / Sign-in CTA */}
         <div className="mt-12 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">Join Our Directory</h2>
-          <p className="text-primary-100 mb-6">
-            Are you a BGHS alumnus? Join our directory to connect with fellow alumni and expand your network.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/login" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
-              Login to Add Profile
-            </Link>
-            <button className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
-              Contact Admin
-            </button>
-          </div>
+          {isAuthed ? (
+            <>
+              <h2 className="text-2xl font-bold mb-4">Search the full directory</h2>
+              <p className="text-primary-100 mb-6">Use filters to find classmates and expand your network.</p>
+            </>
+          ) : (
+            <>
+              <h2 className="text-2xl font-bold mb-4">Join Our Directory</h2>
+              <p className="text-primary-100 mb-6">Sign in to view full profiles and connect with alumni.</p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Link href="/login" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">Login to View Full Directory</Link>
+                <Link href="/register" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">Create Account</Link>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Networking Tips */}

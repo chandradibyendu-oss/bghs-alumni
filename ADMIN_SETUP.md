@@ -121,3 +121,4 @@ If you encounter issues:
 ---
 
 **Your BGHS Alumni website now has a complete authentication system! 🎉**
+

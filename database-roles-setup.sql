@@ -88,3 +88,4 @@ GRANT USAGE ON SCHEMA public TO anon, authenticated;
 GRANT SELECT ON user_roles TO anon, authenticated;
 GRANT SELECT ON user_role_assignments TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION get_user_permissions(UUID) TO anon, authenticated;
+

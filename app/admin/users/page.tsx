@@ -18,9 +18,12 @@ import {
   Save,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  Shield,
+  KeyRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
 import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
 
 interface UserProfile {
@@ -36,6 +39,7 @@ interface UserProfile {
   linkedin_url: string
   website_url: string
   role: string
+  is_approved?: boolean
   created_at: string
   updated_at: string
 }
@@ -77,7 +81,20 @@ export default function AdminUsersPage() {
         router.push('/login')
         return
       }
-      // You can add role-based check here later
+      // Enforce admin permission based on profiles.role if RPC is unavailable
+      let canAccess = false
+      try {
+        const permissions = await getUserPermissions(user.id)
+        canAccess = hasPermission(permissions, 'can_access_admin') || hasPermission(permissions, 'can_manage_users')
+      } catch {
+        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+        canAccess = data?.role === 'super_admin' || data?.role === 'donation_manager' || data?.role === 'event_manager' || data?.role === 'content_moderator'
+      }
+      if (!canAccess) {
+        alert('You do not have permission to access User Management.')
+        router.push('/dashboard')
+        return
+      }
     } catch (error) {
       console.error('Auth error:', error)
       router.push('/login')
@@ -114,7 +131,7 @@ export default function AdminUsersPage() {
       }
 
       const { users } = await response.json()
-      setUsers(users || [])
+      setUsers((users || []).map((u: any) => ({ ...u, is_approved: u.is_approved ?? false })))
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -217,17 +234,76 @@ export default function AdminUsersPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      const success = await updateUserRole(userId, newRole, user.id)
-      if (success) {
-        // Refresh users list
-        fetchUsers()
-        alert('User role updated successfully!')
-      } else {
-        alert('Failed to update user role')
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: userId, role: newRole })
+      })
+      if (!res.ok) {
+        const data = await res.json(); throw new Error(data.error || 'Failed')
       }
+      fetchUsers()
+      alert('User role updated successfully!')
     } catch (error) {
       console.error('Error updating user role:', error)
       alert('Error updating user role')
+    }
+  }
+
+  const handleToggleApproval = async (user: UserProfile) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id: user.id, is_approved: !user.is_approved })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update approval')
+      }
+
+      fetchUsers()
+    } catch (e) {
+      console.error('Approval toggle error:', e)
+      alert('Failed to update approval status')
+    }
+  }
+
+  const handleAdminResetPassword = async (user: UserProfile) => {
+    if (!confirm(`Generate a new password for ${user.email}?`)) return
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { router.push('/login'); return }
+      const res = await fetch('/api/admin/reset-password', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ user_id: user.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed')
+      alert(`Temporary password: ${data.password}\nIt has also been emailed if the user has a valid email.`)
+    } catch (e) {
+      console.error('Admin reset error:', e)
+      alert('Failed to reset password')
     }
   }
 
@@ -325,7 +401,7 @@ export default function AdminUsersPage() {
                              <img 
                  src="/bghs-logo.jpg" 
                  alt="BGHS Alumni Association" 
-                 className="h-10 w-auto"
+                 className="h-8 w-auto"
                />
               <span className="text-xl font-bold text-gray-900">Admin - User Management</span>
             </div>
@@ -577,7 +653,7 @@ export default function AdminUsersPage() {
         )}
 
         {/* Users Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">
               Users ({filteredUsers.length})
@@ -600,9 +676,7 @@ export default function AdminUsersPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Batch Year
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Profession
-                    </th>
+                    {/* Profession column hidden to reduce width */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Location
                     </th>
@@ -610,9 +684,12 @@ export default function AdminUsersPage() {
                       Role
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Approved
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
                       Actions
                     </th>
                   </tr>
@@ -650,31 +727,49 @@ export default function AdminUsersPage() {
                           {user.batch_year}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {user.profession || '-'}
-                      </td>
+                      {/* Profession column removed to reduce width */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {user.location || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-2">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {user.role || 'alumni_member'}
-                          </span>
-                          <button
-                            onClick={() => handleUpdateUserRole(user.id, user.role === 'alumni_member' ? 'alumni_premium' : 'alumni_member')}
-                            className="text-blue-600 hover:text-blue-800 transition-colors"
-                            title="Toggle role"
+                          <select
+                            value={user.role || 'alumni_member'}
+                            onChange={(e) => handleUpdateUserRole(user.id, e.target.value)}
+                            className="border border-gray-300 rounded-md text-xs px-2 py-1 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                            title="Change user role"
                           >
-                            <Shield className="h-4 w-4" />
-                          </button>
+                            {availableRoles.map((role) => (
+                              <option key={role.name} value={role.name}>{role.description || role.name}</option>
+                            ))}
+                          </select>
+                          <Shield className="h-4 w-4 text-gray-300" />
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggleApproval(user)}
+                          className={
+                            `px-2 py-1 rounded text-xs font-medium ` +
+                            (user.is_approved ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800')
+                          }
+                          title={user.is_approved ? 'Click to revoke approval' : 'Click to approve'}
+                        >
+                          {user.is_approved ? 'Approved' : 'Pending'}
+                        </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
+                        <div className="flex justify-end space-x-2 min-w-[7rem]">
+                          <button
+                            onClick={() => handleAdminResetPassword(user)}
+                            className="text-amber-600 hover:text-amber-800 transition-colors"
+                            title="Reset password"
+                          >
+                            <KeyRound className="h-5 w-5" />
+                          </button>
                           <button
                             onClick={() => startEdit(user)}
                             className="text-primary-600 hover:text-primary-900 transition-colors"
