@@ -9,9 +9,9 @@ const supabaseAdmin = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, full_name, batch_year } = await request.json()
+    const { email, password, first_name, middle_name, last_name, batch_year } = await request.json()
 
-    if (!email || !password || !full_name || !batch_year) {
+    if (!email || !password || !first_name || !last_name || !batch_year) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       email,
       password,
       email_confirm: false,
-      user_metadata: { full_name, batch_year: parseInt(batch_year) }
+      user_metadata: { first_name, middle_name, last_name, batch_year: parseInt(batch_year) }
     })
 
     if (createErr || !userRes?.user) {
@@ -42,7 +42,9 @@ export async function POST(request: NextRequest) {
       .insert({
         id: userRes.user.id,
         email,
-        full_name,
+        first_name: first_name.trim(),
+        middle_name: middle_name ? middle_name.trim() : null,
+        last_name: last_name.trim(),
         batch_year: parseInt(batch_year),
         is_approved: false
       })

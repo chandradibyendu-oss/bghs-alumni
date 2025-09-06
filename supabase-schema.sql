@@ -5,6 +5,10 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE profiles (
     id UUID REFERENCES auth.users ON DELETE CASCADE PRIMARY KEY,
     email TEXT UNIQUE NOT NULL,
+    -- New name parts with derived full_name
+    first_name TEXT,
+    middle_name TEXT,
+    last_name TEXT,
     full_name TEXT NOT NULL,
     batch_year INTEGER NOT NULL,
     profession TEXT,
@@ -236,6 +240,28 @@ $$ language 'plpgsql';
 
 -- Create triggers for updating timestamps
 CREATE TRIGGER update_profiles_updated_at BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Helper function to derive full_name from parts
+CREATE OR REPLACE FUNCTION derive_full_name(p_first TEXT, p_middle TEXT, p_last TEXT)
+RETURNS TEXT AS $$
+BEGIN
+  RETURN trim(BOTH ' ' FROM coalesce(p_first,'') || ' ' || coalesce(nullif(p_middle,'' ) || ' ', '') || coalesce(p_last,''));
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to keep full_name in sync with parts
+CREATE OR REPLACE FUNCTION set_full_name_from_parts()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.full_name := derive_full_name(NEW.first_name, NEW.middle_name, NEW.last_name);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_profiles_full_name_parts_ins ON profiles;
+DROP TRIGGER IF EXISTS trg_profiles_full_name_parts_upd ON profiles;
+CREATE TRIGGER trg_profiles_full_name_parts_ins BEFORE INSERT ON profiles FOR EACH ROW EXECUTE FUNCTION set_full_name_from_parts();
+CREATE TRIGGER trg_profiles_full_name_parts_upd BEFORE UPDATE ON profiles FOR EACH ROW EXECUTE FUNCTION set_full_name_from_parts();
 CREATE TRIGGER update_events_updated_at BEFORE UPDATE ON events FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_blog_posts_updated_at BEFORE UPDATE ON blog_posts FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 CREATE TRIGGER update_donation_causes_updated_at BEFORE UPDATE ON donation_causes FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
@@ -264,3 +290,126 @@ $$ language 'plpgsql';
 
 -- Create trigger for event attendees
 CREATE TRIGGER update_event_attendees AFTER INSERT OR DELETE ON event_registrations FOR EACH ROW EXECUTE FUNCTION increment_event_attendees();
+
+-- Gallery Schema
+
+-- Create get_user_permissions function
+CREATE OR REPLACE FUNCTION get_user_permissions(user_id UUID)
+RETURNS TABLE(permission_name TEXT) AS $$
+BEGIN
+  RETURN QUERY
+  SELECT 
+    CASE 
+      WHEN p.role = 'super_admin' THEN 'can_access_admin'::TEXT
+      WHEN p.role = 'content_moderator' THEN 'can_manage_content'::TEXT
+      WHEN p.role = 'content_creator' THEN 'can_create_content'::TEXT
+      WHEN p.role = 'event_manager' THEN 'can_manage_events'::TEXT
+      WHEN p.role = 'donation_manager' THEN 'can_manage_campaigns'::TEXT
+      ELSE 'public'::TEXT
+    END as permission_name
+  FROM profiles p
+  WHERE p.id = user_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Create photo_categories table
+CREATE TABLE photo_categories (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Create gallery_photos table
+CREATE TABLE gallery_photos (
+    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    category_id UUID REFERENCES photo_categories(id) ON DELETE SET NULL,
+    uploaded_by UUID REFERENCES profiles(id) ON DELETE SET NULL,
+    file_url TEXT NOT NULL,
+    thumbnail_url TEXT,
+    file_size INTEGER,
+    width INTEGER,
+    height INTEGER,
+    is_featured BOOLEAN DEFAULT FALSE,
+    is_approved BOOLEAN DEFAULT FALSE,
+    view_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc'::text, NOW()) NOT NULL
+);
+
+-- Create indexes for gallery_photos
+CREATE INDEX idx_gallery_photos_category ON gallery_photos(category_id);
+CREATE INDEX idx_gallery_photos_uploaded_by ON gallery_photos(uploaded_by);
+CREATE INDEX idx_gallery_photos_featured ON gallery_photos(is_featured) WHERE is_featured = TRUE;
+CREATE INDEX idx_gallery_photos_approved ON gallery_photos(is_approved) WHERE is_approved = TRUE;
+CREATE INDEX idx_gallery_photos_created_at ON gallery_photos(created_at DESC);
+
+-- Insert default photo categories
+INSERT INTO photo_categories (name, description, display_order) VALUES
+('School Building', 'Photos of the school building, classrooms, and facilities', 1),
+('Events', 'Photos from school events, reunions, and gatherings', 2),
+('Sports', 'Sports events, teams, and activities', 3),
+('Cultural', 'Cultural programs, competitions, and performances', 4),
+('Alumni', 'Alumni gatherings, achievements, and activities', 5),
+('Historical', 'Historical photos and memorabilia', 6),
+('General', 'General school life and miscellaneous photos', 7);
+
+-- RLS Policies for gallery_photos
+ALTER TABLE gallery_photos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE photo_categories ENABLE ROW LEVEL SECURITY;
+
+-- Anyone can view approved photos
+CREATE POLICY "Anyone can view approved photos" ON gallery_photos
+    FOR SELECT USING (is_approved = TRUE);
+
+-- Authenticated users can view their own photos
+CREATE POLICY "Users can view their own photos" ON gallery_photos
+    FOR SELECT USING (auth.uid() = uploaded_by);
+
+-- Users with content creation permissions can upload photos
+CREATE POLICY "Content creators can insert photos" ON gallery_photos
+    FOR INSERT WITH CHECK (
+        auth.uid() IS NOT NULL AND
+        EXISTS (
+            SELECT 1 FROM profiles p 
+            WHERE p.id = auth.uid() 
+            AND p.role IN ('content_creator', 'content_moderator', 'super_admin')
+        )
+    );
+
+-- Users with content management permissions can update photos
+CREATE POLICY "Content managers can update photos" ON gallery_photos
+    FOR UPDATE USING (
+        EXISTS (
+            SELECT 1 FROM profiles p 
+            WHERE p.id = auth.uid() 
+            AND p.role IN ('content_moderator', 'super_admin')
+        )
+    );
+
+-- Users with admin permissions can delete photos
+CREATE POLICY "Admins can delete photos" ON gallery_photos
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM profiles p 
+            WHERE p.id = auth.uid() 
+            AND p.role = 'super_admin'
+        )
+    );
+
+-- Anyone can view photo categories
+CREATE POLICY "Anyone can view photo categories" ON photo_categories
+    FOR SELECT USING (TRUE);
+
+-- Users with content management permissions can manage categories
+CREATE POLICY "Content managers can manage categories" ON photo_categories
+    FOR ALL USING (
+        EXISTS (
+            SELECT 1 FROM profiles p 
+            WHERE p.id = auth.uid() 
+            AND p.role IN ('content_moderator', 'super_admin')
+        )
+    );

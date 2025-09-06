@@ -6,7 +6,9 @@ import { Mail, User, GraduationCap, Lock, Eye, EyeOff } from 'lucide-react'
 
 export default function RegisterPage() {
   const [email, setEmail] = useState('')
-  const [fullName, setFullName] = useState('')
+  const [firstName, setFirstName] = useState('')
+  const [middleName, setMiddleName] = useState('')
+  const [lastName, setLastName] = useState('')
   const [batchYear, setBatchYear] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -30,12 +32,17 @@ export default function RegisterPage() {
       return
     }
 
+    if (!firstName.trim() || !lastName.trim()) {
+      setError('First name and last name are required')
+      return
+    }
+
     setLoading(true)
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, full_name: fullName, batch_year: batchYear })
+        body: JSON.stringify({ email, password, first_name: firstName.trim(), middle_name: middleName.trim() || undefined, last_name: lastName.trim(), full_name: `${firstName.trim()} ${middleName ? middleName.trim() + ' ' : ''}${lastName.trim()}`.trim(), batch_year: batchYear })
       })
       const data = await res.json()
       if (!res.ok) {
@@ -59,11 +66,21 @@ export default function RegisterPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input className="input-field pl-10" value={fullName} onChange={e=>setFullName(e.target.value)} placeholder="Your name" required />
+          <div className="space-y-4">
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input className="input-field pl-10" value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="First name" required />
+              </div>
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name (optional)</label>
+              <input className="input-field" value={middleName} onChange={e=>setMiddleName(e.target.value)} placeholder="Middle name" />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input className="input-field" value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Last name" required />
             </div>
           </div>
 

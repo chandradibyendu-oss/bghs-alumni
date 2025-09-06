@@ -155,7 +155,7 @@ export default function ForgotPassword() {
           <img 
             src="/bghs-logo.jpg" 
             alt="BGHS Alumni" 
-            className="h-10 w-auto object-contain"
+            className="h-14 w-auto object-contain shrink-0"
           />
           <div className="ml-3">
             <h2 className="text-xl font-bold text-gray-900">BGHS Alumni</h2>

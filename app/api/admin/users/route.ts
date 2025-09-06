@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the request body
-    const { email, password, full_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
+    const { email, password, first_name, middle_name, last_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
 
     // Validate required fields
-    if (!email || !password || !full_name || !batch_year) {
+    if (!email || !password || !first_name || !last_name || !batch_year) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -45,7 +45,9 @@ export async function POST(request: NextRequest) {
       password,
       email_confirm: true,
       user_metadata: {
-        full_name,
+        first_name,
+        middle_name,
+        last_name,
         batch_year: parseInt(batch_year)
       }
     })
@@ -61,7 +63,9 @@ export async function POST(request: NextRequest) {
       .insert({
         id: authData.user.id,
         email,
-        full_name,
+        first_name: first_name.trim(),
+        middle_name: middle_name ? middle_name.trim() : null,
+        last_name: last_name.trim(),
         batch_year: parseInt(batch_year),
         profession: profession || null,
         company: company || null,

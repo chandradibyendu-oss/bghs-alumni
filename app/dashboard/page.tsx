@@ -76,7 +76,7 @@ export default function DashboardPage() {
                 <img 
                   src="/bghs-logo.jpg" 
                   alt="BGHS Alumni Association" 
-                  className="h-8 w-auto"
+                  className="h-14 w-auto object-contain shrink-0"
                 />
                 <span className="text-xl font-bold text-gray-900">Dashboard</span>
               </Link>

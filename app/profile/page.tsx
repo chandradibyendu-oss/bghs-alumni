@@ -9,6 +9,9 @@ interface Profile {
   id: string
   email: string
   full_name: string
+  first_name?: string | null
+  middle_name?: string | null
+  last_name?: string | null
   batch_year: number
   profession: string | null
   company: string | null
@@ -58,6 +61,9 @@ export default function ProfilePage() {
     setSaving(true)
     try {
       const updates = {
+        first_name: profile.first_name || null,
+        middle_name: profile.middle_name || null,
+        last_name: profile.last_name || null,
         full_name: profile.full_name,
         batch_year: profile.batch_year,
         profession: profile.profession,
@@ -104,9 +110,23 @@ export default function ProfilePage() {
 
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-              <input className="input-field" value={profile.full_name}
-                onChange={(e)=>updateField('full_name', e.target.value)} />
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <input className="input-field" value={profile.first_name || ''}
+                onChange={(e)=>updateField('first_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+              <input className="input-field" value={profile.middle_name || ''}
+                onChange={(e)=>updateField('middle_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <input className="input-field" value={profile.last_name || ''}
+                onChange={(e)=>updateField('last_name', e.target.value)} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name (derived)</label>
+              <input className="input-field" value={profile.full_name} disabled />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>

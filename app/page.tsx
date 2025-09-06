@@ -21,6 +21,19 @@ const slideshowData = [
     }
   },
   {
+    id: 5,
+    type: 'gallery',
+    title: 'School Memories',
+    subtitle: 'Browse Our Photo Gallery',
+    description: 'Explore photos from school events, reunions, and memorable moments shared by our alumni community.',
+    backgroundImage: '/school-building.jpg',
+    icon: Star,
+    cta: {
+      primary: { text: 'View Gallery', href: '/gallery' },
+      secondary: { text: 'Upload Photos', href: '/gallery' }
+    }
+  },
+  {
     id: 2,
     type: 'event',
     title: 'Annual Alumni Reunion 2024',
@@ -137,23 +150,24 @@ export default function Home() {
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center gap-3">
               <button className="md:hidden p-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
                 <MenuIcon className="h-6 w-6 text-gray-700" />
               </button>
               <img 
                 src="/bghs-logo.jpg" 
                 alt="BGHS Alumni Association" 
-                className="h-8 w-auto object-contain"
+                className="h-14 w-auto object-contain shrink-0 flex-none"
               />
-              <div className="flex flex-col">
-                <span className="text-2xl font-bold text-gray-900">BGHS Alumni</span>
-                <span className="text-sm text-gray-600">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
+              <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
+                <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
+                <span className="text-sm text-gray-600 truncate">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-8">
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
+              <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
               <Link href="/donate" className="text-gray-700 hover:text-primary-600 transition-colors">Donate</Link>
               {userEmail ? (
@@ -195,6 +209,7 @@ export default function Home() {
             <nav className="space-y-2">
               <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
+              <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
               <Link href="/donate" className="block px-2 py-2 rounded hover:bg-gray-50">Donate</Link>
               <div className="pt-2 border-t mt-2">
@@ -381,22 +396,24 @@ export default function Home() {
         </div>
       </section>
 
-             {/* CTA Section */}
-       <section className="py-16 bg-primary-600">
-         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-           <h2 className="text-3xl font-bold text-white mb-4">Ready to Reconnect?</h2>
-           <p className="text-xl text-primary-100 mb-4">
-             Join thousands of BGHS alumni who are already part of our growing community
-           </p>
-           <p className="text-lg text-primary-200 mb-8">
-             বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি
-           </p>
+             {/* CTA Section - Only show for non-logged-in users */}
+       {!userEmail && (
+         <section className="py-16 bg-primary-600">
+           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+             <h2 className="text-3xl font-bold text-white mb-4">Ready to Reconnect?</h2>
+             <p className="text-xl text-primary-100 mb-4">
+               Join thousands of BGHS alumni who are already part of our growing community
+             </p>
+             <p className="text-lg text-primary-200 mb-8">
+               বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি
+             </p>
 
-           <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
-             Get Started Today
-           </Link>
-         </div>
-       </section>
+             <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
+               Get Started Today
+             </Link>
+           </div>
+         </section>
+       )}
 
              {/* Footer */}
        <footer className="bg-gray-900 text-white py-12">
@@ -407,7 +424,7 @@ export default function Home() {
                  <img 
                    src="/bghs-logo.jpg" 
                    alt="BGHS Alumni Association" 
-                   className="h-8 w-auto object-contain"
+                   className="h-14 w-auto object-contain shrink-0"
                  />
                  <div className="flex flex-col">
                    <span className="text-lg font-semibold">BGHS Alumni</span>
@@ -432,7 +449,7 @@ export default function Home() {
               <ul className="space-y-2 text-gray-400">
                 <li>Barasat, North 24 Parganas</li>
                 <li>West Bengal, India</li>
-                <li>Email: alumni@bghs.edu.in</li>
+                <li>Email: admin@alumnibghs.org</li>
               </ul>
             </div>
             <div>

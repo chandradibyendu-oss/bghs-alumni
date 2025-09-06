@@ -9,6 +9,9 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.883.0",
+    "@aws-sdk/s3-request-presigner": "^3.883.0",
+    "@azure/msal-node": "3.7.3",
     "@sendgrid/mail": "^8.1.5",
     "@stripe/stripe-js": "^2.2.0",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
@@ -17,6 +20,7 @@
     "autoprefixer": "^10.4.16",
     "clsx": "^2.0.0",
     "date-fns": "^2.30.0",
+    "dotenv": "^17.2.2",
     "lucide-react": "^0.294.0",
     "next": "^14.2.32",
     "postcss": "^8.4.32",
@@ -24,6 +28,7 @@
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",
     "react-hot-toast": "^2.4.1",
+    "sharp": "^0.34.3",
     "stripe": "^14.9.0",
     "tailwindcss": "^3.3.6",
     "twilio": "^5.9.0"

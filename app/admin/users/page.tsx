@@ -53,7 +53,9 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState({
     email: '',
-    full_name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     batch_year: '',
     profession: '',
     company: '',
@@ -157,7 +159,10 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           email: formData.email,
           password: password,
-          full_name: formData.full_name,
+          first_name: formData.first_name,
+          middle_name: formData.middle_name || undefined,
+          last_name: formData.last_name,
+          full_name: `${formData.first_name} ${formData.middle_name ? formData.middle_name + ' ' : ''}${formData.last_name}`.trim(),
           batch_year: formData.batch_year,
           profession: formData.profession,
           company: formData.company,
@@ -203,7 +208,10 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({
           id: editingUser.id,
-          full_name: formData.full_name,
+          first_name: formData.first_name || undefined,
+          middle_name: formData.middle_name || undefined,
+          last_name: formData.last_name || undefined,
+          full_name: `${formData.first_name || ''} ${formData.middle_name ? formData.middle_name + ' ' : ''}${formData.last_name || ''}`.trim(),
           batch_year: formData.batch_year,
           profession: formData.profession,
           company: formData.company,
@@ -343,7 +351,9 @@ export default function AdminUsersPage() {
   const resetForm = () => {
     setFormData({
       email: '',
-      full_name: '',
+      first_name: '',
+      middle_name: '',
+      last_name: '',
       batch_year: '',
       profession: '',
       company: '',
@@ -359,7 +369,9 @@ export default function AdminUsersPage() {
     setEditingUser(user)
     setFormData({
       email: user.email,
-      full_name: user.full_name,
+      first_name: '',
+      middle_name: '',
+      last_name: '',
       batch_year: user.batch_year.toString(),
       profession: user.profession || '',
       company: user.company || '',
@@ -401,7 +413,7 @@ export default function AdminUsersPage() {
                              <img 
                  src="/bghs-logo.jpg" 
                  alt="BGHS Alumni Association" 
-                 className="h-8 w-auto"
+                className="h-14 w-auto object-contain shrink-0"
                />
               <span className="text-xl font-bold text-gray-900">Admin - User Management</span>
             </div>
@@ -512,14 +524,35 @@ export default function AdminUsersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                   <input
                     type="text"
-                    value={formData.full_name}
-                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
+                    value={formData.first_name}
+                    onChange={(e) => setFormData({...formData, first_name: e.target.value})}
                     required
                     className="input-field"
-                    placeholder="John Doe"
+                    placeholder="John"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+                  <input
+                    type="text"
+                    value={formData.middle_name}
+                    onChange={(e) => setFormData({...formData, middle_name: e.target.value})}
+                    className="input-field"
+                    placeholder="A."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <input
+                    type="text"
+                    value={formData.last_name}
+                    onChange={(e) => setFormData({...formData, last_name: e.target.value})}
+                    required
+                    className="input-field"
+                    placeholder="Doe"
                   />
                 </div>
                 <div>

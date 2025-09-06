@@ -55,7 +55,7 @@ export default function LoginPage() {
                          <img 
                src="/bghs-logo.jpg" 
                alt="BGHS Alumni Association" 
-               className="h-10 w-auto"
+               className="h-10 md:h-12 lg:h-14 w-auto"
              />
           </div>
           <h2 className="mt-6 text-3xl font-bold text-gray-900">

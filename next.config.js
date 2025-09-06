@@ -12,6 +12,18 @@ const nextConfig = {
         protocol: 'http',
         hostname: 'localhost',
       },
+      {
+        protocol: 'https',
+        hostname: 'alumnibghs.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'r2.alumnibghs.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'pub-12011e6d961a440ad2d8f07187ee8319.r2.dev',
+      },
     ],
   },
 }

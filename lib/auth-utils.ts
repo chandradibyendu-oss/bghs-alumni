@@ -38,6 +38,9 @@ export interface UserProfile {
   id: string
   email: string
   full_name: string
+  first_name?: string
+  middle_name?: string
+  last_name?: string
   batch_year: number
   profession: string
   company: string
