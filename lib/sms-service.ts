@@ -8,6 +8,17 @@ export interface SMSOptions {
 
 export async function sendSMS(options: SMSOptions): Promise<boolean> {
   try {
+    // Optional console logging for debugging OTP delivery
+    const shouldLog = process.env.LOG_SMS_OTP === '1' || process.env.NODE_ENV !== 'production'
+    if (shouldLog) {
+      try {
+        console.log('=== SMS DEBUG (OTP) ===')
+        console.log('To:', options.to)
+        console.log('Message:', options.message)
+        console.log('=======================')
+      } catch {}
+    }
+
     const hasTwilioCreds = !!(
       process.env.TWILIO_ACCOUNT_SID &&
       process.env.TWILIO_AUTH_TOKEN &&

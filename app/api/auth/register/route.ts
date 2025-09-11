@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { verifyOTPFromDB, markOTPAsUsed } from '@/lib/otp-utils'
 
 const supabaseAdmin = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -9,10 +10,29 @@ const supabaseAdmin = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, first_name, middle_name, last_name, batch_year } = await request.json()
+    const { email, phone, password, first_name, middle_name, last_name, batch_year, email_otp, phone_otp } = await request.json()
 
-    if (!email || !password || !first_name || !last_name || !batch_year) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    // Require at least one contact method
+    if ((!email && !phone) || !password || !first_name || !last_name || !batch_year) {
+      return NextResponse.json({ error: 'Provide email or phone and all required fields' }, { status: 400 })
+    }
+
+    // If email provided, require OTP and verify
+    if (email) {
+      if (!email_otp || String(email_otp).length !== 6) {
+        return NextResponse.json({ error: 'Email OTP required' }, { status: 400 })
+      }
+      const ok = await verifyOTPFromDB(email, null, String(email_otp))
+      if (!ok) return NextResponse.json({ error: 'Invalid email OTP' }, { status: 400 })
+    }
+
+    // If phone provided, require OTP and verify
+    if (phone) {
+      if (!phone_otp || String(phone_otp).length !== 6) {
+        return NextResponse.json({ error: 'Phone OTP required' }, { status: 400 })
+      }
+      const ok = await verifyOTPFromDB(null, phone, String(phone_otp))
+      if (!ok) return NextResponse.json({ error: 'Invalid phone OTP' }, { status: 400 })
     }
 
     // Basic password rule: enforced again by reset route; keep consistent
@@ -25,9 +45,11 @@ export async function POST(request: NextRequest) {
 
     // Create auth user (email confirmation optional here)
     const { data: userRes, error: createErr } = await admin.auth.admin.createUser({
-      email,
+      email: email || undefined,
+      phone: phone || undefined,
       password,
-      email_confirm: false,
+      email_confirm: !!email,
+      phone_confirm: !!phone,
       user_metadata: { first_name, middle_name, last_name, batch_year: parseInt(batch_year) }
     })
 
@@ -41,7 +63,8 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .insert({
         id: userRes.user.id,
-        email,
+        email: email || null,
+        phone: phone || null,
         first_name: first_name.trim(),
         middle_name: middle_name ? middle_name.trim() : null,
         last_name: last_name.trim(),
@@ -54,6 +77,10 @@ export async function POST(request: NextRequest) {
       await admin.auth.admin.deleteUser(userRes.user.id)
       return NextResponse.json({ error: 'Could not create profile' }, { status: 500 })
     }
+
+    // Mark OTPs as used
+    if (email && email_otp) { await markOTPAsUsed(email, null, String(email_otp)) }
+    if (phone && phone_otp) { await markOTPAsUsed(null, phone, String(phone_otp)) }
 
     return NextResponse.json({ success: true, pendingApproval: true })
   } catch (e) {

@@ -32,18 +32,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the request body
-    const { email, password, first_name, middle_name, last_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
+    const { email, phone, password, first_name, middle_name, last_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
 
     // Validate required fields
-    if (!email || !password || !first_name || !last_name || !batch_year) {
+    if (!email || !phone || !password || !first_name || !last_name || !batch_year) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
     // Create the user with admin privileges
     const { data: authData, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
+      phone,
       password,
       email_confirm: true,
+      phone_confirm: true,
       user_metadata: {
         first_name,
         middle_name,
@@ -63,6 +65,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: authData.user.id,
         email,
+        phone,
         first_name: first_name.trim(),
         middle_name: middle_name ? middle_name.trim() : null,
         last_name: last_name.trim(),

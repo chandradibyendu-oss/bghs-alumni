@@ -183,7 +183,11 @@ export default function Home() {
                         <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
                         <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
                         {isAdmin && (
-                          <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Admin</Link>
+                          <>
+                            <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+                            <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
+                            <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                          </>
                         )}
                         <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
                       </div>
@@ -218,7 +222,11 @@ export default function Home() {
                     <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
                     <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
                     {isAdmin && (
-                      <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Admin</Link>
+                      <>
+                        <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+                        <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
+                        <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+                      </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
                   </>

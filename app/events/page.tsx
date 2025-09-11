@@ -1,73 +1,105 @@
-import Link from 'next/link'
-import { Calendar, Clock, MapPin, Users, ArrowLeft, Filter, Search } from 'lucide-react'
+'use client'
 
-const events = [
-  {
-    id: 1,
-    title: "Annual Alumni Reunion 2024",
-    date: "2024-12-15",
-    time: "6:00 PM",
-    location: "BGHS Main Campus, Barasat",
-    description: "Join us for our biggest annual reunion event. Network with fellow alumni, enjoy cultural programs, and reminisce about your school days.",
-    attendees: 150,
-    maxAttendees: 200,
-    category: "Reunion",
-    image: "/images/reunion.jpg"
-  },
-  {
-    id: 2,
-    title: "Career Guidance Workshop",
-    date: "2024-11-20",
-    time: "2:00 PM",
-    location: "Online (Zoom)",
-    description: "A special session for current students featuring successful alumni sharing career insights and guidance.",
-    attendees: 45,
-    maxAttendees: 100,
-    category: "Workshop",
-    image: "/images/workshop.jpg"
-  },
-  {
-    id: 3,
-    title: "Sports Meet & Alumni Tournament",
-    date: "2024-10-25",
-    time: "9:00 AM",
-    location: "BGHS Sports Ground",
-    description: "Annual sports meet where alumni compete in various sports events. Cricket, football, and athletics competitions.",
-    attendees: 80,
-    maxAttendees: 120,
-    category: "Sports",
-    image: "/images/sports.jpg"
-  },
-  {
-    id: 4,
-    title: "Charity Fundraiser Dinner",
-    date: "2024-12-01",
-    time: "7:00 PM",
-    location: "Grand Hotel, Barasat",
-    description: "Elegant dinner event to raise funds for school infrastructure development and scholarships.",
-    attendees: 60,
-    maxAttendees: 80,
-    category: "Fundraiser",
-    image: "/images/dinner.jpg"
-  }
-]
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import Image from 'next/image'
+import { Calendar, Clock, MapPin, Users, ArrowLeft, Filter, Search, Plus, Eye } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
 const categories = ["All", "Reunion", "Workshop", "Sports", "Fundraiser", "Cultural"]
 
 export default function EventsPage() {
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [events, setEvents] = useState<any[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState('All')
+
+  useEffect(() => {
+    checkAdminStatus()
+    fetchEvents()
+  }, [])
+
+  const checkAdminStatus = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        setCurrentUserId(user.id)
+        try {
+          const perms = await getUserPermissions(user.id)
+          setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_events'))
+        } catch {
+          // Fallback: check role directly
+          const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+          setIsAdmin(data?.role === 'super_admin' || data?.role === 'event_manager')
+        }
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error)
+    }
+  }
+
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('*')
+        .order('date', { ascending: true })
+
+      if (error) throw error
+      setEvents(data || [])
+    } catch (error) {
+      console.error('Error fetching events:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filteredEvents = events.filter(event => {
+    const matchesSearch = !searchTerm || 
+      event.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.location.toLowerCase().includes(searchTerm.toLowerCase())
+    
+    const matchesCategory = selectedCategory === 'All' || event.category === selectedCategory
+    
+    return matchesSearch && matchesCategory
+  })
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading events...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Events & Reunions</h1>
-              <p className="text-gray-600">Stay connected with your alma mater through our exciting events</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-gray-500 hover:text-gray-700">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Events & Reunions</h1>
+                <p className="text-gray-600">Stay connected with your alma mater through our exciting events</p>
+              </div>
             </div>
+            {isAdmin && (
+              <Link href="/admin/events" className="btn-primary flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                Manage Events
+              </Link>
+            )}
           </div>
         </div>
       </div>
@@ -83,14 +115,21 @@ export default function EventsPage() {
                   type="text"
                   placeholder="Search events..."
                   className="input-field pl-10"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
             </div>
             <div className="flex gap-2">
-              <select className="input-field">
-                <option>All Categories</option>
-                {categories.slice(1).map(category => (
-                  <option key={category}>{category}</option>
+              <select 
+                className="input-field"
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+              >
+                {categories.map(category => (
+                  <option key={category} value={category}>
+                    {category === 'All' ? 'All Categories' : category}
+                  </option>
                 ))}
               </select>
               <button className="btn-secondary flex items-center gap-2">
@@ -103,10 +142,23 @@ export default function EventsPage() {
 
         {/* Events Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((event) => (
+          {filteredEvents.map((event) => (
             <div key={event.id} className="card hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                <Calendar className="h-12 w-12 text-gray-400" />
+              <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                {event.image_url ? (
+                  <Image
+                    src={event.image_url}
+                    alt={event.title}
+                    width={400}
+                    height={225}
+                    className="rounded-lg object-cover w-full h-full"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center text-gray-400">
+                    <Calendar className="h-12 w-12 mb-2" />
+                    <span className="text-sm">No Image</span>
+                  </div>
+                )}
               </div>
               
               <div className="mb-4">
@@ -137,16 +189,31 @@ export default function EventsPage() {
                 </div>
                 <div className="flex items-center text-sm text-gray-600">
                   <Users className="h-4 w-4 mr-2" />
-                  {event.attendees}/{event.maxAttendees} attendees
+                  {event.current_attendees}/{event.max_attendees} attendees
                 </div>
               </div>
 
-              <div className="flex gap-2">
-                <button className="btn-primary flex-1">Register</button>
-                <button className="btn-secondary">Details</button>
-              </div>
+                <div className="flex gap-2">
+                  {/* Public events page - only show Register and Details */}
+                  <button className="btn-primary flex-1">Register</button>
+                  <Link href={`/events/${event.id}`} className="btn-secondary flex items-center justify-center gap-1 text-sm">
+                    <Eye className="h-4 w-4" />
+                    Details
+                  </Link>
+                </div>
             </div>
           ))}
+          {filteredEvents.length === 0 && (
+            <div className="col-span-full text-center py-12">
+              <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
+              <p className="text-gray-500">
+                {searchTerm || selectedCategory !== 'All' 
+                  ? 'Try adjusting your search or filter criteria.' 
+                  : 'No events are currently scheduled. Check back later!'}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Upcoming Events CTA */}

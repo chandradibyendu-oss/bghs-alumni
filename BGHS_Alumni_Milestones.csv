@@ -1,0 +1,9 @@
+Milestone ID,Milestone Name,Phase,Target Date,Status,Deliverables,Success Criteria,Dependencies,Risk Level,Owner,Notes
+M1,Environment Setup Complete,Phase 1,2025-01-18,Not Started,Development environment; Database schema; Basic auth,All developers can work locally,None,Low,Lead Developer,Foundation milestone
+M2,User Management Complete,Phase 2,2025-02-07,Not Started,Registration; Login; Profile management; Dashboard,Users can register and manage profiles,Phase 1,Medium,Full-stack Developer,Core user functionality
+M3,Directory & Events Complete,Phase 3,2025-03-07,Not Started,Alumni directory; Events system; Blog system,Users can search alumni and manage events,Phase 2,Medium,Full-stack Developer,Major features complete
+M4,Gallery System Complete,Phase 4,2025-03-21,Not Started,Photo gallery; Upload system; Image optimization,Users can upload and view photos,Phase 3,High,Full-stack Developer,Media functionality
+M5,Admin & Donations Complete,Phase 5,2025-04-10,Not Started,Admin dashboard; Donation system; User management,Admins can manage system and donations,Phase 3,Medium,Full-stack Developer,Admin functionality
+M6,Production Ready,Phase 6,2025-04-17,Not Started,Live system; Testing complete; Performance optimized,System is live and performing well,Phase 5,High,DevOps,Go-live milestone
+M7,Post-Launch Support,Post-Launch,2025-05-17,Not Started,Bug fixes; User support; Monitoring,System is stable and users are supported,Phase 6,Medium,Support Team,Support phase
+

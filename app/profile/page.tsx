@@ -13,6 +13,10 @@ interface Profile {
   middle_name?: string | null
   last_name?: string | null
   batch_year: number
+  last_class?: number | null
+  year_of_leaving?: number | null
+  start_class?: number | null
+  start_year?: number | null
   profession: string | null
   company: string | null
   location: string | null
@@ -58,6 +62,10 @@ export default function ProfilePage() {
 
   const save = async () => {
     if (!profile) return
+    if (!profile.phone || !profile.phone.trim()) {
+      toast.error('Phone is required')
+      return
+    }
     setSaving(true)
     try {
       const updates = {
@@ -66,6 +74,10 @@ export default function ProfilePage() {
         last_name: profile.last_name || null,
         full_name: profile.full_name,
         batch_year: profile.batch_year,
+        last_class: profile.last_class ?? null,
+        year_of_leaving: profile.year_of_leaving ?? null,
+        start_class: profile.start_class ?? null,
+        start_year: profile.start_year ?? null,
         profession: profile.profession,
         company: profile.company,
         location: profile.location,
@@ -133,12 +145,13 @@ export default function ProfilePage() {
               <input className="input-field" value={profile.email} disabled />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year (10th Standard)</label>
               <input type="number" className="input-field" value={profile.batch_year}
                 onChange={(e)=>updateField('batch_year', Number(e.target.value))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+              <p className="text-xs text-blue-600 mb-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
               <input className="input-field" placeholder="+91XXXXXXXXXX" value={profile.phone || ''}
                 onChange={(e)=>updateField('phone', e.target.value)} />
             </div>
@@ -171,6 +184,60 @@ export default function ProfilePage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
               <input className="input-field" value={profile.website_url || ''}
                 onChange={(e)=>updateField('website_url', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Education at BGHS */}
+          <div className="mt-6 border-t border-gray-200 pt-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Education at BGHS</h2>
+            <p className="text-sm text-gray-600 mb-4">Specify the last class you studied at BGHS and the year you left. Optionally, add when you started.</p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last class attended (1–12)</label>
+                <select
+                  className="input-field"
+                  value={profile.last_class ?? ''}
+                  onChange={(e)=>updateField('last_class', e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select class</option>
+                  {Array.from({length:12}).map((_,i)=>i+1).map(n=> (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Year of leaving (YYYY)</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  placeholder="e.g., 2002"
+                  value={profile.year_of_leaving ?? ''}
+                  onChange={(e)=>updateField('year_of_leaving', e.target.value ? Number(e.target.value) : null)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start class (optional)</label>
+                <select
+                  className="input-field"
+                  value={profile.start_class ?? ''}
+                  onChange={(e)=>updateField('start_class', e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Select class</option>
+                  {Array.from({length:12}).map((_,i)=>i+1).map(n=> (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Start year (optional)</label>
+                <input
+                  type="number"
+                  className="input-field"
+                  placeholder="e.g., 1994"
+                  value={profile.start_year ?? ''}
+                  onChange={(e)=>updateField('start_year', e.target.value ? Number(e.target.value) : null)}
+                />
+              </div>
             </div>
           </div>
 

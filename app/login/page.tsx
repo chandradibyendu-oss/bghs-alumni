@@ -7,12 +7,13 @@ import { GraduationCap, Eye, EyeOff, Mail, Lock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone' | 'auto'>('auto')
   const router = useRouter()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -22,8 +23,31 @@ export default function LoginPage() {
     setSuccess('')
 
     try {
+      // First, determine if we need to look up the user
+      let actualEmail = identifier
+      
+      if (loginMethod === 'auto' || !identifier.includes('@')) {
+        // Look up user to get their email for Supabase auth
+        const lookupResponse = await fetch('/api/auth/login-lookup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ identifier })
+        })
+        
+        if (lookupResponse.ok) {
+          const lookupData = await lookupResponse.json()
+          actualEmail = lookupData.email
+          setLoginMethod(lookupData.loginMethod)
+        } else {
+          const errorData = await lookupResponse.json()
+          setError(errorData.error || 'Account not found')
+          return
+        }
+      }
+
+      // Now login with the email
       const { data, error } = await supabase.auth.signInWithPassword({
-        email,
+        email: actualEmail,
         password,
       })
 
@@ -69,27 +93,33 @@ export default function LoginPage() {
         {/* Login Form */}
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
           <div className="space-y-4">
-            {/* Email Field */}
+            {/* Email or Phone Field */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email Address
+              <label htmlFor="identifier" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address or Phone Number
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Mail className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
-                  id="email"
-                  name="email"
-                  type="email"
-                  autoComplete="email"
+                  id="identifier"
+                  name="identifier"
+                  type="text"
+                  autoComplete="username"
                   required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  value={identifier}
+                  onChange={(e) => setIdentifier(e.target.value)}
                   className="input-field pl-10"
-                  placeholder="Enter your email"
+                  placeholder="Enter your email address or phone number"
                 />
               </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  You can use either your email address or phone number to sign in
+                </p>
+                <p className="mt-1 text-xs text-blue-600">
+                  📱 For phone numbers, include country code (e.g., +91XXXXXXXXXX)
+                </p>
             </div>
 
             {/* Password Field */}

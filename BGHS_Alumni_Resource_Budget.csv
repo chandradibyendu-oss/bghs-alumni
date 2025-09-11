@@ -1,0 +1,19 @@
+Resource Type,Role,Name,Weekly Rate,Total Weeks,Total Cost,Phase 1,Phase 2,Phase 3,Phase 4,Phase 5,Phase 6,Notes
+Personnel,Project Manager,PM Lead,2500,12,30000,5000,5000,5000,5000,5000,5000,Full-time project management
+Personnel,Lead Developer,Senior Dev,3000,12,36000,6000,6000,6000,6000,6000,6000,Technical leadership and architecture
+Personnel,Backend Developer,Backend Dev 1,2000,12,24000,4000,4000,4000,4000,4000,4000,Database and API development
+Personnel,Backend Developer,Backend Dev 2,2000,12,24000,4000,4000,4000,4000,4000,4000,Authentication and integrations
+Personnel,Frontend Developer,Frontend Dev 1,2000,12,24000,4000,4000,4000,4000,4000,4000,UI/UX development
+Personnel,Frontend Developer,Frontend Dev 2,2000,12,24000,4000,4000,4000,4000,4000,4000,Component development
+Personnel,QA Tester,QA Specialist,1500,3,4500,0,0,0,0,0,4500,Part-time testing (weeks 10-12)
+Infrastructure,Supabase Pro,Database,25,12,300,50,50,50,50,50,50,PostgreSQL database hosting
+Infrastructure,Vercel Pro,Hosting,20,12,240,40,40,40,40,40,40,Application hosting and deployment
+Infrastructure,Cloudflare R2,Storage,5,12,60,10,10,10,10,10,10,Image storage and CDN
+Infrastructure,SendGrid,Email Service,15,12,180,30,30,30,30,30,30,Transactional email service
+Infrastructure,Stripe,Payment Processing,30,12,360,60,60,60,60,60,60,Payment processing fees
+Tools,Development Tools,Licenses,50,12,600,100,100,100,100,100,100,VS Code Pro; design tools
+Tools,Monitoring,Analytics,20,12,240,40,40,40,40,40,40,Error tracking and analytics
+Tools,Security,SSL Certificates,10,12,120,20,20,20,20,20,20,Security certificates
+Contingency,Buffer,10% Buffer,0,0,12350,2058,2058,2058,2058,2058,2058,10% contingency for overruns
+Total,,,,123500,20583,20583,20583,20583,20583,20583,Total project cost
+

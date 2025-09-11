@@ -29,6 +29,7 @@ import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
 interface UserProfile {
   id: string
   email: string
+  phone?: string | null
   full_name: string
   batch_year: number
   profession: string
@@ -53,6 +54,7 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
   const [formData, setFormData] = useState({
     email: '',
+    phone: '',
     first_name: '',
     middle_name: '',
     last_name: '',
@@ -158,6 +160,7 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({
           email: formData.email,
+          phone: formData.phone,
           password: password,
           first_name: formData.first_name,
           middle_name: formData.middle_name || undefined,
@@ -355,6 +358,7 @@ export default function AdminUsersPage() {
       middle_name: '',
       last_name: '',
       batch_year: '',
+      phone: '',
       profession: '',
       company: '',
       location: '',
@@ -369,6 +373,7 @@ export default function AdminUsersPage() {
     setEditingUser(user)
     setFormData({
       email: user.email,
+      phone: (user as any).phone || '',
       first_name: '',
       middle_name: '',
       last_name: '',
@@ -460,7 +465,7 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Batch Year</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Batch Year (10th Standard)</label>
               <select
                 value={filterYear}
                 onChange={(e) => setFilterYear(e.target.value)}
@@ -506,6 +511,18 @@ export default function AdminUsersPage() {
                     required
                     className="input-field"
                     placeholder="user@example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                  <p className="text-xs text-blue-600 mb-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
+                  <input
+                    type="tel"
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    required
+                    className="input-field"
+                    placeholder="+91 98765 43210"
                   />
                 </div>
                 <div>
@@ -556,7 +573,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year (10th Standard) *</label>
                   <input
                     type="number"
                     value={formData.batch_year}
@@ -707,7 +724,7 @@ export default function AdminUsersPage() {
                       User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Batch Year
+                      Batch Year (10th Standard)
                     </th>
                     {/* Profession column hidden to reduce width */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">

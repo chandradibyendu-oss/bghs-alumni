@@ -7,8 +7,7 @@ import { toast } from 'react-hot-toast'
 
 export default function ForgotPassword() {
   const [step, setStep] = useState<'email' | 'otp' | 'password'>('email')
-  const [email, setEmail] = useState('')
-  const [phone, setPhone] = useState('')
+  const [identifier, setIdentifier] = useState('')
   const [otp, setOtp] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -17,12 +16,18 @@ export default function ForgotPassword() {
   const [isLoading, setIsLoading] = useState(false)
   const [otpSent, setOtpSent] = useState(false)
   const [countdown, setCountdown] = useState(0)
+  const [loginMethod, setLoginMethod] = useState<'email' | 'phone' | 'auto'>('auto')
 
   const handleSendOTP = async () => {
-    if (!email && !phone) {
+    if (!identifier) {
       toast.error('Please enter either email or phone number')
       return
     }
+
+    // Determine if it's email or phone
+    const isEmail = identifier.includes('@')
+    const email = isEmail ? identifier : null
+    const phone = !isEmail ? identifier : null
 
     setIsLoading(true)
     try {
@@ -31,7 +36,7 @@ export default function ForgotPassword() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, phone }),
       })
 
       const data = await response.json()
@@ -40,6 +45,7 @@ export default function ForgotPassword() {
         toast.success('OTP sent successfully!')
         setOtpSent(true)
         setStep('otp')
+        setLoginMethod(isEmail ? 'email' : 'phone')
         startCountdown()
       } else {
         toast.error(data.error || 'Failed to send OTP')
@@ -57,6 +63,11 @@ export default function ForgotPassword() {
       return
     }
 
+    // Determine if it's email or phone
+    const isEmail = identifier.includes('@')
+    const email = isEmail ? identifier : null
+    const phone = !isEmail ? identifier : null
+
     setIsLoading(true)
     try {
       const response = await fetch('/api/auth/verify-otp', {
@@ -64,7 +75,7 @@ export default function ForgotPassword() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, otp }),
+        body: JSON.stringify({ email, phone, otp }),
       })
 
       const data = await response.json()
@@ -100,6 +111,11 @@ export default function ForgotPassword() {
       return
     }
 
+    // Determine if it's email or phone
+    const isEmail = identifier.includes('@')
+    const email = isEmail ? identifier : null
+    const phone = !isEmail ? identifier : null
+
     setIsLoading(true)
     try {
       const response = await fetch('/api/auth/reset-password', {
@@ -109,6 +125,7 @@ export default function ForgotPassword() {
         },
         body: JSON.stringify({ 
           email, 
+          phone,
           otp, 
           newPassword 
         }),
@@ -166,39 +183,43 @@ export default function ForgotPassword() {
           Forgot Password
         </h2>
         <p className="text-center text-gray-600 mb-8">
-          {step === 'email' && 'Enter your email address to receive OTP'}
-          {step === 'otp' && 'Enter the OTP sent to your email'}
+          {step === 'email' && 'Enter your email address or phone number to receive OTP'}
+          {step === 'otp' && `Enter the OTP sent to your ${loginMethod === 'phone' ? 'phone' : 'email'}`}
           {step === 'password' && 'Create your new password'}
         </p>
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* Step 1: Email Input */}
+          {/* Step 1: Email or Phone Input */}
           {step === 'email' && (
             <div className="space-y-6">
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  Email Address
+                <label htmlFor="identifier" className="block text-sm font-medium text-gray-700">
+                  Email Address or Phone Number
                 </label>
                 <div className="mt-1 relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <Mail className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    id="identifier"
+                    name="identifier"
+                    type="text"
+                    autoComplete="username"
+                    value={identifier}
+                    onChange={(e) => setIdentifier(e.target.value)}
                     className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500 sm:text-sm"
-                    placeholder="Enter your email address"
+                    placeholder="Enter your email address or phone number"
                   />
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  You can use either your email address or phone number to receive OTP
+                </p>
+                <p className="mt-1 text-xs text-blue-600">
+                  📱 For phone numbers, include country code (e.g., +91XXXXXXXXXX)
+                </p>
               </div>
-
-              {/* Phone-based OTP temporarily disabled */}
 
               <div>
                 <button
@@ -232,7 +253,7 @@ export default function ForgotPassword() {
                   />
                 </div>
                 <p className="mt-2 text-sm text-gray-600">
-                  Enter the 6-digit code sent to {email || phone}
+                  Enter the 6-digit code sent to {identifier}
                 </p>
               </div>
 
