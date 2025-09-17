@@ -40,6 +40,7 @@ export default function GalleryPage() {
   const [photos, setPhotos] = useState<GalleryPhoto[]>([])
   const [categories, setCategories] = useState<PhotoCategory[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
   const [searchTerm, setSearchTerm] = useState('')
@@ -51,6 +52,12 @@ export default function GalleryPage() {
   const [rotation, setRotation] = useState(0)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [baseScale, setBaseScale] = useState(1)
+  
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1)
+  const [hasMorePhotos, setHasMorePhotos] = useState(true)
+  const [totalPhotos, setTotalPhotos] = useState(0)
+  const PHOTOS_PER_PAGE = 24 // Load 24 photos at a time
 
   useEffect(() => {
     checkPermissions()
@@ -85,9 +92,31 @@ export default function GalleryPage() {
     }
   }
 
-  const fetchPhotos = async () => {
+  const fetchPhotos = async (page = 1, append = false) => {
     try {
-      setLoading(true)
+      if (page === 1) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
+      // First get the total count
+      let countQuery = supabase
+        .from('gallery_photos')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_approved', true)
+
+      if (selectedCategory !== 'all') {
+        countQuery = countQuery.eq('category_id', selectedCategory)
+      }
+
+      if (searchTerm) {
+        countQuery = countQuery.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+      }
+
+      const { count: totalCount } = await countQuery
+
+      // Then get the actual data
       let query = supabase
         .from('gallery_photos')
         .select(`
@@ -97,6 +126,7 @@ export default function GalleryPage() {
         `)
         .eq('is_approved', true)
         .order('created_at', { ascending: false })
+        .range((page - 1) * PHOTOS_PER_PAGE, page * PHOTOS_PER_PAGE - 1)
 
       if (selectedCategory !== 'all') {
         query = query.eq('category_id', selectedCategory)
@@ -109,16 +139,34 @@ export default function GalleryPage() {
       const { data, error } = await query
 
       if (error) throw error
-      setPhotos(data || [])
+      
+      if (append) {
+        setPhotos(prev => [...prev, ...(data || [])])
+      } else {
+        setPhotos(data || [])
+      }
+      
+      setTotalPhotos(totalCount || 0)
+      setHasMorePhotos((data?.length || 0) === PHOTOS_PER_PAGE)
+      setCurrentPage(page)
     } catch (error) {
       console.error('Error fetching photos:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMorePhotos = async () => {
+    if (!loadingMore && hasMorePhotos) {
+      await fetchPhotos(currentPage + 1, true)
     }
   }
 
   useEffect(() => {
-    fetchPhotos()
+    setCurrentPage(1)
+    setHasMorePhotos(true)
+    fetchPhotos(1, false)
   }, [selectedCategory, searchTerm])
 
   const filteredPhotos = photos.filter(photo => {
@@ -313,52 +361,91 @@ export default function GalleryPage() {
         </div>
       </div>
 
-      {/* Filters and Controls */}
+      {/* Enhanced Filters and Controls */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          {/* Search */}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search photos..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4">
+            {/* Search */}
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search Photos</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by title, description, or photographer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Category Filter */}
+            <div className="lg:w-64">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Category</label>
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="all">All Categories</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* View Mode */}
+            <div className="lg:w-32">
+              <label className="block text-sm font-medium text-gray-700 mb-2">View</label>
+              <div className="flex border border-gray-300 rounded-lg">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`flex-1 p-2 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                  title="Grid View"
+                >
+                  <Grid className="h-4 w-4 mx-auto" />
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`flex-1 p-2 ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+                  title="List View"
+                >
+                  <List className="h-4 w-4 mx-auto" />
+                </button>
+              </div>
             </div>
           </div>
-
-          {/* Category Filter */}
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-          >
-            <option value="all">All Categories</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-
-          {/* View Mode */}
-          <div className="flex border border-gray-300 rounded-lg">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 ${viewMode === 'grid' ? 'bg-primary-600 text-white' : 'text-gray-600'}`}
-            >
-              <Grid className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 ${viewMode === 'list' ? 'bg-primary-600 text-white' : 'text-gray-600'}`}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
+          
+          {/* Active Filters Display */}
+          {(selectedCategory !== 'all' || searchTerm) && (
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center gap-2 text-sm text-gray-600">
+                <span>Active filters:</span>
+                {selectedCategory !== 'all' && (
+                  <span className="bg-primary-100 text-primary-800 px-2 py-1 rounded-full text-xs">
+                    {categories.find(c => c.id === selectedCategory)?.name}
+                  </span>
+                )}
+                {searchTerm && (
+                  <span className="bg-gray-100 text-gray-800 px-2 py-1 rounded-full text-xs">
+                    "{searchTerm}"
+                  </span>
+                )}
+                <button
+                  onClick={() => {
+                    setSelectedCategory('all')
+                    setSearchTerm('')
+                  }}
+                  className="text-primary-600 hover:text-primary-700 text-xs underline"
+                >
+                  Clear all
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Photos Grid/List */}
@@ -425,25 +512,31 @@ export default function GalleryPage() {
                       )}
                     </div>
 
-                    {/* Photo Info - Compact */}
-                    <div className="p-2">
-                      <h3 className="font-medium text-gray-900 text-xs mb-1 line-clamp-1">
-                        {photo.title}
-                      </h3>
-                      <p className="text-xs text-gray-600 mb-1 line-clamp-2">
-                        {photo.description}
-                      </p>
-                      <div className="text-xs text-gray-500">
-                        {photo.photo_categories?.name || 'Uncategorized'}
+                    {/* Minimalist Photo Info - Only show on hover */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                      <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                        <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                          {photo.title}
+                        </h3>
+                        {photo.description && (
+                          <p className="text-xs text-white/80 line-clamp-2">
+                            {photo.description}
+                          </p>
+                        )}
+                        <div className="text-xs text-white/70 mt-1">
+                          by {photo.profiles?.full_name || 'Anonymous'}
+                        </div>
                       </div>
+                      
+                      {/* Admin controls - only show for admins */}
                       {canManage && (
-                        <div className="flex gap-1 mt-2">
+                        <div className="absolute top-2 right-2 flex gap-1">
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
                               handleApprovePhoto(photo.id)
                             }}
-                            className="text-green-600 hover:text-green-800 p-1"
+                            className="bg-green-600 hover:bg-green-700 text-white p-1 rounded"
                             title="Approve"
                           >
                             <Check className="h-3 w-3" />
@@ -453,7 +546,7 @@ export default function GalleryPage() {
                               e.stopPropagation()
                               handleDeletePhoto(photo.id)
                             }}
-                            className="text-red-600 hover:text-red-800 p-1"
+                            className="bg-red-600 hover:bg-red-700 text-white p-1 rounded"
                             title="Delete"
                           >
                             <Trash2 className="h-3 w-3" />
@@ -492,10 +585,10 @@ export default function GalleryPage() {
                         <p className="text-sm text-gray-600 mt-1 line-clamp-2">{photo.description}</p>
                       )}
                       <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
-                        <span>{photo.photo_categories?.name}</span>
+                        <span>by {photo.profiles?.full_name || 'Anonymous'}</span>
                         <div className="flex items-center gap-2">
                           <Eye className="h-3 w-3" />
-                          <span>{photo.view_count}</span>
+                          <span>{photo.view_count || 0}</span>
                         </div>
                       </div>
                       {canManage && (
@@ -528,6 +621,47 @@ export default function GalleryPage() {
               </div>
             )}
           </>
+        )}
+        
+        {/* Load More Button */}
+        {!loading && hasMorePhotos && photos.length > 0 && (
+          <div className="flex justify-center mt-8">
+            <button
+              onClick={loadMorePhotos}
+              disabled={loadingMore}
+              className="px-8 py-3 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-colors"
+            >
+              {loadingMore ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Loading more photos...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4" />
+                  Load More Photos
+                </>
+              )}
+            </button>
+          </div>
+        )}
+        
+        {/* Photos Count Display */}
+        {!loading && photos.length > 0 && (
+          <div className="text-center mt-4 text-sm text-gray-500">
+            {totalPhotos > 0 ? (
+              <>
+                Showing {photos.length} of {totalPhotos} photos
+                {hasMorePhotos && (
+                  <span className="ml-2 text-primary-600">
+                    • Click "Load More" to see more
+                  </span>
+                )}
+              </>
+            ) : (
+              `Showing ${photos.length} photos`
+            )}
+          </div>
         )}
       </div>
 

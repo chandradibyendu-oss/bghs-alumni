@@ -12,17 +12,26 @@ interface PhotoCategory {
   description: string
 }
 
+interface Event {
+  id: string
+  title: string
+  date: string
+  category: string
+}
+
 export default function UploadPage() {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<PhotoCategory[]>([])
+  const [events, setEvents] = useState<Event[]>([])
   const [canUpload, setCanUpload] = useState(false)
   const [checkingPermissions, setCheckingPermissions] = useState(true)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    categoryId: ''
+    categoryId: '',
+    eventId: ''
   })
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -33,6 +42,7 @@ export default function UploadPage() {
   useEffect(() => {
     checkPermissions()
     fetchCategories()
+    fetchEvents()
   }, [])
 
   const checkPermissions = async () => {
@@ -87,37 +97,71 @@ export default function UploadPage() {
     }
   }
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please select an image file')
-        return
-      }
+  const fetchEvents = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('events')
+        .select('id, title, date, category')
+        .order('date', { ascending: false })
+        .limit(20) // Get recent events
 
-      // Validate file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB')
-        return
-      }
-
-      setSelectedFile(file)
-      setError('')
-
-      // Create preview
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        setPreview(e.target?.result as string)
-      }
-      reader.readAsDataURL(file)
+      if (error) throw error
+      setEvents(data || [])
+    } catch (error) {
+      console.error('Error fetching events:', error)
     }
+  }
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
+
+    // Validate files
+    const maxFiles = 10
+    const maxSize = 10 * 1024 * 1024 // 10MB
+
+    if (files.length > maxFiles) {
+      setError(`Maximum ${maxFiles} files allowed`)
+      return
+    }
+
+    const invalidFiles = files.filter(file => {
+      if (!file.type.startsWith('image/')) return true
+      if (file.size > maxSize) return true
+      return false
+    })
+
+    if (invalidFiles.length > 0) {
+      setError('All files must be images under 10MB')
+      return
+    }
+
+    setSelectedFiles(files)
+    setError('')
+
+    // Create previews
+    const previewPromises = files.map(file => 
+      new Promise<string>((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => resolve(e.target?.result as string)
+        reader.readAsDataURL(file)
+      })
+    )
+
+    Promise.all(previewPromises).then(setPreviews)
+  }
+
+  const removeFile = (index: number) => {
+    const newFiles = selectedFiles.filter((_, i) => i !== index)
+    const newPreviews = previews.filter((_, i) => i !== index)
+    setSelectedFiles(newFiles)
+    setPreviews(newPreviews)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!selectedFile || !formData.title || !formData.categoryId) {
+    if (selectedFiles.length === 0 || !formData.title || !formData.categoryId) {
       setError('Please fill in all required fields')
       return
     }
@@ -126,34 +170,41 @@ export default function UploadPage() {
     setError('')
 
     try {
-      const uploadData = new FormData()
-      uploadData.append('file', selectedFile)
-      uploadData.append('title', formData.title)
-      uploadData.append('description', formData.description)
-      uploadData.append('categoryId', formData.categoryId)
+      // For now, upload files one by one (we'll optimize this later)
+      const uploadPromises = selectedFiles.map(async (file, index) => {
+        const uploadData = new FormData()
+        uploadData.append('file', file)
+        uploadData.append('title', `${formData.title} - ${index + 1}`)
+        uploadData.append('description', formData.description)
+        uploadData.append('categoryId', formData.categoryId)
+        uploadData.append('eventId', formData.eventId || '')
 
-      // Attach Supabase access token so the API route can authenticate the user server-side
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData.session?.access_token
+        // Attach Supabase access token
+        const { data: sessionData } = await supabase.auth.getSession()
+        const accessToken = sessionData.session?.access_token
 
-      const response = await fetch('/api/gallery/upload', {
-        method: 'POST',
-        body: uploadData,
-        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+        const response = await fetch('/api/gallery/upload', {
+          method: 'POST',
+          body: uploadData,
+          headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined
+        })
+
+        if (!response.ok) {
+          const result = await response.json()
+          throw new Error(result.error || 'Upload failed')
+        }
+
+        return response.json()
       })
 
-      const result = await response.json()
+      await Promise.all(uploadPromises)
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Upload failed')
-      }
-
-      setSuccess('Photo uploaded successfully! It will be reviewed before being published.')
+      setSuccess(`${selectedFiles.length} photo(s) uploaded successfully! They will be reviewed before being published.`)
       
       // Reset form
-      setSelectedFile(null)
-      setPreview(null)
-      setFormData({ title: '', description: '', categoryId: '' })
+      setSelectedFiles([])
+      setPreviews([])
+      setFormData({ title: '', description: '', categoryId: '', eventId: '' })
       if (fileInputRef.current) {
         fileInputRef.current.value = ''
       }
@@ -179,7 +230,6 @@ export default function UploadPage() {
     e.preventDefault()
     const files = e.dataTransfer.files
     if (files.length > 0) {
-      const file = files[0]
       if (fileInputRef.current) {
         fileInputRef.current.files = files
         handleFileSelect({ target: { files } } as any)
@@ -256,29 +306,43 @@ export default function UploadPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* File Upload */}
+            {/* Multiple File Upload */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Photo *
+                Photos * (up to 10 files)
               </label>
               <div
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors"
               >
-                {preview ? (
+                {previews.length > 0 ? (
                   <div className="space-y-4">
-                    <img
-                      src={preview}
-                      alt="Preview"
-                      className="mx-auto max-h-64 rounded-lg"
-                    />
+                    {/* Preview Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      {previews.map((preview, index) => (
+                        <div key={index} className="relative">
+                          <img
+                            src={preview}
+                            alt={`Preview ${index + 1}`}
+                            className="w-full h-24 object-cover rounded-lg"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-600"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
                     <div className="flex justify-center">
                       <button
                         type="button"
                         onClick={() => {
-                          setSelectedFile(null)
-                          setPreview(null)
+                          setSelectedFiles([])
+                          setPreviews([])
                           if (fileInputRef.current) {
                             fileInputRef.current.value = ''
                           }
@@ -286,16 +350,19 @@ export default function UploadPage() {
                         className="text-red-600 hover:text-red-800 flex items-center gap-2"
                       >
                         <X className="h-4 w-4" />
-                        Remove
+                        Remove All
                       </button>
                     </div>
+                    <p className="text-sm text-gray-500">
+                      {selectedFiles.length} photo(s) selected
+                    </p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     <ImageIcon className="h-12 w-12 text-gray-400 mx-auto" />
                     <div>
                       <p className="text-gray-600">
-                        Drag and drop your photo here, or{' '}
+                        Drag and drop your photos here, or{' '}
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
@@ -305,7 +372,7 @@ export default function UploadPage() {
                         </button>
                       </p>
                       <p className="text-sm text-gray-500 mt-1">
-                        Supports JPG, PNG, GIF (max 10MB)
+                        Supports JPG, PNG, GIF (max 10MB each, up to 10 files)
                       </p>
                     </div>
                   </div>
@@ -314,6 +381,7 @@ export default function UploadPage() {
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={handleFileSelect}
                   className="hidden"
                 />
@@ -357,6 +425,29 @@ export default function UploadPage() {
               </select>
             </div>
 
+            {/* Event Selection */}
+            <div>
+              <label htmlFor="event" className="block text-sm font-medium text-gray-700 mb-2">
+                Related Event (Optional)
+              </label>
+              <select
+                id="event"
+                value={formData.eventId}
+                onChange={(e) => setFormData({ ...formData, eventId: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              >
+                <option value="">No specific event</option>
+                {events.map((event) => (
+                  <option key={event.id} value={event.id}>
+                    {event.title} ({new Date(event.date).toLocaleDateString()})
+                  </option>
+                ))}
+              </select>
+              <p className="text-sm text-gray-500 mt-1">
+                Select an event if these photos are from a specific school event
+              </p>
+            </div>
+
             {/* Description */}
             <div>
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
@@ -383,7 +474,7 @@ export default function UploadPage() {
               </button>
               <button
                 type="submit"
-                disabled={loading || !selectedFile || !formData.title || !formData.categoryId}
+                disabled={loading || selectedFiles.length === 0 || !formData.title || !formData.categoryId}
                 className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
                 {loading ? (

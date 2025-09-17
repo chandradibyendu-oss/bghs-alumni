@@ -170,13 +170,13 @@ export default function ForgotPassword() {
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex items-center justify-center mb-6">
           <img 
-            src="/bghs-logo.jpg" 
+            src="/bghs-logo.png" 
             alt="BGHS Alumni" 
             className="h-14 w-auto object-contain shrink-0"
           />
           <div className="ml-3">
             <h2 className="text-xl font-bold text-gray-900">BGHS Alumni</h2>
-            <p className="text-xs text-gray-600">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</p>
+            <p className="text-xs text-gray-600">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</p>
           </div>
         </div>
         <h2 className="text-center text-3xl font-bold text-gray-900 mb-2">

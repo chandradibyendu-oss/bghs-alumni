@@ -416,7 +416,7 @@ export default function AdminUsersPage() {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-3">
                              <img 
-                 src="/bghs-logo.jpg" 
+                 src="/bghs-logo.png" 
                  alt="BGHS Alumni Association" 
                 className="h-14 w-auto object-contain shrink-0"
                />

@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
     const title = formData.get('title') as string
     const description = formData.get('description') as string
     const categoryId = formData.get('categoryId') as string
+    const eventId = formData.get('eventId') as string
 
     if (!file || !title || !categoryId) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
         title,
         description,
         category_id: categoryId,
+        event_id: eventId || null,
         uploaded_by: user.id,
         file_url: r2Response.url,
         thumbnail_url: thumbnailResponse?.url || null,

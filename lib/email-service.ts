@@ -52,9 +52,9 @@ export function generateOTPEmail(otp: string, recipientName?: string): EmailOpti
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
-          <img src="https://alumnibghs.org/bghs-logo.jpg" alt="BGHS Alumni" style="height: 60px; width: auto;">
+          <img src="https://alumnibghs.org/bghs-logo.png" alt="BGHS Alumni" style="height: 60px; width: auto;">
           <h1 style="color: #1f2937; margin: 10px 0;">BGHS Alumni</h1>
-          <p style="color: #6b7280; font-size: 14px; margin: 0;">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</p>
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</p>
         </div>
         
         <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; margin-bottom: 20px;">

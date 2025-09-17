@@ -155,16 +155,17 @@ export default function Home() {
                 <MenuIcon className="h-6 w-6 text-gray-700" />
               </button>
               <img 
-                src="/bghs-logo.jpg" 
+                src="/bghs-logo.png" 
                 alt="BGHS Alumni Association" 
                 className="h-14 w-auto object-contain shrink-0 flex-none"
               />
               <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
                 <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
-                <span className="text-sm text-gray-600 truncate">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
+                <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</span>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-8">
+              <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
@@ -211,6 +212,7 @@ export default function Home() {
               <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
             </div>
             <nav className="space-y-2">
+              <Link href="/about" className="block px-2 py-2 rounded hover:bg-gray-50">About</Link>
               <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
@@ -413,7 +415,7 @@ export default function Home() {
                Join thousands of BGHS alumni who are already part of our growing community
              </p>
              <p className="text-lg text-primary-200 mb-8">
-               বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি
+               বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি
              </p>
 
              <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
@@ -430,13 +432,13 @@ export default function Home() {
              <div>
                <div className="flex items-center space-x-3 mb-4">
                  <img 
-                   src="/bghs-logo.jpg" 
+                   src="/bghs-logo.png" 
                    alt="BGHS Alumni Association" 
                    className="h-14 w-auto object-contain shrink-0"
                  />
                  <div className="flex flex-col">
                    <span className="text-lg font-semibold">BGHS Alumni</span>
-                   <span className="text-xs text-gray-400">বারাসাত গভঃ হাই স্কুল প্রাক্তন ছাত্র সমিতি</span>
+                   <span className="text-xs text-gray-400">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</span>
                  </div>
                </div>
                <p className="text-gray-400">
@@ -446,6 +448,7 @@ export default function Home() {
                          <div>
                <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
                <ul className="space-y-2">
+                 <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About</Link></li>
                  <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                  <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
                  <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>

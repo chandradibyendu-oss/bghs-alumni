@@ -30,10 +30,6 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'bghs-gallery.alumnibghs.org',
-      },
-      {
-        protocol: 'https',
         hostname: 'upload.wikimedia.org',
       },
     ],

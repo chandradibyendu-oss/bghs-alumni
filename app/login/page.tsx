@@ -77,7 +77,7 @@ export default function LoginPage() {
         <div className="text-center">
           <div className="flex justify-center mb-4">
                          <img 
-               src="/bghs-logo.jpg" 
+               src="/bghs-logo.png" 
                alt="BGHS Alumni Association" 
                className="h-10 md:h-12 lg:h-14 w-auto"
              />

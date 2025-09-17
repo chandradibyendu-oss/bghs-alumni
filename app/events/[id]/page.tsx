@@ -15,6 +15,8 @@ import {
   Info,
   Phone,
   Mail,
+  Camera,
+  Eye,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
@@ -150,13 +152,15 @@ function TierSection({
 
 export default function EventDetailPage({ params }: { params: { id: string } }) {
   const [event, setEvent] = useState<any>(null)
+  const [eventPhotos, setEventPhotos] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [photosLoading, setPhotosLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   // Get sponsors from event metadata, fallback to mock data if none
   const eventSponsors = event?.metadata?.sponsors || []
   const mockSponsors = [
-    { name: 'Acme Foundation', logo_url: '/bghs-logo.jpg', website_url: 'https://example.com', tier: 'Platinum' },
+    { name: 'Acme Foundation', logo_url: '/bghs-logo.png', website_url: 'https://example.com', tier: 'Platinum' },
     { name: 'Globex Corp', logo_url: '/school-building.jpg', website_url: 'https://example.com', tier: 'Gold' },
     { name: 'Initech Inc', logo_url: '/school-building.jpg', website_url: 'https://example.com', tier: 'Gold' },
     { name: 'Umbrella Corp', logo_url: '/school-building.jpg', website_url: 'https://example.com', tier: 'Silver' },
@@ -170,6 +174,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     fetchEvent()
   }, [params.id])
+
+  useEffect(() => {
+    if (event) {
+      fetchEventPhotos()
+    }
+  }, [event])
 
   const fetchEvent = async () => {
     try {
@@ -188,6 +198,39 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setLoading(false)
     }
+  }
+
+  const fetchEventPhotos = async () => {
+    try {
+      setPhotosLoading(true)
+      const { data, error } = await supabase
+        .from('gallery_photos')
+        .select(`
+          id,
+          title,
+          description,
+          file_url,
+          thumbnail_url,
+          created_at,
+          profiles(full_name)
+        `)
+        .eq('event_id', params.id)
+        .eq('is_approved', true)
+        .order('created_at', { ascending: false })
+        .limit(12) // Show first 12 photos
+
+      if (error) throw error
+      setEventPhotos(data || [])
+    } catch (error) {
+      console.error('Error fetching event photos:', error)
+    } finally {
+      setPhotosLoading(false)
+    }
+  }
+
+  const handlePhotoClick = (photo: any) => {
+    // Redirect to gallery with event filter
+    window.location.href = `/gallery?event=${params.id}`
   }
 
   if (loading) {
@@ -364,6 +407,80 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             <h2 className="text-xl font-semibold text-gray-900 mb-3">About this event</h2>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <p className="text-gray-700 leading-relaxed">{event.description}</p>
+            </div>
+          </section>
+
+          {/* Event Photos */}
+          <section>
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                <Camera className="h-5 w-5 text-primary-600" />
+                Event Photos
+              </h2>
+              {eventPhotos.length > 0 && (
+                <Link 
+                  href={`/gallery?event=${params.id}`}
+                  className="text-primary-600 hover:text-primary-700 text-sm font-medium flex items-center gap-1"
+                >
+                  <Eye className="h-4 w-4" />
+                  View All
+                </Link>
+              )}
+            </div>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              {photosLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600"></div>
+                  <span className="ml-3 text-gray-600">Loading photos...</span>
+                </div>
+              ) : eventPhotos.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                  {eventPhotos.map((photo) => (
+                    <div 
+                      key={photo.id} 
+                      className="group relative cursor-pointer"
+                      onClick={() => handlePhotoClick(photo)}
+                    >
+                      <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                        <Image
+                          src={photo.thumbnail_url || photo.file_url}
+                          alt={photo.title}
+                          width={200}
+                          height={200}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+                      
+                      {/* Hover overlay with photo details */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-lg">
+                        <div className="absolute bottom-0 left-0 right-0 p-3 text-white">
+                          <h3 className="font-medium text-sm mb-1 line-clamp-1">
+                            {photo.title}
+                          </h3>
+                          <p className="text-xs text-white/80">
+                            by {photo.profiles?.full_name || 'Anonymous'}
+                          </p>
+                        </div>
+                        
+                        {/* View icon in center */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="bg-white/20 backdrop-blur-sm rounded-full p-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <Eye className="h-5 w-5 text-white" />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Camera className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                  <p className="text-gray-500 mb-2">No photos uploaded yet</p>
+                  <p className="text-sm text-gray-400">
+                    Photos from this event will appear here once uploaded
+                  </p>
+                </div>
+              )}
             </div>
           </section>
 

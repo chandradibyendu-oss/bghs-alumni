@@ -21,6 +21,7 @@ interface Profile {
   company: string | null
   location: string | null
   bio: string | null
+  avatar_url?: string | null
   linkedin_url: string | null
   website_url: string | null
   phone: string | null
@@ -32,6 +33,9 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [profile, setProfile] = useState<Profile | null>(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [showCamera, setShowCamera] = useState(false)
+  const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
 
   useEffect(() => {
     const load = async () => {
@@ -99,6 +103,86 @@ export default function ProfilePage() {
     }
   }
 
+  const uploadAvatar = async (file: File) => {
+    if (!file) return
+    setUploadingAvatar(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      const res = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+        body: form
+      })
+      if (!res.ok) throw new Error('Upload failed')
+      const { avatar_url } = await res.json()
+      if (profile) setProfile({ ...profile, avatar_url })
+      toast.success('Profile photo updated')
+    } catch (e) {
+      toast.error('Failed to upload photo')
+    } finally {
+      setUploadingAvatar(false)
+    }
+  }
+
+  const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) uploadAvatar(file)
+  }
+
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true })
+      setVideoStream(stream)
+      setShowCamera(true)
+    } catch (e) {
+      toast.error('Cannot access camera')
+    }
+  }
+
+  const closeCamera = () => {
+    videoStream?.getTracks().forEach(t => t.stop())
+    setVideoStream(null)
+    setShowCamera(false)
+  }
+
+  useEffect(() => {
+    if (!showCamera) return
+    const video = document.getElementById('avatar-video') as HTMLVideoElement | null
+    if (video && videoStream) {
+      try {
+        // @ts-ignore - srcObject is supported in modern browsers
+        video.srcObject = videoStream
+      } catch {
+        video.src = URL.createObjectURL(new Blob([new Uint8Array()], { type: 'video/webm' }))
+      }
+    }
+  }, [showCamera, videoStream])
+
+  const capturePhoto = async () => {
+    try {
+      const video = document.getElementById('avatar-video') as HTMLVideoElement | null
+      if (!video) return
+      const canvas = document.createElement('canvas')
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+      const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.9))
+      if (!blob) return
+      const file = new File([blob], 'camera.jpg', { type: 'image/jpeg' })
+      await uploadAvatar(file)
+      closeCamera()
+    } catch (e) {
+      toast.error('Failed to capture photo')
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -118,6 +202,24 @@ export default function ProfilePage() {
             {!profile.is_approved && (
               <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending approval</span>
             )}
+          </div>
+
+          {/* Avatar */}
+          <div className="mb-6 flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+              {profile.avatar_url ? (
+                <img src={profile.avatar_url} alt={profile.full_name} className="w-20 h-20 object-cover" />
+              ) : (
+                <span className="text-gray-500 text-sm">No Photo</span>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <label className="btn-secondary cursor-pointer">
+                <input type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+                {uploadingAvatar ? 'Uploading...' : 'Upload Photo'}
+              </label>
+              <button type="button" className="btn-secondary" onClick={openCamera} disabled={uploadingAvatar}>Use Camera</button>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-4">
@@ -248,6 +350,23 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+      
+      {showCamera && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-4 w-full max-w-md">
+            <div className="mb-3">
+              <p className="font-medium text-gray-900 mb-2">Capture Profile Photo</p>
+              <div className="aspect-[4/3] bg-black rounded overflow-hidden">
+                <video id="avatar-video" autoPlay playsInline className="w-full h-full object-contain" />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="btn-secondary" onClick={closeCamera}>Cancel</button>
+              <button className="btn-primary" onClick={capturePhoto}>Capture</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
