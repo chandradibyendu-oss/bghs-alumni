@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Dev console output for quick testing (remove in production)
+    try {
+      console.log('=== OTP DEBUG ===')
+      if (email) console.log(`Email: ${email} -> OTP: ${otp}`)
+      if (phone) console.log(`Phone: ${phone} -> OTP: ${otp}`)
+      console.log('==================')
+    } catch {}
+
     // Send OTP via email or SMS (both if both provided)
     const tasks: Promise<any>[] = []
     if (email) tasks.push(sendEmailOTP(String(email), otp))

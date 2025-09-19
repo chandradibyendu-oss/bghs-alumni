@@ -31,7 +31,10 @@ interface UserProfile {
   email: string
   phone?: string | null
   full_name: string
-  batch_year: number
+  last_class?: number | null
+  year_of_leaving?: number | null
+  start_class?: number | null
+  start_year?: number | null
   profession: string
   company: string
   location: string
@@ -58,7 +61,10 @@ export default function AdminUsersPage() {
     first_name: '',
     middle_name: '',
     last_name: '',
-    batch_year: '',
+    last_class: '',
+    year_of_leaving: '',
+    start_class: '',
+    start_year: '',
     profession: '',
     company: '',
     location: '',
@@ -166,7 +172,12 @@ export default function AdminUsersPage() {
           middle_name: formData.middle_name || undefined,
           last_name: formData.last_name,
           full_name: `${formData.first_name} ${formData.middle_name ? formData.middle_name + ' ' : ''}${formData.last_name}`.trim(),
-          batch_year: formData.batch_year,
+          // send new fields; keep batch_year for temporary compatibility
+          last_class: formData.last_class ? Number(formData.last_class) : null,
+          year_of_leaving: formData.year_of_leaving ? Number(formData.year_of_leaving) : null,
+          start_class: formData.start_class ? Number(formData.start_class) : null,
+          start_year: formData.start_year ? Number(formData.start_year) : null,
+          batch_year: formData.year_of_leaving || undefined,
           profession: formData.profession,
           company: formData.company,
           location: formData.location,
@@ -215,7 +226,11 @@ export default function AdminUsersPage() {
           middle_name: formData.middle_name || undefined,
           last_name: formData.last_name || undefined,
           full_name: `${formData.first_name || ''} ${formData.middle_name ? formData.middle_name + ' ' : ''}${formData.last_name || ''}`.trim(),
-          batch_year: formData.batch_year,
+          last_class: formData.last_class ? Number(formData.last_class) : null,
+          year_of_leaving: formData.year_of_leaving ? Number(formData.year_of_leaving) : null,
+          start_class: formData.start_class ? Number(formData.start_class) : null,
+          start_year: formData.start_year ? Number(formData.start_year) : null,
+          batch_year: formData.year_of_leaving || undefined,
           profession: formData.profession,
           company: formData.company,
           location: formData.location,
@@ -357,7 +372,10 @@ export default function AdminUsersPage() {
       first_name: '',
       middle_name: '',
       last_name: '',
-      batch_year: '',
+      last_class: '',
+      year_of_leaving: '',
+      start_class: '',
+      start_year: '',
       phone: '',
       profession: '',
       company: '',
@@ -377,7 +395,10 @@ export default function AdminUsersPage() {
       first_name: '',
       middle_name: '',
       last_name: '',
-      batch_year: user.batch_year.toString(),
+      last_class: user.last_class?.toString() || '',
+      year_of_leaving: user.year_of_leaving?.toString() || (user as any).batch_year?.toString() || '',
+      start_class: user.start_class?.toString() || '',
+      start_year: user.start_year?.toString() || '',
       profession: user.profession || '',
       company: user.company || '',
       location: user.location || '',
@@ -391,11 +412,11 @@ export default function AdminUsersPage() {
     const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.profession?.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesYear = !filterYear || user.batch_year.toString() === filterYear
+    const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
     return matchesSearch && matchesYear
   })
 
-  const batchYears = Array.from(new Set(users.map(u => u.batch_year))).sort((a, b) => b - a)
+  const leavingYears = Array.from(new Set(users.map(u => u.year_of_leaving).filter(Boolean) as number[])).sort((a, b) => (b - a))
 
   if (loading) {
     return (
@@ -465,14 +486,14 @@ export default function AdminUsersPage() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Batch Year (10th Standard)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Filter by Year of Leaving</label>
               <select
                 value={filterYear}
                 onChange={(e) => setFilterYear(e.target.value)}
                 className="input-field"
               >
                 <option value="">All Years</option>
-                {batchYears.map(year => (
+                {leavingYears.map(year => (
                   <option key={year} value={year}>{year}</option>
                 ))}
               </select>
@@ -573,16 +594,30 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year (10th Standard) *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Class Attended *</label>
+                  <select
+                    value={formData.last_class}
+                    onChange={(e) => setFormData({...formData, last_class: e.target.value})}
+                    required
+                    className="input-field"
+                  >
+                    <option value="">Select class</option>
+                    {Array.from({length:12}).map((_,i)=>i+1).map(n=> (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year of Leaving (YYYY) *</label>
                   <input
                     type="number"
-                    value={formData.batch_year}
-                    onChange={(e) => setFormData({...formData, batch_year: e.target.value})}
+                    value={formData.year_of_leaving}
+                    onChange={(e) => setFormData({...formData, year_of_leaving: e.target.value})}
                     required
                     min="1950"
-                    max="2030"
+                    max="2035"
                     className="input-field"
-                    placeholder="2000"
+                    placeholder="2005"
                   />
                 </div>
                 <div>
@@ -724,7 +759,10 @@ export default function AdminUsersPage() {
                       User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Batch Year (10th Standard)
+                      Last Class
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Year of Leaving
                     </th>
                     {/* Profession column hidden to reduce width */}
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -772,9 +810,12 @@ export default function AdminUsersPage() {
                           </div>
                         </div>
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {user.last_class ?? '-'}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
-                          {user.batch_year}
+                          {user.year_of_leaving ?? '-'}
                         </span>
                       </td>
                       {/* Profession column removed to reduce width */}

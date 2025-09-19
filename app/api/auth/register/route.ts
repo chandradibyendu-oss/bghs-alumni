@@ -10,29 +10,35 @@ const supabaseAdmin = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, password, first_name, middle_name, last_name, batch_year, email_otp, phone_otp } = await request.json()
+    const { email, phone, password, first_name, middle_name, last_name, last_class, year_of_leaving, start_class, start_year, email_otp, phone_otp } = await request.json()
 
     // Require at least one contact method
-    if ((!email && !phone) || !password || !first_name || !last_name || !batch_year) {
+    if ((!email && !phone) || !password || !first_name || !last_name || !year_of_leaving || !last_class) {
       return NextResponse.json({ error: 'Provide email or phone and all required fields' }, { status: 400 })
     }
 
-    // If email provided, require OTP and verify
+    // Require OTP for whichever contact(s) are provided, but at least one must be valid
+    let verifiedAny = false
     if (email) {
       if (!email_otp || String(email_otp).length !== 6) {
-        return NextResponse.json({ error: 'Email OTP required' }, { status: 400 })
+        // allow phone-only verification if phone supplied
+      } else {
+        const ok = await verifyOTPFromDB(email, null, String(email_otp))
+        if (!ok) return NextResponse.json({ error: 'Invalid email OTP' }, { status: 400 })
+        verifiedAny = true
       }
-      const ok = await verifyOTPFromDB(email, null, String(email_otp))
-      if (!ok) return NextResponse.json({ error: 'Invalid email OTP' }, { status: 400 })
     }
-
-    // If phone provided, require OTP and verify
     if (phone) {
       if (!phone_otp || String(phone_otp).length !== 6) {
-        return NextResponse.json({ error: 'Phone OTP required' }, { status: 400 })
+        // allow email-only verification if email supplied
+      } else {
+        const ok = await verifyOTPFromDB(null, phone, String(phone_otp))
+        if (!ok) return NextResponse.json({ error: 'Invalid phone OTP' }, { status: 400 })
+        verifiedAny = true
       }
-      const ok = await verifyOTPFromDB(null, phone, String(phone_otp))
-      if (!ok) return NextResponse.json({ error: 'Invalid phone OTP' }, { status: 400 })
+    }
+    if (!verifiedAny) {
+      return NextResponse.json({ error: 'Verify email or phone with OTP' }, { status: 400 })
     }
 
     // Basic password rule: enforced again by reset route; keep consistent
@@ -50,7 +56,7 @@ export async function POST(request: NextRequest) {
       password,
       email_confirm: !!email,
       phone_confirm: !!phone,
-      user_metadata: { first_name, middle_name, last_name, batch_year: parseInt(batch_year) }
+      user_metadata: { first_name, middle_name, last_name, last_class: Number(last_class), year_of_leaving: Number(year_of_leaving), start_class: start_class ? Number(start_class) : null, start_year: start_year ? Number(start_year) : null, batch_year: Number(year_of_leaving) }
     })
 
     if (createErr || !userRes?.user) {
@@ -68,7 +74,12 @@ export async function POST(request: NextRequest) {
         first_name: first_name.trim(),
         middle_name: middle_name ? middle_name.trim() : null,
         last_name: last_name.trim(),
-        batch_year: parseInt(batch_year),
+        last_class: Number(last_class),
+        year_of_leaving: Number(year_of_leaving),
+        start_class: start_class ? Number(start_class) : null,
+        start_year: start_year ? Number(start_year) : null,
+        // legacy support
+        batch_year: Number(year_of_leaving),
         is_approved: false
       })
 

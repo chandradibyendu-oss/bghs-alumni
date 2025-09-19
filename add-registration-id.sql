@@ -70,3 +70,4 @@ CREATE INDEX IF NOT EXISTS idx_profiles_registration_id ON profiles(registration
 COMMENT ON COLUMN profiles.registration_id IS 'Memorable registration ID in format BGHS-YYYY-XXXX (e.g., BGHS-2024-0001)';
 
 
+

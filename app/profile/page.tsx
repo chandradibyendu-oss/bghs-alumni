@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 
 interface Profile {
@@ -95,7 +96,14 @@ export default function ProfilePage() {
         .update(updates)
         .eq('id', profile.id)
       if (error) throw error
-      toast.success('Profile updated')
+      toast.success('Profile updated successfully!')
+      
+      // Show success message with navigation options
+      setTimeout(() => {
+        toast.success('Profile saved! You can continue editing or go back to home.', {
+          duration: 4000,
+        })
+      }, 500)
     } catch (e) {
       toast.error('Update failed')
     } finally {
@@ -197,11 +205,23 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-gray-50 py-10">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          {/* Breadcrumb Navigation */}
+          <nav className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+            <Link href="/" className="hover:text-gray-700">Home</Link>
+            <span>/</span>
+            <span className="text-gray-700 font-medium">My Profile</span>
+          </nav>
+
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-gray-900">My Profile</h1>
-            {!profile.is_approved && (
-              <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending approval</span>
-            )}
+            <div className="flex items-center gap-3">
+              {!profile.is_approved && (
+                <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending approval</span>
+              )}
+              <Link href="/" className="btn-secondary">
+                Back to Home
+              </Link>
+            </div>
           </div>
 
           {/* Avatar */}
@@ -343,10 +363,24 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end">
-            <button onClick={save} disabled={saving} className="btn-primary px-6 py-2 disabled:opacity-50">
-              {saving ? 'Saving...' : 'Save Changes'}
-            </button>
+          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200">
+            <div className="flex items-center gap-3">
+              <Link href="/dashboard" className="text-gray-600 hover:text-gray-800 text-sm">
+                ← Back to Dashboard
+              </Link>
+              <span className="text-gray-300">|</span>
+              <Link href="/directory" className="text-gray-600 hover:text-gray-800 text-sm">
+                View Alumni Directory
+              </Link>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link href="/" className="btn-secondary">
+                Go to Home
+              </Link>
+              <button onClick={save} disabled={saving} className="btn-primary px-6 py-2 disabled:opacity-50">
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </div>
       </div>

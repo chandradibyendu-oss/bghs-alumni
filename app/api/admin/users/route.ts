@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Get the request body
-    const { email, phone, password, first_name, middle_name, last_name, batch_year, profession, company, location, bio, linkedin_url, website_url } = await request.json()
+    const { email, phone, password, first_name, middle_name, last_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, batch_year } = await request.json()
 
-    // Validate required fields
-    if (!email || !phone || !password || !first_name || !last_name || !batch_year) {
+    // Validate required fields (use new fields; keep batch_year temporarily optional for back-compat)
+    if (!email || !phone || !password || !first_name || !last_name || !(Number.isFinite(Number(year_of_leaving)) && Number(year_of_leaving) > 1900) || !(Number.isFinite(Number(last_class)) && Number(last_class) >= 1 && Number(last_class) <= 12)) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
     }
 
@@ -50,7 +50,12 @@ export async function POST(request: NextRequest) {
         first_name,
         middle_name,
         last_name,
-        batch_year: parseInt(batch_year)
+        last_class: Number(last_class),
+        year_of_leaving: Number(year_of_leaving),
+        start_class: start_class ? Number(start_class) : null,
+        start_year: start_year ? Number(start_year) : null,
+        // legacy value for any consumers still reading it
+        batch_year: year_of_leaving ? Number(year_of_leaving) : (batch_year ? Number(batch_year) : null)
       }
     })
 
@@ -69,7 +74,12 @@ export async function POST(request: NextRequest) {
         first_name: first_name.trim(),
         middle_name: middle_name ? middle_name.trim() : null,
         last_name: last_name.trim(),
-        batch_year: parseInt(batch_year),
+        last_class: Number(last_class),
+        year_of_leaving: Number(year_of_leaving),
+        start_class: start_class ? Number(start_class) : null,
+        start_year: start_year ? Number(start_year) : null,
+        // keep legacy column populated if it still exists
+        batch_year: year_of_leaving ? Number(year_of_leaving) : null,
         profession: profession || null,
         company: company || null,
         location: location || null,
@@ -153,7 +163,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get the request body
-    const { id, full_name, batch_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role } = await request.json()
+    const { id, full_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role, batch_year } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
@@ -162,7 +172,12 @@ export async function PUT(request: NextRequest) {
     // Build updates only with provided fields
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
     if (full_name !== undefined) updates.full_name = full_name
-    if (batch_year !== undefined) updates.batch_year = Number.parseInt(batch_year)
+    if (last_class !== undefined) updates.last_class = last_class === null ? null : Number(last_class)
+    if (year_of_leaving !== undefined) updates.year_of_leaving = year_of_leaving === null ? null : Number(year_of_leaving)
+    if (start_class !== undefined) updates.start_class = start_class === null ? null : Number(start_class)
+    if (start_year !== undefined) updates.start_year = start_year === null ? null : Number(start_year)
+    // keep legacy column in sync, if present
+    if (year_of_leaving !== undefined) updates.batch_year = year_of_leaving === null ? null : Number(year_of_leaving)
     if (profession !== undefined) updates.profession = profession || null
     if (company !== undefined) updates.company = company || null
     if (location !== undefined) updates.location = location || null

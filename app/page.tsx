@@ -161,7 +161,7 @@ export default function Home() {
               />
               <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
                 <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
-                <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</span>
+                <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
               </div>
             </div>
             <div className="hidden md:flex items-center space-x-8">
@@ -242,19 +242,35 @@ export default function Home() {
       )}
 
       {/* Hero Slideshow Section */}
-      <section className="relative h-[80vh] overflow-hidden">
-        {/* Background Image with Overlay */}
+      <section className="relative h-screen overflow-hidden">
+        {/* Background Video with Overlay */}
         <div className="absolute inset-0 z-0">
-          <div 
-            className="w-full h-full bg-cover bg-center bg-no-repeat opacity-90 transition-all duration-1000"
+          <video 
+            className="w-full h-full min-w-full min-h-full object-cover opacity-95"
+            autoPlay 
+            muted 
+            loop 
+            playsInline
+            preload="auto"
             style={{
-              backgroundImage: `url('${currentSlideData.backgroundImage}')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
+              objectFit: 'cover',
+              objectPosition: 'center 10%'
             }}
-          />
-          {/* Elegant Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-gray-600/70 via-gray-500/60 to-slate-600/70"></div>
+          >
+            <source src="/bghs-5mb.mp4" type="video/mp4" />
+            {/* Fallback image if video fails to load */}
+            <div 
+              className="w-full h-full bg-cover bg-center bg-no-repeat"
+              style={{
+                backgroundImage: `url('${currentSlideData.backgroundImage}')`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center'
+              }}
+            />
+          </video>
+          {/* Enhanced Overlay to match About page */}
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-transparent to-accent-900/20"></div>
         </div>
         
         {/* Content */}
@@ -269,17 +285,17 @@ export default function Home() {
               </div>
             )}
             
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 drop-shadow-lg">
-              <span className="bg-gradient-to-r from-white to-accent-200 bg-clip-text text-transparent">
+            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 drop-shadow-2xl">
+              <span className="bg-gradient-to-r from-white via-white to-accent-100 bg-clip-text text-transparent">
                 {currentSlideData.title}
               </span>
             </h1>
             
-            <h2 className="text-xl md:text-2xl text-primary-100 mb-6 drop-shadow-md">
+            <h2 className="text-xl md:text-2xl text-white mb-6 drop-shadow-lg font-medium">
               {currentSlideData.subtitle}
             </h2>
             
-            <p className="text-lg text-primary-100 mb-8 max-w-3xl mx-auto drop-shadow-md">
+            <p className="text-lg text-white mb-8 max-w-3xl mx-auto drop-shadow-md">
               {currentSlideData.description}
             </p>
             
@@ -292,7 +308,7 @@ export default function Home() {
               </Link>
               <Link 
                 href={currentSlideData.cta.secondary.href} 
-                className="bg-transparent text-white border-2 border-white hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="bg-transparent text-white border-2 border-white/90 hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 {currentSlideData.cta.secondary.text}
               </Link>
@@ -415,7 +431,7 @@ export default function Home() {
                Join thousands of BGHS alumni who are already part of our growing community
              </p>
              <p className="text-lg text-primary-200 mb-8">
-               বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি
+               বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়
              </p>
 
              <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200">
@@ -438,7 +454,7 @@ export default function Home() {
                  />
                  <div className="flex flex-col">
                    <span className="text-lg font-semibold">BGHS Alumni</span>
-                   <span className="text-xs text-gray-400">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</span>
+                   <span className="text-xs text-gray-400">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
                  </div>
                </div>
                <p className="text-gray-400">
