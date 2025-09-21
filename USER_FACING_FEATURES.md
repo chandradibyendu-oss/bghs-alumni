@@ -407,3 +407,4 @@ This document outlines all user-facing features based on navigation paths, menu 
 *Framework: Next.js 14.2.32*
 *Database: Supabase*
 
+

@@ -752,7 +752,7 @@ export default function AdminUsersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="w-full min-w-[1200px] divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -777,7 +777,7 @@ export default function AdminUsersPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-32">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
                       Actions
                     </th>
                   </tr>
@@ -852,24 +852,26 @@ export default function AdminUsersPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2 min-w-[7rem]">
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium w-40">
+                        <div className="flex justify-end space-x-3">
                           <button
                             onClick={() => handleAdminResetPassword(user)}
-                            className="text-amber-600 hover:text-amber-800 transition-colors"
+                            className="text-amber-600 hover:text-amber-800 transition-colors p-1"
                             title="Reset password"
                           >
                             <KeyRound className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => startEdit(user)}
-                            className="text-primary-600 hover:text-primary-900 transition-colors"
+                            className="text-primary-600 hover:text-primary-900 transition-colors p-1"
+                            title="Edit user"
                           >
                             <Edit className="h-5 w-5" />
                           </button>
                           <button
                             onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900 transition-colors"
+                            className="text-red-600 hover:text-red-900 transition-colors p-1"
+                            title="Delete user"
                           >
                             <Trash2 className="h-5 w-5" />
                           </button>

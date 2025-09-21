@@ -10,7 +10,10 @@ const supabaseAdmin = () => {
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, phone, password, first_name, middle_name, last_name, last_class, year_of_leaving, start_class, start_year, email_otp, phone_otp } = await request.json()
+    const { 
+      email, phone, password, first_name, middle_name, last_name, last_class, year_of_leaving, start_class, start_year, 
+      email_otp, phone_otp, verification 
+    } = await request.json()
 
     // Require at least one contact method
     if ((!email && !phone) || !password || !first_name || !last_name || !year_of_leaving || !last_class) {
@@ -92,6 +95,71 @@ export async function POST(request: NextRequest) {
     // Mark OTPs as used
     if (email && email_otp) { await markOTPAsUsed(email, null, String(email_otp)) }
     if (phone && phone_otp) { await markOTPAsUsed(null, phone, String(phone_otp)) }
+
+    // Handle verification data if provided
+    if (verification) {
+      const {
+        has_evidence,
+        evidence_files,
+        has_references,
+        reference_1,
+        reference_2,
+        reference_1_valid,
+        reference_2_valid
+      } = verification
+
+      // Validate verification requirements
+      if (!has_evidence && !has_references) {
+        // Clean up created user and profile if verification is invalid
+        await admin.auth.admin.deleteUser(userRes.user.id)
+        return NextResponse.json({ 
+          error: 'Either evidence files or references are required for verification' 
+        }, { status: 400 })
+      }
+
+      // Validate references if provided
+      if (has_references) {
+        if (!reference_1 || !reference_2) {
+          await admin.auth.admin.deleteUser(userRes.user.id)
+          return NextResponse.json({ 
+            error: 'Both reference IDs are required when using references' 
+          }, { status: 400 })
+        }
+        
+        if (!reference_1_valid || !reference_2_valid) {
+          await admin.auth.admin.deleteUser(userRes.user.id)
+          return NextResponse.json({ 
+            error: 'Both reference IDs must be valid' 
+          }, { status: 400 })
+        }
+      }
+
+      // Create verification record
+      const verificationData = {
+        user_id: userRes.user.id,
+        has_evidence: has_evidence || false,
+        evidence_files: has_evidence && evidence_files ? evidence_files : [],
+        has_references: has_references || false,
+        reference_1: has_references ? reference_1 : null,
+        reference_2: has_references ? reference_2 : null,
+        reference_1_valid: has_references ? reference_1_valid : false,
+        reference_2_valid: has_references ? reference_2_valid : false,
+        verification_status: 'pending'
+      }
+
+      const { error: verificationErr } = await admin
+        .from('alumni_verification')
+        .insert(verificationData)
+
+      if (verificationErr) {
+        console.error('Verification creation error:', verificationErr)
+        // Clean up created user and profile if verification fails
+        await admin.auth.admin.deleteUser(userRes.user.id)
+        return NextResponse.json({ 
+          error: 'Could not save verification data' 
+        }, { status: 500 })
+      }
+    }
 
     return NextResponse.json({ success: true, pendingApproval: true })
   } catch (e) {

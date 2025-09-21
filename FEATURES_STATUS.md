@@ -186,3 +186,4 @@ This document outlines the implementation status of features for the BGHS Alumni
 *Framework: Next.js 14.2.32*
 *Database: Supabase*
 
+
