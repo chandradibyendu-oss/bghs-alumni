@@ -383,7 +383,8 @@ export class PDFGenerator {
       const { puppeteer, chromium } = await getPuppeteer()
       let browser: any
       if (isServerless) {
-        const executablePath = await (chromium.executablePath?.(chromium.path) || chromium.executablePath())
+        // Use the correct executablePath method for @sparticuz/chromium
+        const executablePath = await chromium.executablePath()
         browser = await puppeteer.launch({
           args: chromium.args,
           defaultViewport: chromium.defaultViewport,
