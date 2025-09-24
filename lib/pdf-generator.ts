@@ -1,11 +1,8 @@
-// Serverless: prefer Playwright (playwright-aws-lambda) which bundles all deps
-// Local dev: use Puppeteer
-let puppeteerLib: any
+// Use Playwright for both local and serverless environments for consistency
 let playwrightAws: any
 let playwrightCore: any
-const isServerless = process.env.VERCEL === '1' || process.env.NOW_REGION !== undefined
 
-async function getBrowserServerless() {
+async function getBrowser() {
   if (!playwrightAws) {
     const aws = await import('playwright-aws-lambda')
     playwrightAws = aws
@@ -23,14 +20,6 @@ async function getBrowserServerless() {
     headless: true,
   })
   return browser
-}
-
-async function getBrowserLocal() {
-  if (!puppeteerLib) {
-    const mod = await import('puppeteer')
-    puppeteerLib = mod.default || mod
-  }
-  return puppeteerLib.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
 }
 import { EvidenceFile } from './r2-storage'
 
@@ -389,12 +378,7 @@ export class PDFGenerator {
       const html = this.replaceTemplateVariables(this.htmlTemplate, data)
 
       // Launch Puppeteer (serverless vs local)
-      let browser: any
-      if (isServerless) {
-        browser = await getBrowserServerless()
-      } else {
-        browser = await getBrowserLocal()
-      }
+      const browser = await getBrowser()
 
       const page = await browser.newPage()
       
