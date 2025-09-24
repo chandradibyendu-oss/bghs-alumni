@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  // Optional: allow manual trigger via GET with the same secret
+  // Allow manual trigger via GET (Vercel Run button issues GET)
   const vercelCron = request.headers.get('x-vercel-cron')
   const secret = request.headers.get('x-cron-key') || request.headers.get('X-CRON-KEY')
   const userAgent = request.headers.get('user-agent') || ''
@@ -32,7 +32,15 @@ export async function GET(request: NextRequest) {
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  return NextResponse.json({ ok: true })
+
+  const nextJob = await databaseQueue.getNextJob('pdf_generation')
+  if (!nextJob) {
+    return new NextResponse(null, { status: 204 })
+  }
+
+  const body = JSON.stringify({ jobId: nextJob.id })
+  const req = new Request(request.url, { method: 'POST', body, headers: { 'content-type': 'application/json' } })
+  return await processJob(req as any)
 }
 
 
