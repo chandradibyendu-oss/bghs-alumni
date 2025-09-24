@@ -3,8 +3,10 @@ import { databaseQueue } from '@/lib/queue-service'
 import { POST as processJob } from '@/app/api/admin/process-pdf/route'
 
 export async function POST(request: NextRequest) {
+  const vercelCron = request.headers.get('x-vercel-cron')
   const secret = request.headers.get('x-cron-key') || request.headers.get('X-CRON-KEY')
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  const isAuthorized = Boolean(vercelCron) || (process.env.CRON_SECRET && secret === process.env.CRON_SECRET)
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -22,8 +24,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   // Optional: allow manual trigger via GET with the same secret
+  const vercelCron = request.headers.get('x-vercel-cron')
   const secret = request.headers.get('x-cron-key') || request.headers.get('X-CRON-KEY')
-  if (!process.env.CRON_SECRET || secret !== process.env.CRON_SECRET) {
+  const isAuthorized = Boolean(vercelCron) || (process.env.CRON_SECRET && secret === process.env.CRON_SECRET)
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   return NextResponse.json({ ok: true })
