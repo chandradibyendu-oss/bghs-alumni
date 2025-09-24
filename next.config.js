@@ -3,8 +3,8 @@ const nextConfig = {
   // Transpile lucide-react to avoid missing vendor-chunk issues on some Windows setups
   transpilePackages: ['lucide-react'],
   experimental: {
-    // Ensure playwright packages are externalized
-    serverComponentsExternalPackages: ['playwright-aws-lambda', 'playwright-core']
+    // Ensure chromium packages are externalized
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core']
   },
   images: {
     remotePatterns: [

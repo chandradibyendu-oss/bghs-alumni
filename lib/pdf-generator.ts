@@ -1,23 +1,24 @@
-// Use Playwright for both local and serverless environments for consistency
-let playwrightAws: any
-let playwrightCore: any
+// Use @sparticuz/chromium + puppeteer-core for serverless compatibility
+let chromium: any
+let puppeteerCore: any
 
 async function getBrowser() {
-  if (!playwrightAws) {
-    const aws = await import('playwright-aws-lambda')
-    playwrightAws = aws
+  if (!chromium) {
+    const mod = await import('@sparticuz/chromium')
+    chromium = mod.default || mod
   }
-  if (!playwrightCore) {
-    const core = await import('playwright-core')
-    playwrightCore = core
+  if (!puppeteerCore) {
+    const mod = await import('puppeteer-core')
+    puppeteerCore = mod.default || mod
   }
-  const { chromium } = playwrightCore
-  // playwright-aws-lambda provides chromium args and executablePath
-  const executablePath = await playwrightAws.executablePath()
-  const browser = await chromium.launch({
-    args: playwrightAws.args,
+  
+  const executablePath = await chromium.executablePath()
+  const browser = await puppeteerCore.launch({
+    args: chromium.args,
+    defaultViewport: chromium.defaultViewport,
     executablePath,
-    headless: true,
+    headless: chromium.headless !== false,
+    ignoreHTTPSErrors: true,
   })
   return browser
 }
