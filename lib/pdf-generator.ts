@@ -1,4 +1,28 @@
-import puppeteer from 'puppeteer'
+// Use serverless-compatible Chromium on Vercel and full Puppeteer locally
+let puppeteerLib: any
+let chromium: any
+const isServerless = !!process.env.VERCEL
+
+async function getPuppeteer() {
+  if (isServerless) {
+    if (!chromium) {
+      // Lazy import to avoid bundling issues
+      const mod = await import('@sparticuz/chromium')
+      chromium = mod.default || mod
+    }
+    if (!puppeteerLib) {
+      const mod = await import('puppeteer-core')
+      puppeteerLib = mod.default || mod
+    }
+    return { puppeteer: puppeteerLib, chromium }
+  }
+
+  if (!puppeteerLib) {
+    const mod = await import('puppeteer')
+    puppeteerLib = mod.default || mod
+  }
+  return { puppeteer: puppeteerLib, chromium: null as any }
+}
 import { EvidenceFile } from './r2-storage'
 
 export interface RegistrationPDFData {
@@ -355,11 +379,24 @@ export class PDFGenerator {
       // Simple template replacement instead of Handlebars
       const html = this.replaceTemplateVariables(this.htmlTemplate, data)
 
-      // Launch Puppeteer
-      const browser = await puppeteer.launch({
-        headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-      })
+      // Launch Puppeteer (serverless vs local)
+      const { puppeteer, chromium } = await getPuppeteer()
+      let browser: any
+      if (isServerless) {
+        const executablePath = await (chromium.executablePath?.(chromium.path) || chromium.executablePath())
+        browser = await puppeteer.launch({
+          args: chromium.args,
+          defaultViewport: chromium.defaultViewport,
+          executablePath,
+          headless: chromium.headless !== false,
+          ignoreHTTPSErrors: true,
+        })
+      } else {
+        browser = await puppeteer.launch({
+          headless: true,
+          args: ['--no-sandbox', '--disable-setuid-sandbox']
+        })
+      }
 
       const page = await browser.newPage()
       
