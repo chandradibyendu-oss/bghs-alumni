@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/admin/process-pdf/next",
-      "schedule": "* * * * *",
+      "schedule": "0 0 * * *",
       "methods": ["POST"],
       "headers": {
         "X-CRON-KEY": "@CRON_SECRET"
