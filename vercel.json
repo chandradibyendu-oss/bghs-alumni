@@ -1,0 +1,12 @@
+{
+  "crons": [
+    {
+      "path": "/api/admin/process-pdf/next",
+      "schedule": "* * * * *",
+      "method": "POST",
+      "headers": {
+        "X-CRON-KEY": "@cron_secret"
+      }
+    }
+  ]
+}

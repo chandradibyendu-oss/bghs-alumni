@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifyOTPFromDB, markOTPAsUsed } from '@/lib/otp-utils'
+import { databaseQueue } from '@/lib/queue-service'
+import { r2Storage } from '@/lib/r2-storage'
 
 const supabaseAdmin = () => {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -9,39 +11,41 @@ const supabaseAdmin = () => {
 }
 
 export async function POST(request: NextRequest) {
+  // Capture sessionId early so it's available in catch cleanup
+  let sessionIdFromRequest: string | undefined
   try {
     const { 
       email, phone, password, first_name, middle_name, last_name, last_class, year_of_leaving, start_class, start_year, 
-      email_otp, phone_otp, verification 
+      email_otp, phone_otp, verification, sessionId 
     } = await request.json()
 
-    // Require at least one contact method
-    if ((!email && !phone) || !password || !first_name || !last_name || !year_of_leaving || !last_class) {
-      return NextResponse.json({ error: 'Provide email or phone and all required fields' }, { status: 400 })
+    sessionIdFromRequest = sessionId
+
+    // Require email and all other required fields
+    if (!email || !password || !first_name || !last_name || !year_of_leaving || !last_class) {
+      return NextResponse.json({ error: 'Email and all required fields must be provided' }, { status: 400 })
     }
 
-    // Require OTP for whichever contact(s) are provided, but at least one must be valid
-    let verifiedAny = false
-    if (email) {
-      if (!email_otp || String(email_otp).length !== 6) {
-        // allow phone-only verification if phone supplied
-      } else {
-        const ok = await verifyOTPFromDB(email, null, String(email_otp))
-        if (!ok) return NextResponse.json({ error: 'Invalid email OTP' }, { status: 400 })
-        verifiedAny = true
-      }
+    // Normalize email (trim + lowercase)
+    const normalizedEmail = String(email).trim().toLowerCase()
+
+    // Require email OTP verification
+    if (!email_otp || String(email_otp).length !== 6) {
+      return NextResponse.json({ error: 'Email OTP is required' }, { status: 400 })
     }
+    const emailVerified = await verifyOTPFromDB(normalizedEmail, null, String(email_otp))
+    if (!emailVerified) {
+      return NextResponse.json({ error: 'Invalid email OTP' }, { status: 400 })
+    }
+    
+    // Phone OTP verification is optional - only if phone is provided
     if (phone) {
-      if (!phone_otp || String(phone_otp).length !== 6) {
-        // allow email-only verification if email supplied
-      } else {
-        const ok = await verifyOTPFromDB(null, phone, String(phone_otp))
-        if (!ok) return NextResponse.json({ error: 'Invalid phone OTP' }, { status: 400 })
-        verifiedAny = true
+      if (phone_otp && String(phone_otp).length === 6) {
+        const phoneVerified = await verifyOTPFromDB(null, phone, String(phone_otp))
+        if (!phoneVerified) {
+          return NextResponse.json({ error: 'Invalid phone OTP' }, { status: 400 })
+        }
       }
-    }
-    if (!verifiedAny) {
-      return NextResponse.json({ error: 'Verify email or phone with OTP' }, { status: 400 })
     }
 
     // Basic password rule: enforced again by reset route; keep consistent
@@ -52,12 +56,12 @@ export async function POST(request: NextRequest) {
 
     const admin = supabaseAdmin()
 
-    // Create auth user (email confirmation optional here)
+    // Create auth user (email is required, phone optional)
     const { data: userRes, error: createErr } = await admin.auth.admin.createUser({
-      email: email || undefined,
+      email: normalizedEmail,
       phone: phone || undefined,
       password,
-      email_confirm: !!email,
+      email_confirm: true,
       phone_confirm: !!phone,
       user_metadata: { first_name, middle_name, last_name, last_class: Number(last_class), year_of_leaving: Number(year_of_leaving), start_class: start_class ? Number(start_class) : null, start_year: start_year ? Number(start_year) : null, batch_year: Number(year_of_leaving) }
     })
@@ -72,7 +76,7 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .insert({
         id: userRes.user.id,
-        email: email || null,
+        email: normalizedEmail,
         phone: phone || null,
         first_name: first_name.trim(),
         middle_name: middle_name ? middle_name.trim() : null,
@@ -93,7 +97,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Mark OTPs as used
-    if (email && email_otp) { await markOTPAsUsed(email, null, String(email_otp)) }
+    await markOTPAsUsed(normalizedEmail, null, String(email_otp))
     if (phone && phone_otp) { await markOTPAsUsed(null, phone, String(phone_otp)) }
 
     // Handle verification data if provided
@@ -159,12 +163,61 @@ export async function POST(request: NextRequest) {
           error: 'Could not save verification data' 
         }, { status: 500 })
       }
+
+      // Move temporary evidence files to permanent location
+      if (sessionId && verification?.has_evidence) {
+        try {
+          const permanentFiles = await r2Storage.moveTempEvidenceToPermanent(sessionId, userRes.user.id)
+          
+          // Update verification record with permanent file URLs
+          if (permanentFiles.length > 0) {
+            await admin
+              .from('alumni_verification')
+              .update({
+                evidence_files: permanentFiles,
+                has_evidence: true
+              })
+              .eq('user_id', userRes.user.id)
+          }
+        } catch (fileError) {
+          console.error('Failed to move temp files to permanent:', fileError)
+          // Clean up user if file move fails
+          await admin.auth.admin.deleteUser(userRes.user.id)
+          return NextResponse.json({ 
+            error: 'Failed to process evidence files' 
+          }, { status: 500 })
+        }
+      }
+
+      // Queue PDF generation job for admin notification
+      try {
+        await databaseQueue.addJob('pdf_generation', { userId: userRes.user.id })
+        console.log('PDF generation job queued for user:', userRes.user.id)
+      } catch (queueError) {
+        console.error('Failed to queue PDF generation:', queueError)
+        // Don't fail registration if PDF queue fails - just log the error
+      }
     }
 
     return NextResponse.json({ success: true, pendingApproval: true })
   } catch (e) {
     console.error('Register error:', e)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    
+    // Clean up temporary files if sessionId exists
+    if (sessionIdFromRequest) {
+      try {
+        await r2Storage.deleteTempEvidenceFiles(sessionIdFromRequest)
+        console.log('Temporary files cleaned up for session:', sessionIdFromRequest)
+      } catch (cleanupError) {
+        console.error('Failed to cleanup temp files:', cleanupError)
+      }
+    }
+    
+    return NextResponse.json({ 
+      error: e instanceof Error && e.message.includes('email_exists') 
+        ? 'A user with this email address already exists' 
+        : 'Internal server error' 
+    }, { status: 500 })
   }
 }
 

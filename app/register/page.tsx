@@ -34,6 +34,8 @@ export default function RegisterPage() {
   
   // Verification fields state
   const [evidenceFiles, setEvidenceFiles] = useState<File[]>([])
+  const [tempEvidenceFiles, setTempEvidenceFiles] = useState<any[]>([]) // Store temp file data
+  const [sessionId, setSessionId] = useState<string>('') // Session ID for temp uploads
   const [reference1, setReference1] = useState('')
   const [reference2, setReference2] = useState('')
   const [reference1Valid, setReference1Valid] = useState(false)
@@ -57,14 +59,23 @@ export default function RegisterPage() {
   const passwordRef = useRef<HTMLInputElement|null>(null)
 
   const strongPw = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/
-  const contactProvided = !!(email || phone)
-  const oneVerified = (email && emailVerified) || (phone && phoneVerified)
+  const emailProvided = !!email
+  const phoneProvided = !!phone
+  const emailVerifiedRequired = email && emailVerified
+  const phoneVerifiedOptional = !phone || (phone && phoneVerified)
   
   // Verification validation
   const hasEvidence = evidenceFiles.length > 0
   const hasReferences = reference1.trim() && reference2.trim() && reference1Valid && reference2Valid
   const hasPartialReferences = (reference1.trim() && reference1Valid) || (reference2.trim() && reference2Valid)
   const hasVerification = hasEvidence || hasReferences
+
+  // Generate session ID on component mount
+  useEffect(() => {
+    if (!sessionId) {
+      setSessionId(`session-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
+    }
+  }, [sessionId])
 
   // Decrement cooldown timers every second while active
   useEffect(() => {
@@ -95,9 +106,9 @@ export default function RegisterPage() {
 
     if (!firstName.trim()) { nextFieldErrors.firstName = 'Enter first name'; if (!firstInvalid) firstInvalid = firstNameRef.current }
     if (!lastName.trim()) { nextFieldErrors.lastName = 'Enter last name'; if (!firstInvalid) firstInvalid = lastNameRef.current }
-    if (!email && !phone) {
-      nextFieldErrors.contact = 'Provide at least an email or a phone number'
-      if (!firstInvalid) firstInvalid = (emailInputRef.current || phoneInputRef.current) as unknown as HTMLElement
+    if (!email.trim()) { 
+      nextFieldErrors.email = 'Email is required'; 
+      if (!firstInvalid) firstInvalid = emailInputRef.current 
     }
     if (!/^(?:[1-9]|1[0-2])$/.test(lastClass)) { nextFieldErrors.lastClass = 'Select last class (1-12)'; if (!firstInvalid) firstInvalid = lastClassRef.current }
     if (!/^[0-9]{4}$/.test(yearOfLeaving)) { nextFieldErrors.yearOfLeaving = 'Enter a valid 4-digit year'; if (!firstInvalid) firstInvalid = yearRef.current }
@@ -122,47 +133,29 @@ export default function RegisterPage() {
       return
     }
 
-    const atLeastOneVerified = (email && emailVerified) || (phone && phoneVerified)
-    if (!atLeastOneVerified) {
-      setError('Verify email or phone with OTP')
-      if (phone) {
-        setShowPhoneOTP(true)
-        if (!lastPhoneSentTo || lastPhoneSentTo !== phone) { try { await sendPhoneOtp() } catch {} }
-        setTimeout(() => { phoneOtpRef.current?.focus(); phoneFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 0)
-      } else if (email) {
-        setShowEmailOTP(true)
-        if (!lastEmailSentTo || lastEmailSentTo !== email) { try { await sendEmailOtp() } catch {} }
-        setTimeout(() => { emailOtpRef.current?.focus(); emailFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 0)
-      }
+    // Email verification is required
+    if (!emailVerified) {
+      setError('Verify email with OTP')
+      setShowEmailOTP(true)
+      if (!lastEmailSentTo || lastEmailSentTo !== email) { try { await sendEmailOtp() } catch {} }
+      setTimeout(() => { emailOtpRef.current?.focus(); emailFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 0)
+      return
+    }
+    
+    // Phone verification is optional - only if phone is provided
+    if (phone && !phoneVerified) {
+      setError('Verify phone with OTP (optional)')
+      setShowPhoneOTP(true)
+      if (!lastPhoneSentTo || lastPhoneSentTo !== phone) { try { await sendPhoneOtp() } catch {} }
+      setTimeout(() => { phoneOtpRef.current?.focus(); phoneFieldRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }) }, 0)
       return
     }
 
     setLoading(true)
-    setUploading(true)
     
     try {
-      // Step 1: Upload evidence files if any
-      let uploadedEvidenceFiles: any[] = []
-      if (hasEvidence && evidenceFiles.length > 0) {
-        const formData = new FormData()
-        evidenceFiles.forEach(file => formData.append('files', file))
-        // Generate temporary user ID for file organization (will be replaced with real user ID after registration)
-        const tempUserId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-        formData.append('userId', tempUserId)
-        
-        const uploadRes = await fetch('/api/evidence/upload', {
-          method: 'POST',
-          body: formData
-        })
-        
-        if (!uploadRes.ok) {
-          const uploadError = await uploadRes.json()
-          throw new Error(uploadError.error || 'Failed to upload evidence files')
-        }
-        
-        const uploadData = await uploadRes.json()
-        uploadedEvidenceFiles = uploadData.data.files
-      }
+      // Evidence files are already uploaded to temporary storage
+      // The backend will move them to permanent location on successful registration
 
       // Step 2: Submit registration with verification data
       const res = await fetch('/api/auth/register', {
@@ -183,9 +176,10 @@ export default function RegisterPage() {
           email_otp: emailVerified ? emailOtp : undefined,
           phone_otp: phoneVerified ? phoneOtp : undefined,
           // Verification data with uploaded file URLs
+          sessionId,
           verification: {
             has_evidence: hasEvidence,
-            evidence_files: uploadedEvidenceFiles,
+            evidence_files: tempEvidenceFiles, // Use temp file data
             has_references: hasReferences,
             reference_1: reference1.trim() || null,
             reference_2: reference2.trim() || null,
@@ -197,6 +191,18 @@ export default function RegisterPage() {
       
       const data = await res.json()
       if (!res.ok) {
+        // Clean up temporary files on registration failure
+        if (sessionId) {
+          try {
+            await fetch('/api/evidence/temp-upload', {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionId })
+            })
+          } catch (cleanupError) {
+            console.error('Failed to cleanup temp files:', cleanupError)
+          }
+        }
         setError(data.error || 'Registration failed')
         return
       }
@@ -204,10 +210,23 @@ export default function RegisterPage() {
       setMessage('Registration submitted successfully! An admin will review your verification and approve your account.')
     } catch (error) {
       console.error('Registration error:', error)
+      
+      // Clean up temporary files on any error
+      if (sessionId) {
+        try {
+          await fetch('/api/evidence/temp-upload', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ sessionId })
+          })
+        } catch (cleanupError) {
+          console.error('Failed to cleanup temp files:', cleanupError)
+        }
+      }
+      
       setError(error instanceof Error ? error.message : 'Network error. Please try again.')
     } finally {
       setLoading(false)
-      setUploading(false)
     }
   }
 
@@ -268,7 +287,7 @@ export default function RegisterPage() {
   }
 
   // Verification helper functions
-  const handleFileSelect = (files: FileList | null) => {
+  const handleFileSelect = async (files: FileList | null) => {
     if (!files) return
     
     // Enhanced file validation limits
@@ -310,11 +329,46 @@ export default function RegisterPage() {
       setError('Some files were skipped. Only JPG, PNG, PDF files under 5MB are allowed.')
     }
     
-    setEvidenceFiles(prev => [...prev, ...validFiles])
+    // Upload files to temporary storage immediately
+    if (validFiles.length > 0 && sessionId) {
+      setUploading(true)
+      try {
+        const formData = new FormData()
+        validFiles.forEach(file => formData.append('files', file))
+        formData.append('sessionId', sessionId)
+        
+        const response = await fetch('/api/evidence/temp-upload', {
+          method: 'POST',
+          body: formData
+        })
+        
+        if (!response.ok) {
+          throw new Error('Failed to upload files')
+        }
+        
+        const result = await response.json()
+        
+        // Update state with uploaded files
+        setEvidenceFiles(prev => [...prev, ...validFiles])
+        setTempEvidenceFiles(prev => [...prev, ...result.data.files])
+        
+        setError('') // Clear any previous errors
+      } catch (error) {
+        console.error('File upload error:', error)
+        setError('Failed to upload files. Please try again.')
+      } finally {
+        setUploading(false)
+      }
+    }
   }
 
-  const removeFile = (index: number) => {
+  const removeFile = async (index: number) => {
+    // Remove from state
     setEvidenceFiles(prev => prev.filter((_, i) => i !== index))
+    setTempEvidenceFiles(prev => prev.filter((_, i) => i !== index))
+    
+    // Note: In a production system, you might want to delete the temp file from R2 here
+    // For now, we'll let the cleanup job handle expired temp files
   }
 
   const validateReference = async (refValue: string, isFirst: boolean) => {
@@ -384,9 +438,12 @@ export default function RegisterPage() {
         </div>
 
         <form noValidate onSubmit={handleSubmit} className="space-y-4 bg-white p-6 rounded-lg shadow">
+          <p className="text-sm text-gray-600 mb-4">
+            Fields marked with <span className="text-red-500">*</span> are required
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input ref={firstNameRef} className={`input-field pl-10 ${fieldErrors.firstName ? 'border-red-300' : ''}`} value={firstName} onChange={e=>setFirstName(e.target.value)} placeholder="First name" aria-invalid={!!fieldErrors.firstName} />
@@ -394,7 +451,7 @@ export default function RegisterPage() {
               {fieldErrors.firstName && <p className="text-xs text-red-600 mt-1">{fieldErrors.firstName}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
               <input ref={lastNameRef} className={`input-field ${fieldErrors.lastName ? 'border-red-300' : ''}`} value={lastName} onChange={e=>setLastName(e.target.value)} placeholder="Last name" aria-invalid={!!fieldErrors.lastName} />
               {fieldErrors.lastName && <p className="text-xs text-red-600 mt-1">{fieldErrors.lastName}</p>}
             </div>
@@ -402,11 +459,11 @@ export default function RegisterPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email (required if phone not provided)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
               <div className="space-y-2" ref={emailFieldRef}>
                 <div className="relative">
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-                  <input ref={emailInputRef} type="email" className={`input-field pl-10 pr-28 ${fieldErrors.contact ? 'border-red-300' : ''}`} value={email} onChange={e=>{ setEmail(e.target.value); setEmailVerified(false); setShowEmailOTP(false); setEmailCooldown(0); setEmailOtp('') }} placeholder="you@example.com" aria-invalid={!!fieldErrors.contact} />
+                  <input ref={emailInputRef} type="email" className={`input-field pl-10 pr-28 ${fieldErrors.email ? 'border-red-300' : ''}`} value={email} onChange={e=>{ setEmail(e.target.value); setEmailVerified(false); setShowEmailOTP(false); setEmailCooldown(0); setEmailOtp('') }} placeholder="you@example.com" aria-invalid={!!fieldErrors.email} />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
                     {!emailVerified ? (
                       <button type="button" onClick={sendEmailOtp} disabled={!email || sendingEmailOtp || (emailCooldown>0 && email===lastEmailSentTo)} className="px-3 py-1 text-sm rounded border">
@@ -435,10 +492,11 @@ export default function RegisterPage() {
                   </div>
                 )}
               </div>
+              {fieldErrors.email && <p className="text-xs text-red-600 mt-1">{fieldErrors.email}</p>}
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone (required if email not provided)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
               <div className="space-y-2" ref={phoneFieldRef}>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -475,13 +533,10 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          {!contactProvided && (
-            <p className="text-sm text-red-600">Provide at least one contact: email or phone.</p>
-          )}
 
           <div className="grid sm:grid-cols-2 gap-4 bg-gray-50 rounded-lg p-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Class Attended</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Class Attended <span className="text-red-500">*</span></label>
               <select
                 id="last_class"
                 aria-invalid={!!fieldErrors.lastClass}
@@ -499,7 +554,7 @@ export default function RegisterPage() {
               {/* <p className="text-xs text-gray-500 mt-1">Class you last studied at BGHS (1–12).</p> */}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Year of Leaving (YYYY)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Year of Leaving (YYYY) <span className="text-red-500">*</span></label>
               <div className="relative">
                 <GraduationCap className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <input
@@ -539,7 +594,7 @@ export default function RegisterPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
             <p className="text-xs text-gray-500 mb-1">8+ chars with uppercase, lowercase, number, and symbol.</p>
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -560,7 +615,7 @@ export default function RegisterPage() {
                 <div className="flex items-center gap-3">
                   <Users className="h-5 w-5 text-gray-600" />
                   <div>
-                    <h3 className="font-medium text-gray-900">Alumni Verification</h3>
+                    <h3 className="font-medium text-gray-900">Alumni Verification <span className="text-red-500">*</span></h3>
                     <p className="text-sm text-gray-500">Upload evidence or provide references for verification</p>
                   </div>
                 </div>
@@ -745,8 +800,8 @@ export default function RegisterPage() {
               'Register'
             )}
           </button>
-          {!oneVerified && (
-            <p className="text-xs text-gray-600 mt-2">Verify email or phone with OTP to complete registration.</p>
+          {!emailVerifiedRequired && (
+            <p className="text-xs text-gray-600 mt-2">Verify email with OTP to complete registration.</p>
           )}
         </form>
 

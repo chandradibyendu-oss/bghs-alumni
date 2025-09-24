@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, ListObjectsV2Command, CopyObjectCommand } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 interface R2UploadResponse {
@@ -190,6 +190,181 @@ class R2Storage {
         console.error(`Failed to delete evidence file ${key}:`, error)
         // Continue with other files even if one fails
       }
+    }
+  }
+
+  /**
+   * Upload evidence files to temporary location
+   * @param files Array of files to upload
+   * @param sessionId Session ID for temporary organization
+   * @returns Uploaded files data
+   */
+  async uploadEvidenceFilesToTemp(files: File[], sessionId: string): Promise<EvidenceFile[]> {
+    const EVIDENCE_LIMITS = {
+      maxFiles: 5,
+      maxSizePerFile: 5 * 1024 * 1024, // 5MB
+      maxTotalSize: 20 * 1024 * 1024, // 20MB
+      allowedTypes: ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf']
+    }
+
+    // Validate files
+    if (files.length > EVIDENCE_LIMITS.maxFiles) {
+      throw new Error(`Maximum ${EVIDENCE_LIMITS.maxFiles} files allowed`)
+    }
+
+    let totalSize = 0
+    const validFiles: File[] = []
+
+    for (const file of files) {
+      if (!EVIDENCE_LIMITS.allowedTypes.includes(file.type)) {
+        throw new Error(`File type ${file.type} not allowed`)
+      }
+      if (file.size > EVIDENCE_LIMITS.maxSizePerFile) {
+        throw new Error(`File ${file.name} exceeds ${EVIDENCE_LIMITS.maxSizePerFile / (1024 * 1024)}MB limit`)
+      }
+      totalSize += file.size
+      validFiles.push(file)
+    }
+
+    if (totalSize > EVIDENCE_LIMITS.maxTotalSize) {
+      throw new Error(`Total size exceeds ${EVIDENCE_LIMITS.maxTotalSize / (1024 * 1024)}MB limit`)
+    }
+
+    const uploadedFiles: EvidenceFile[] = []
+    for (const file of validFiles) {
+      try {
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const timestamp = Date.now()
+        const sanitizedName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_')
+        const fileName = `${timestamp}-${sanitizedName}`
+        const result = await this.uploadFile(buffer, fileName, file.type, `temp-evidence/${sessionId}`)
+        
+        uploadedFiles.push({
+          name: file.name,
+          url: result.url,
+          size: file.size,
+          type: file.type
+        })
+      } catch (error) {
+        console.error(`Failed to upload temp file ${file.name}:`, error)
+        throw new Error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      }
+    }
+
+    return uploadedFiles
+  }
+
+  /**
+   * Move temporary evidence files to permanent location
+   * @param sessionId Session ID
+   * @param userId User ID for permanent location
+   * @returns Permanent file URLs
+   */
+  async moveTempEvidenceToPermanent(sessionId: string, userId: string): Promise<EvidenceFile[]> {
+    try {
+      // List temporary files
+      const tempFiles = await this.listTempFiles(sessionId)
+      
+      if (tempFiles.length === 0) {
+        return []
+      }
+
+      const permanentFiles: EvidenceFile[] = []
+      
+      for (const tempFile of tempFiles) {
+        // Copy to permanent location
+        const permanentPath = `evidence/${userId}/${tempFile.name}`
+        await this.copyFile(tempFile.key, permanentPath)
+        
+        // Delete temporary file
+        await this.deleteFile(tempFile.key)
+        
+        permanentFiles.push({
+          name: tempFile.name,
+          url: this.getPublicUrl(permanentPath),
+          size: tempFile.size,
+          type: tempFile.contentType
+        })
+      }
+
+      return permanentFiles
+    } catch (error) {
+      console.error('Failed to move temp files to permanent:', error)
+      throw new Error(`Failed to move files: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Delete temporary evidence files
+   * @param sessionId Session ID
+   */
+  async deleteTempEvidenceFiles(sessionId: string): Promise<void> {
+    try {
+      const tempFiles = await this.listTempFiles(sessionId)
+      
+      for (const file of tempFiles) {
+        await this.deleteFile(file.key)
+      }
+    } catch (error) {
+      console.error(`Failed to delete temp files for session ${sessionId}:`, error)
+      throw new Error(`Failed to delete temp files: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * List temporary files for a session
+   * @param sessionId Session ID
+   * @returns List of temporary files
+   */
+  private async listTempFiles(sessionId: string): Promise<any[]> {
+    const command = new ListObjectsV2Command({
+      Bucket: this.bucketName,
+      Prefix: `temp-evidence/${sessionId}/`
+    })
+
+    const result = await this.client.send(command)
+    const contents = result.Contents || []
+    return contents
+      .filter(obj => !!obj.Key)
+      .map(obj => ({
+        key: obj.Key as string,
+        name: obj.Key!.split('/').pop() as string,
+        size: obj.Size ?? 0,
+        contentType: 'application/octet-stream'
+      }))
+  }
+
+  /**
+   * Copy file from one location to another
+   * @param sourceKey Source file key
+   * @param destKey Destination file key
+   */
+  private async copyFile(sourceKey: string, destKey: string): Promise<void> {
+    const command = new CopyObjectCommand({
+      Bucket: this.bucketName,
+      CopySource: `${this.bucketName}/${sourceKey}`,
+      Key: destKey
+    })
+    await this.client.send(command)
+  }
+
+  /**
+   * Upload registration PDF to R2
+   * @param pdfBuffer PDF file buffer
+   * @param userId User ID for folder structure
+   * @returns PDF URL
+   */
+  async uploadRegistrationPDF(pdfBuffer: Buffer, userId: string): Promise<string> {
+    try {
+      const timestamp = new Date().toISOString().slice(0, 7) // YYYY-MM
+      const fileName = `registration-${userId}-${Date.now()}.pdf`
+      const key = `registration-pdfs/${timestamp}/${fileName}`
+      
+      const result = await this.uploadFile(pdfBuffer, fileName, 'application/pdf', `registration-pdfs/${timestamp}`)
+      return result.url
+    } catch (error) {
+      console.error('Failed to upload registration PDF:', error)
+      throw new Error(`Failed to upload PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 }

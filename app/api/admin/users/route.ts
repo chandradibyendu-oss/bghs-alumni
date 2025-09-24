@@ -163,15 +163,66 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get the request body
-    const { id, full_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role, batch_year } = await request.json()
+    const { id, email, phone, first_name, middle_name, last_name, full_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role, batch_year } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
+    // Optional: normalize inputs
+    const normalizedEmail = typeof email === 'string' && email ? String(email).trim().toLowerCase() : undefined
+    const normalizedPhone = typeof phone === 'string' && phone ? String(phone).trim() : undefined
+
+    // Validate uniqueness if email/phone provided
+    if (normalizedEmail) {
+      // Check profiles for duplicate email (case-insensitive)
+      const { data: dupProfiles, error: dupErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .ilike('email', normalizedEmail)
+        .neq('id', id)
+      if (dupErr) {
+        console.error('Email duplicate check error:', dupErr)
+        return NextResponse.json({ error: 'Failed to validate email uniqueness' }, { status: 500 })
+      }
+      if ((dupProfiles || []).length > 0) {
+        return NextResponse.json({ error: 'Email already in use' }, { status: 409 })
+      }
+      // Check Auth (listUsers as no direct select on auth schema)
+      const { data: listData, error: listErr } = await supabaseAdmin.auth.admin.listUsers()
+      if (listErr) {
+        console.error('Auth list users error:', listErr)
+        return NextResponse.json({ error: 'Failed to validate email in auth' }, { status: 500 })
+      }
+      const authDup = (listData.users || []).find(u => (u.email || '').toLowerCase() === normalizedEmail && u.id !== id)
+      if (authDup) {
+        return NextResponse.json({ error: 'Email already registered in auth' }, { status: 409 })
+      }
+    }
+
+    if (normalizedPhone) {
+      const { data: dupPhones, error: phoneDupErr } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('phone', normalizedPhone)
+        .neq('id', id)
+      if (phoneDupErr) {
+        console.error('Phone duplicate check error:', phoneDupErr)
+        return NextResponse.json({ error: 'Failed to validate phone uniqueness' }, { status: 500 })
+      }
+      if ((dupPhones || []).length > 0) {
+        return NextResponse.json({ error: 'Phone already in use' }, { status: 409 })
+      }
+    }
+
     // Build updates only with provided fields
     const updates: Record<string, any> = { updated_at: new Date().toISOString() }
-    if (full_name !== undefined) updates.full_name = full_name
+    if (normalizedEmail !== undefined) updates.email = normalizedEmail
+    if (normalizedPhone !== undefined) updates.phone = normalizedPhone
+    if (full_name !== undefined) updates.full_name = typeof full_name === 'string' ? full_name.trim() : full_name
+    if (first_name !== undefined) updates.first_name = typeof first_name === 'string' ? first_name.trim() : first_name
+    if (middle_name !== undefined) updates.middle_name = middle_name === null ? null : (typeof middle_name === 'string' ? middle_name.trim() : middle_name)
+    if (last_name !== undefined) updates.last_name = typeof last_name === 'string' ? last_name.trim() : last_name
     if (last_class !== undefined) updates.last_class = last_class === null ? null : Number(last_class)
     if (year_of_leaving !== undefined) updates.year_of_leaving = year_of_leaving === null ? null : Number(year_of_leaving)
     if (start_class !== undefined) updates.start_class = start_class === null ? null : Number(start_class)
@@ -195,6 +246,25 @@ export async function PUT(request: NextRequest) {
     if (updateError) {
       console.error('Error updating profile:', updateError)
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+    }
+
+    // Update auth email/phone if provided
+    if (normalizedEmail || normalizedPhone || first_name !== undefined || middle_name !== undefined || last_name !== undefined) {
+      const { error: authUpdateErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        email_confirm: normalizedEmail ? true : undefined,
+        phone_confirm: normalizedPhone ? true : undefined,
+        user_metadata: {
+          ...(first_name !== undefined ? { first_name: typeof first_name === 'string' ? first_name.trim() : first_name } : {}),
+          ...(middle_name !== undefined ? { middle_name: middle_name === null ? null : (typeof middle_name === 'string' ? middle_name.trim() : middle_name) } : {}),
+          ...(last_name !== undefined ? { last_name: typeof last_name === 'string' ? last_name.trim() : last_name } : {})
+        }
+      } as any)
+      if (authUpdateErr) {
+        console.error('Auth update error:', authUpdateErr)
+        return NextResponse.json({ error: 'Failed to update auth user' }, { status: 500 })
+      }
     }
 
     // If role provided, also update permissions from user_roles table (if exists)
@@ -241,31 +311,48 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Get the user ID from the URL
+    // Get identifiers from the URL
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('id')
+    const emailRaw = searchParams.get('email')
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
+    if (!userId && !emailRaw) {
+      return NextResponse.json({ error: 'User ID or email is required' }, { status: 400 })
     }
 
-    // Delete the profile first
+    // Resolve to userId if only email is provided
+    let resolvedUserId = userId
+    if (!resolvedUserId && emailRaw) {
+      const normalizedEmail = emailRaw.trim().toLowerCase()
+      const { data: authUsers, error: findErr } = await supabaseAdmin.auth.admin.listUsers()
+      if (findErr) {
+        console.error('Error listing users:', findErr)
+        return NextResponse.json({ error: 'Failed to locate user by email' }, { status: 500 })
+      }
+      const match = authUsers.users.find(u => (u.email || '').toLowerCase() === normalizedEmail)
+      if (!match) {
+        return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      }
+      resolvedUserId = match.id
+    }
+
+    // Delete from Auth first
+    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(resolvedUserId as string)
+    if (authDeleteError) {
+      console.error('Error deleting auth user:', authDeleteError)
+      return NextResponse.json({ error: 'Failed to delete auth user' }, { status: 500 })
+    }
+
+    // Then delete the profile (and any cascading dependents)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .delete()
-      .eq('id', userId)
+      .eq('id', resolvedUserId as string)
 
     if (profileError) {
       console.error('Error deleting profile:', profileError)
-      return NextResponse.json({ error: 'Failed to delete user profile' }, { status: 500 })
-    }
-
-    // Delete the auth user
-    const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(userId)
-    if (authDeleteError) {
-      console.error('Error deleting auth user:', authDeleteError)
-      // Note: Auth user deletion might fail if they have active sessions
-      // This is not critical for profile deletion
+      // Not fatal since auth is already removed; surface warning
+      return NextResponse.json({ success: true, warning: 'Auth user deleted, but profile removal failed' })
     }
 
     return NextResponse.json({ 

@@ -222,6 +222,8 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({
           id: editingUser.id,
+          email: formData.email,
+          phone: formData.phone,
           first_name: formData.first_name || undefined,
           middle_name: formData.middle_name || undefined,
           last_name: formData.last_name || undefined,
@@ -345,7 +347,7 @@ export default function AdminUsersPage() {
         return
       }
 
-      const response = await fetch(`/api/admin/users?id=${userId}`, {
+      const response = await fetch(`/api/admin/users?id=${encodeURIComponent(userId)}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -392,9 +394,9 @@ export default function AdminUsersPage() {
     setFormData({
       email: user.email,
       phone: (user as any).phone || '',
-      first_name: '',
-      middle_name: '',
-      last_name: '',
+      first_name: (user as any).first_name || '',
+      middle_name: (user as any).middle_name || '',
+      last_name: (user as any).last_name || '',
       last_class: user.last_class?.toString() || '',
       year_of_leaving: user.year_of_leaving?.toString() || (user as any).batch_year?.toString() || '',
       start_class: user.start_class?.toString() || '',
@@ -521,9 +523,12 @@ export default function AdminUsersPage() {
             </div>
 
             <form onSubmit={editingUser ? handleEditUser : handleAddUser} className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Fields marked with <span className="text-red-500">*</span> are required
+              </p>
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
                   <input
                     type="email"
                     value={formData.email}
@@ -535,8 +540,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-                  <p className="text-xs text-blue-600 mb-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone <span className="text-red-500">*</span></label>
                   <input
                     type="tel"
                     value={formData.phone}
@@ -545,9 +549,10 @@ export default function AdminUsersPage() {
                     className="input-field"
                     placeholder="+91 98765 43210"
                   />
+                  <p className="text-xs text-blue-600 mt-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Role <span className="text-red-500">*</span></label>
                   <select
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value)}
@@ -562,7 +567,7 @@ export default function AdminUsersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.first_name}
@@ -583,7 +588,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
                   <input
                     type="text"
                     value={formData.last_name}
@@ -594,7 +599,7 @@ export default function AdminUsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Class Attended *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Class Attended <span className="text-red-500">*</span></label>
                   <select
                     value={formData.last_class}
                     onChange={(e) => setFormData({...formData, last_class: e.target.value})}
@@ -608,7 +613,7 @@ export default function AdminUsersPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Year of Leaving (YYYY) *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year of Leaving (YYYY) <span className="text-red-500">*</span></label>
                   <input
                     type="number"
                     value={formData.year_of_leaving}
@@ -654,7 +659,7 @@ export default function AdminUsersPage() {
 
               {!editingUser && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Password *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Password <span className="text-red-500">*</span></label>
                   <div className="relative">
                     <input
                       type={showPassword ? 'text' : 'password'}
@@ -765,7 +770,7 @@ export default function AdminUsersPage() {
                       Year of Leaving
                     </th>
                     {/* Profession column hidden to reduce width */}
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden">
                       Location
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -819,7 +824,7 @@ export default function AdminUsersPage() {
                         </span>
                       </td>
                       {/* Profession column removed to reduce width */}
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 hidden">
                         {user.location || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">

@@ -67,10 +67,7 @@ export default function ProfilePage() {
 
   const save = async () => {
     if (!profile) return
-    if (!profile.phone || !profile.phone.trim()) {
-      toast.error('Phone is required')
-      return
-    }
+    // Phone is now optional, no validation needed
     setSaving(true)
     try {
       const updates = {
@@ -242,9 +239,12 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          <p className="text-sm text-gray-600 mb-4">
+            Fields marked with <span className="text-red-500">*</span> are required
+          </p>
           <div className="grid md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">First Name <span className="text-red-500">*</span></label>
               <input className="input-field" value={profile.first_name || ''}
                 onChange={(e)=>updateField('first_name', e.target.value)} />
             </div>
@@ -254,7 +254,7 @@ export default function ProfilePage() {
                 onChange={(e)=>updateField('middle_name', e.target.value)} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Last Name <span className="text-red-500">*</span></label>
               <input className="input-field" value={profile.last_name || ''}
                 onChange={(e)=>updateField('last_name', e.target.value)} />
             </div>
@@ -263,19 +263,19 @@ export default function ProfilePage() {
               <input className="input-field" value={profile.full_name} disabled />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-red-500">*</span></label>
               <input className="input-field" value={profile.email} disabled />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year (10th Standard)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Batch Year (10th Standard) <span className="text-red-500">*</span></label>
               <input type="number" className="input-field" value={profile.batch_year}
                 onChange={(e)=>updateField('batch_year', Number(e.target.value))} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
-              <p className="text-xs text-blue-600 mb-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
               <input className="input-field" placeholder="+91XXXXXXXXXX" value={profile.phone || ''}
                 onChange={(e)=>updateField('phone', e.target.value)} />
+              <p className="text-xs text-blue-600 mt-2">📱 Include country code (e.g., +91XXXXXXXXXX)</p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Profession</label>
@@ -315,7 +315,7 @@ export default function ProfilePage() {
             <p className="text-sm text-gray-600 mb-4">Specify the last class you studied at BGHS and the year you left. Optionally, add when you started.</p>
             <div className="grid md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last class attended (1–12)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Last class attended (1–12) <span className="text-red-500">*</span></label>
                 <select
                   className="input-field"
                   value={profile.last_class ?? ''}
@@ -328,7 +328,7 @@ export default function ProfilePage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Year of leaving (YYYY)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Year of leaving (YYYY) <span className="text-red-500">*</span></label>
                 <input
                   type="number"
                   className="input-field"
