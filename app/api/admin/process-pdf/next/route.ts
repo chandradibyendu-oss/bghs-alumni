@@ -26,7 +26,9 @@ export async function GET(request: NextRequest) {
   // Optional: allow manual trigger via GET with the same secret
   const vercelCron = request.headers.get('x-vercel-cron')
   const secret = request.headers.get('x-cron-key') || request.headers.get('X-CRON-KEY')
-  const isAuthorized = Boolean(vercelCron) || (process.env.CRON_SECRET && secret === process.env.CRON_SECRET)
+  const userAgent = request.headers.get('user-agent') || ''
+  const isVercelCronUA = userAgent.toLowerCase().includes('vercel-cron')
+  const isAuthorized = Boolean(vercelCron) || isVercelCronUA || (process.env.CRON_SECRET && secret === process.env.CRON_SECRET)
   if (!isAuthorized) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
