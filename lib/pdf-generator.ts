@@ -12,9 +12,20 @@ async function getBrowser() {
     puppeteerCore = mod.default || mod
   }
   
+  // Use newer @sparticuz/chromium API with proper configuration
   const executablePath = await chromium.executablePath()
   const browser = await puppeteerCore.launch({
-    args: chromium.args,
+    args: [
+      ...chromium.args,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ],
     defaultViewport: chromium.defaultViewport,
     executablePath,
     headless: chromium.headless !== false,

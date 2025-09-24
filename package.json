@@ -13,7 +13,7 @@
     "@aws-sdk/s3-request-presigner": "^3.883.0",
     "@azure/msal-node": "3.7.3",
     "@sendgrid/mail": "^8.1.5",
-    "@sparticuz/chromium": "^126.0.0",
+    "@sparticuz/chromium": "^131.0.0",
     "@stripe/stripe-js": "^2.2.0",
     "@supabase/auth-helpers-nextjs": "^0.8.7",
     "@supabase/auth-helpers-react": "^0.4.2",
