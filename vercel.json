@@ -3,9 +3,9 @@
     {
       "path": "/api/admin/process-pdf/next",
       "schedule": "* * * * *",
-      "method": "POST",
+      "methods": ["POST"],
       "headers": {
-        "X-CRON-KEY": "@cron_secret"
+        "X-CRON-KEY": "@CRON_SECRET"
       }
     }
   ]
