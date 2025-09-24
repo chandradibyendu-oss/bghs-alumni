@@ -3,8 +3,8 @@ const nextConfig = {
   // Transpile lucide-react to avoid missing vendor-chunk issues on some Windows setups
   transpilePackages: ['lucide-react'],
   experimental: {
-    // Ensure puppeteer-core and chromium are kept external so their runtime paths work on Vercel
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core']
+    // Ensure playwright packages are externalized
+    serverComponentsExternalPackages: ['playwright-aws-lambda', 'playwright-core']
   },
   images: {
     remotePatterns: [

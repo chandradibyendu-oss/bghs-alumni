@@ -1,27 +1,36 @@
-// Use serverless-compatible Chromium on Vercel and full Puppeteer locally
+// Serverless: prefer Playwright (playwright-aws-lambda) which bundles all deps
+// Local dev: use Puppeteer
 let puppeteerLib: any
-let chromium: any
+let playwrightAws: any
+let playwrightCore: any
 const isServerless = process.env.VERCEL === '1' || process.env.NOW_REGION !== undefined
 
-async function getPuppeteer() {
-  if (isServerless) {
-    if (!chromium) {
-      // Lazy import to avoid bundling issues
-      const mod = await import('@sparticuz/chromium')
-      chromium = mod.default || mod
-    }
-    if (!puppeteerLib) {
-      const mod = await import('puppeteer-core')
-      puppeteerLib = mod.default || mod
-    }
-    return { puppeteer: puppeteerLib, chromium }
+async function getBrowserServerless() {
+  if (!playwrightAws) {
+    const aws = await import('playwright-aws-lambda')
+    playwrightAws = aws
   }
+  if (!playwrightCore) {
+    const core = await import('playwright-core')
+    playwrightCore = core
+  }
+  const { chromium } = playwrightCore
+  // playwright-aws-lambda provides chromium args and executablePath
+  const executablePath = await playwrightAws.executablePath()
+  const browser = await chromium.launch({
+    args: playwrightAws.args,
+    executablePath,
+    headless: true,
+  })
+  return browser
+}
 
+async function getBrowserLocal() {
   if (!puppeteerLib) {
     const mod = await import('puppeteer')
     puppeteerLib = mod.default || mod
   }
-  return { puppeteer: puppeteerLib, chromium: null as any }
+  return puppeteerLib.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
 }
 import { EvidenceFile } from './r2-storage'
 
@@ -380,23 +389,11 @@ export class PDFGenerator {
       const html = this.replaceTemplateVariables(this.htmlTemplate, data)
 
       // Launch Puppeteer (serverless vs local)
-      const { puppeteer, chromium } = await getPuppeteer()
       let browser: any
       if (isServerless) {
-        // Use the correct executablePath method and tmp dir for @sparticuz/chromium on Vercel
-        const executablePath = await chromium.executablePath()
-        browser = await puppeteer.launch({
-          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
-          defaultViewport: chromium.defaultViewport,
-          executablePath,
-          headless: chromium.headless !== false,
-          ignoreHTTPSErrors: true,
-        })
+        browser = await getBrowserServerless()
       } else {
-        browser = await puppeteer.launch({
-          headless: true,
-          args: ['--no-sandbox', '--disable-setuid-sandbox']
-        })
+        browser = await getBrowserLocal()
       }
 
       const page = await browser.newPage()
