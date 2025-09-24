@@ -27,13 +27,36 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       const rawFrom = process.env.FROM_EMAIL || 'admin@alumnibghs.org'
       const fromWithName = rawFrom.includes('<') ? rawFrom : `BGHS Alumni <${rawFrom}>`
 
+      // SendGrid expects attachment content as base64 string
+      const normalizedAttachments = (options.attachments || []).map(att => {
+        let contentBase64: string
+        if (typeof att.content === 'string') {
+          // Best effort: if not base64, convert it
+          try {
+            // Detect if string already looks like base64 (basic heuristic)
+            const maybeBase64 = /^[A-Za-z0-9+/=\r\n]+$/.test(att.content)
+            contentBase64 = maybeBase64 ? att.content : Buffer.from(att.content).toString('base64')
+          } catch {
+            contentBase64 = Buffer.from(att.content).toString('base64')
+          }
+        } else {
+          contentBase64 = Buffer.from(att.content).toString('base64')
+        }
+        return {
+          content: contentBase64,
+          filename: att.filename,
+          type: att.type,
+          disposition: att.disposition || 'attachment',
+        }
+      })
+
       const msg = {
         to: options.to,
         from: fromWithName,
         subject: options.subject,
         html: options.html,
         text: options.text,
-        attachments: options.attachments
+        attachments: normalizedAttachments.length > 0 ? normalizedAttachments : undefined,
       }
       
       await sgMail.send(msg)
