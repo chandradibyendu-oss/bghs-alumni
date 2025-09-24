@@ -1,7 +1,7 @@
 // Use serverless-compatible Chromium on Vercel and full Puppeteer locally
 let puppeteerLib: any
 let chromium: any
-const isServerless = !!process.env.VERCEL
+const isServerless = process.env.VERCEL === '1' || process.env.NOW_REGION !== undefined
 
 async function getPuppeteer() {
   if (isServerless) {
@@ -383,10 +383,10 @@ export class PDFGenerator {
       const { puppeteer, chromium } = await getPuppeteer()
       let browser: any
       if (isServerless) {
-        // Use the correct executablePath method for @sparticuz/chromium
+        // Use the correct executablePath method and tmp dir for @sparticuz/chromium on Vercel
         const executablePath = await chromium.executablePath()
         browser = await puppeteer.launch({
-          args: chromium.args,
+          args: [...chromium.args, '--no-sandbox', '--disable-setuid-sandbox'],
           defaultViewport: chromium.defaultViewport,
           executablePath,
           headless: chromium.headless !== false,
