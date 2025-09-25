@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createSupabaseAdmin } from '@/lib/supabase'
+import { createClient } from '@supabase/supabase-js'
 import { r2Storage } from '@/lib/r2-storage'
+
+// Create Supabase client with service role key for admin operations
+const createSupabaseAdmin = () => {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase configuration')
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey)
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,11 +86,13 @@ export async function POST(request: NextRequest) {
         for (const verification of orphanedPdfs) {
           try {
             if (verification.pdf_url) {
-              const pdfKey = verification.pdf_url.split('/').pop()
-              if (pdfKey) {
-                await r2Storage.deleteFile(`pdfs/${pdfKey}`)
+              // Extract the full path from the URL (e.g., registration-pdfs/2025-09/filename.pdf)
+              const urlParts = verification.pdf_url.split('/')
+              const pdfPath = urlParts.slice(urlParts.indexOf('registration-pdfs')).join('/')
+              if (pdfPath) {
+                await r2Storage.deleteFile(pdfPath)
                 results.deletedPdfs++
-                console.log(`Deleted orphaned PDF: ${pdfKey}`)
+                console.log(`Deleted orphaned PDF: ${pdfPath}`)
               }
             }
           } catch (error) {

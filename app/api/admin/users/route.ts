@@ -350,6 +350,17 @@ export async function DELETE(request: NextRequest) {
       .eq('user_id', resolvedUserId as string)
       .single()
 
+    // Delete job queue entries for this user
+    const { error: jobQueueError } = await supabaseAdmin
+      .from('job_queue')
+      .delete()
+      .eq('payload->>userId', resolvedUserId as string)
+
+    if (jobQueueError) {
+      console.error('Error deleting job queue entries:', jobQueueError)
+      // Not fatal, just log the error
+    }
+
     // Then delete the profile (and any cascading dependents)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -369,10 +380,12 @@ export async function DELETE(request: NextRequest) {
         
         // Delete PDF file
         if (verification.pdf_url) {
-          const pdfKey = verification.pdf_url.split('/').pop() // Extract filename from URL
-          if (pdfKey) {
-            await r2Storage.deleteFile(`pdfs/${pdfKey}`)
-            console.log(`Deleted PDF file: ${pdfKey}`)
+          // Extract the full path from the URL (e.g., registration-pdfs/2025-09/filename.pdf)
+          const urlParts = verification.pdf_url.split('/')
+          const pdfPath = urlParts.slice(urlParts.indexOf('registration-pdfs')).join('/')
+          if (pdfPath) {
+            await r2Storage.deleteFile(pdfPath)
+            console.log(`Deleted PDF file: ${pdfPath}`)
           }
         }
 
