@@ -343,6 +343,13 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to delete auth user' }, { status: 500 })
     }
 
+    // Get verification data before deletion to clean up R2 files
+    const { data: verification } = await supabaseAdmin
+      .from('alumni_verification')
+      .select('pdf_url, evidence_files')
+      .eq('user_id', resolvedUserId as string)
+      .single()
+
     // Then delete the profile (and any cascading dependents)
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
@@ -355,9 +362,42 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ success: true, warning: 'Auth user deleted, but profile removal failed' })
     }
 
+    // Clean up R2 files if verification data exists
+    if (verification) {
+      try {
+        const { r2Storage } = await import('@/lib/r2-storage')
+        
+        // Delete PDF file
+        if (verification.pdf_url) {
+          const pdfKey = verification.pdf_url.split('/').pop() // Extract filename from URL
+          if (pdfKey) {
+            await r2Storage.deleteFile(`pdfs/${pdfKey}`)
+            console.log(`Deleted PDF file: ${pdfKey}`)
+          }
+        }
+
+        // Delete evidence files
+        if (verification.evidence_files && Array.isArray(verification.evidence_files)) {
+          for (const file of verification.evidence_files) {
+            if (file.key) {
+              await r2Storage.deleteFile(file.key)
+              console.log(`Deleted evidence file: ${file.key}`)
+            }
+          }
+        }
+      } catch (r2Error) {
+        console.error('Error cleaning up R2 files:', r2Error)
+        // Don't fail the deletion, just log the error
+      }
+    }
+
     return NextResponse.json({ 
       success: true, 
-      message: 'User deleted successfully' 
+      message: 'User deleted successfully',
+      cleanup: {
+        database: true,
+        r2Files: verification ? true : false
+      }
     })
 
   } catch (error) {
