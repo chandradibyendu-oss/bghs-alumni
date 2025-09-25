@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useAuth } from '@/lib/supabase'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 interface CleanupResults {
   orphanedPdfs: number
@@ -18,16 +18,32 @@ interface StorageStats {
 }
 
 export default function CleanupPage() {
-  const { user } = useAuth()
+  const [session, setSession] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [results, setResults] = useState<CleanupResults | null>(null)
   const [stats, setStats] = useState<StorageStats | null>(null)
   const [message, setMessage] = useState('')
 
+  useEffect(() => {
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+    })
+
+    return () => subscription.unsubscribe()
+  }, [])
+
   const getAuthHeaders = () => {
-    const token = localStorage.getItem('supabase.auth.token')
+    if (!session?.access_token) {
+      throw new Error('No authentication token available')
+    }
     return {
-      'Authorization': `Bearer ${token}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json'
     }
   }
@@ -114,11 +130,11 @@ export default function CleanupPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  if (!user) {
+  if (!session) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Access Denied</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-4">Authentication Required</h1>
           <p className="text-gray-600">Please log in to access the cleanup utility.</p>
         </div>
       </div>

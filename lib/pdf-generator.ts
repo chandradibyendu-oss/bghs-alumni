@@ -33,6 +33,7 @@ async function getBrowser() {
   })
   return browser
 }
+
 import { EvidenceFile } from './r2-storage'
 
 export interface RegistrationPDFData {
@@ -88,12 +89,14 @@ export class PDFGenerator {
         </div>
     </div>` : ''
     
-    // Reference section
-    const referenceSection = data.referenceValidation.reference_1 ? `
+    // Reference section (render if either reference exists)
+    const hasRef1 = !!data.referenceValidation.reference_1
+    const hasRef2 = !!data.referenceValidation.reference_2
+    const referenceSection = (hasRef1 || hasRef2) ? `
     <div class="section">
         <h2>Reference Validation</h2>
         <div class="info-grid">
-            ${data.referenceValidation.reference_1 ? `
+            ${hasRef1 ? `
             <div class="info-label">Reference 1:</div>
             <div class="info-value">
                 ${data.referenceValidation.reference_1}
@@ -104,7 +107,7 @@ export class PDFGenerator {
                   '<span class="reference-status status-pending">PENDING</span>'}
             </div>` : ''}
             
-            ${data.referenceValidation.reference_2 ? `
+            ${hasRef2 ? `
             <div class="info-label">Reference 2:</div>
             <div class="info-value">
                 ${data.referenceValidation.reference_2}
@@ -123,8 +126,18 @@ export class PDFGenerator {
       : 'References Only'
     
     return template
+      // Replace the full-name composite pattern first so conditionals collapse correctly
+      .replace(/\{\{user\.first_name\}\}\s+\{\{#if user\.middle_name\}\}\{\{user\.middle_name\}\}\s+\{\{\/if\}\}\{\{user\.last_name\}\}/g, fullName)
+      // Replace the phone composite pattern exactly as in template (handles no whitespace between tags)
+      .replace(/\{\{#if user\.phone\}\}\{\{user\.phone\}\}\{\{else\}\}Not provided\{\{\/if\}\}/g, phoneDisplay)
       .replace(/\{\{registrationId\}\}/g, data.registrationId)
       .replace(/\{\{submissionDate\}\}/g, data.submissionDate)
+      // Handle middle name conditional block (for any other occurrences)
+      .replace(/\{\{#if user\.middle_name\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.middle_name && String(data.user.middle_name).trim() ? `${String(data.user.middle_name).trim()} ` : '')
+      // Handle phone conditional with else (for any other occurrences)
+      .replace(/\{\{#if user\.phone\}\}[\s\S]*?\{\{else\}\}[\s\S]*?\{\{\/if\}\}/g, phoneDisplay)
+      // Full name convenience (in case we ever need it)
+      .replace(/\{\{user\.full_name\}\}/g, fullName)
       .replace(/\{\{user\.first_name\}\}/g, data.user.first_name)
       .replace(/\{\{user\.middle_name\}\}/g, data.user.middle_name || '')
       .replace(/\{\{user\.last_name\}\}/g, data.user.last_name)
@@ -136,6 +149,7 @@ export class PDFGenerator {
       .replace(/\{\{user\.start_year\}\}/g, data.user.start_year?.toString() || '')
       .replace(/\{\{user\.created_at\}\}/g, data.user.created_at)
       .replace(/\{\{user\.id\}\}/g, data.user.id)
+      // (The conditional blocks above already collapsed middle name and phone)
       .replace(/\{\{#if user\.start_class\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.start_class ? `
             <div class="info-label">Start Class:</div>
             <div class="info-value">Class ${data.user.start_class}</div>` : '')
@@ -143,7 +157,8 @@ export class PDFGenerator {
             <div class="info-label">Start Year:</div>
             <div class="info-value">${data.user.start_year}</div>` : '')
       .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)
-      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?\{\{\/if\}\}/g, referenceSection)
+      // Replace the entire reference section enclosed by the outer block
+      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?<\/div>\s*\{\{\/if\}\}/g, (hasRef1 || hasRef2) ? referenceSection : '')
       .replace(/\{\{#if evidenceFiles\.length\}\}\{\{#if referenceValidation\.reference_1\}\}Evidence \+ References\{\{else\}\}Evidence Only\{\{\/if\}\}\{\{else\}\}References Only\{\{\/if\}\}/g, verificationMethod)
   }
 
