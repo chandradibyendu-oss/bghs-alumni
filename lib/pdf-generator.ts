@@ -118,7 +118,14 @@ export class PDFGenerator {
                   '<span class="reference-status status-pending">PENDING</span>'}
             </div>` : ''}
         </div>
-    </div>` : ''
+    </div>` : `
+    <div class="section">
+        <h2>Reference Validation</h2>
+        <div class="info-grid">
+            <div class="info-label">Status:</div>
+            <div class="info-value">No references provided - Evidence-based verification only</div>
+        </div>
+    </div>`
     
     // Verification method
     const verificationMethod = data.evidenceFiles.length > 0 
@@ -126,15 +133,15 @@ export class PDFGenerator {
       : 'References Only'
     
     return template
-      // Replace the full-name composite pattern first so conditionals collapse correctly
-      .replace(/\{\{user\.first_name\}\}\s+\{\{#if user\.middle_name\}\}\{\{user\.middle_name\}\}\s+\{\{\/if\}\}\{\{user\.last_name\}\}/g, fullName)
-      // Replace the phone composite pattern exactly as in template (handles no whitespace between tags)
+      // Replace the full-name composite pattern exactly as it appears in template
+      .replace(/\{\{user\.first_name\}\} \{\{#if user\.middle_name\}\}\{\{user\.middle_name\}\} \{\{\/if\}\}\{\{user\.last_name\}\}/g, fullName)
+      // Replace the phone conditional pattern exactly as it appears in template
       .replace(/\{\{#if user\.phone\}\}\{\{user\.phone\}\}\{\{else\}\}Not provided\{\{\/if\}\}/g, phoneDisplay)
       .replace(/\{\{registrationId\}\}/g, data.registrationId)
       .replace(/\{\{submissionDate\}\}/g, data.submissionDate)
-      // Handle middle name conditional block (for any other occurrences)
+      // Handle any remaining middle name conditional blocks
       .replace(/\{\{#if user\.middle_name\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.middle_name && String(data.user.middle_name).trim() ? `${String(data.user.middle_name).trim()} ` : '')
-      // Handle phone conditional with else (for any other occurrences)
+      // Handle any remaining phone conditional blocks
       .replace(/\{\{#if user\.phone\}\}[\s\S]*?\{\{else\}\}[\s\S]*?\{\{\/if\}\}/g, phoneDisplay)
       // Full name convenience (in case we ever need it)
       .replace(/\{\{user\.full_name\}\}/g, fullName)
@@ -157,8 +164,8 @@ export class PDFGenerator {
             <div class="info-label">Start Year:</div>
             <div class="info-value">${data.user.start_year}</div>` : '')
       .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)
-      // Replace the entire reference section enclosed by the outer block
-      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?<\/div>\s*\{\{\/if\}\}/g, (hasRef1 || hasRef2) ? referenceSection : '')
+      // Replace the entire reference section - use greedy matching to capture all nested {{#if}} blocks
+      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*\{\{\/if\}\}\s*\n\s*<div class="section">\s*<h2>System Information<\/h2>/g, (hasRef1 || hasRef2) ? referenceSection + '\n\n    <div class="section">\n        <h2>System Information</h2>' : '\n\n    <div class="section">\n        <h2>System Information</h2>')
       .replace(/\{\{#if evidenceFiles\.length\}\}\{\{#if referenceValidation\.reference_1\}\}Evidence \+ References\{\{else\}\}Evidence Only\{\{\/if\}\}\{\{else\}\}References Only\{\{\/if\}\}/g, verificationMethod)
   }
 
