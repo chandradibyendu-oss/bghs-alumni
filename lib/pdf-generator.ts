@@ -3,6 +3,19 @@ let chromium: any
 let puppeteerCore: any
 
 async function getBrowser() {
+  // Check if we're in a local development environment
+  const isLocal = process.env.NODE_ENV === 'development' || process.env.VERCEL !== 'true'
+  
+  if (isLocal) {
+    // Use local puppeteer for development
+    const puppeteer = await import('puppeteer')
+    return await puppeteer.default.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    })
+  }
+  
+  // Use @sparticuz/chromium for production/serverless
   if (!chromium) {
     const mod = await import('@sparticuz/chromium')
     chromium = mod.default || mod
@@ -74,14 +87,15 @@ export class PDFGenerator {
     const startClassDisplay = data.user.start_class ? `Class ${data.user.start_class}` : ''
     const startYearDisplay = data.user.start_year ? data.user.start_year.toString() : ''
     
-    // Evidence section
+    // Evidence section - moved to separate page after References
     const evidenceSection = data.evidenceFiles.length > 0 ? `
+    <div class="page-break"></div>
     <div class="section">
         <h2>Evidence Documents</h2>
         <p><strong>Total Files:</strong> ${data.evidenceFiles.length}</p>
         <div class="evidence-section">
             ${data.evidenceFiles.map(file => `
-            <div style="margin-bottom: 20px;">
+            <div style="margin-bottom: 15px;">
                 <p><strong>${file.name}</strong> (${file.size} bytes)</p>
                 <img src="${file.url}" alt="${file.name}" class="evidence-image" />
             </div>
@@ -164,8 +178,8 @@ export class PDFGenerator {
             <div class="info-label">Start Year:</div>
             <div class="info-value">${data.user.start_year}</div>` : '')
       .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)
-      // Replace the entire reference section - use greedy matching to capture all nested {{#if}} blocks
-      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*\{\{\/if\}\}\s*\n\s*<div class="section">\s*<h2>System Information<\/h2>/g, (hasRef1 || hasRef2) ? referenceSection + '\n\n    <div class="section">\n        <h2>System Information</h2>' : '\n\n    <div class="section">\n        <h2>System Information</h2>')
+      // Replace the entire reference section - simple approach: match from {{#if referenceValidation.reference_1}} to <div class="section"> with System Information
+      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?<div class="section">\s*<h2>System Information<\/h2>/g, (hasRef1 || hasRef2) ? referenceSection + '\n\n    <div class="section">\n        <h2>System Information</h2>' : '\n\n    <div class="section">\n        <h2>System Information</h2>')
       .replace(/\{\{#if evidenceFiles\.length\}\}\{\{#if referenceValidation\.reference_1\}\}Evidence \+ References\{\{else\}\}Evidence Only\{\{\/if\}\}\{\{else\}\}References Only\{\{\/if\}\}/g, verificationMethod)
   }
 
@@ -180,48 +194,50 @@ export class PDFGenerator {
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
+            line-height: 1.3;
             color: #333;
             max-width: 800px;
             margin: 0 auto;
-            padding: 20px;
+            padding: 15px;
             background-color: #f9f9f9;
+            font-size: 12px;
         }
         .header {
             text-align: center;
             background-color: #1e40af;
             color: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 30px;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
         }
         .header h1 {
             margin: 0;
-            font-size: 24px;
+            font-size: 18px;
         }
         .header p {
-            margin: 5px 0 0 0;
-            font-size: 14px;
+            margin: 3px 0 0 0;
+            font-size: 11px;
             opacity: 0.9;
         }
         .section {
             background-color: white;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 12px;
+            margin-bottom: 10px;
+            border-radius: 6px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
         .section h2 {
             color: #1e40af;
-            border-bottom: 2px solid #e5e7eb;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 5px;
+            margin-bottom: 8px;
+            font-size: 14px;
         }
         .info-grid {
             display: grid;
             grid-template-columns: 1fr 2fr;
-            gap: 10px;
-            margin-bottom: 15px;
+            gap: 6px;
+            margin-bottom: 8px;
         }
         .info-label {
             font-weight: bold;
@@ -231,20 +247,20 @@ export class PDFGenerator {
             color: #6b7280;
         }
         .evidence-section {
-            margin-top: 20px;
+            margin-top: 10px;
         }
         .evidence-image {
-            max-width: 200px;
-            max-height: 200px;
-            margin: 10px;
+            max-width: 150px;
+            max-height: 150px;
+            margin: 5px;
             border: 1px solid #d1d5db;
-            border-radius: 4px;
+            border-radius: 3px;
         }
         .reference-status {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 10px;
             font-weight: bold;
         }
         .status-valid {
@@ -261,18 +277,21 @@ export class PDFGenerator {
         }
         .footer {
             text-align: center;
-            margin-top: 40px;
-            padding: 20px;
+            margin-top: 10px;
+            padding: 8px;
             background-color: #f3f4f6;
-            border-radius: 8px;
-            font-size: 12px;
+            border-radius: 6px;
+            font-size: 10px;
             color: #6b7280;
         }
         .admin-notes {
-            border: 2px dashed #d1d5db;
-            padding: 20px;
-            margin-top: 20px;
+            border: 1px dashed #d1d5db;
+            padding: 10px;
+            margin-top: 10px;
             background-color: #f9fafb;
+        }
+        .page-break {
+            page-break-before: always;
         }
     </style>
 </head>
@@ -320,21 +339,6 @@ export class PDFGenerator {
             {{/if}}
         </div>
     </div>
-
-    {{#if evidenceFiles.length}}
-    <div class="section">
-        <h2>Evidence Documents</h2>
-        <p><strong>Total Files:</strong> {{evidenceFiles.length}}</p>
-        <div class="evidence-section">
-            {{#each evidenceFiles}}
-            <div style="margin-bottom: 20px;">
-                <p><strong>{{this.name}}</strong> ({{this.size}} bytes)</p>
-                <img src="{{this.url}}" alt="{{this.name}}" class="evidence-image" />
-            </div>
-            {{/each}}
-        </div>
-    </div>
-    {{/if}}
 
     {{#if referenceValidation.reference_1}}
     <div class="section">
@@ -384,13 +388,28 @@ export class PDFGenerator {
         </div>
     </div>
 
+    {{#if evidenceFiles.length}}
+    <div class="section">
+        <h2>Evidence Documents</h2>
+        <p><strong>Total Files:</strong> {{evidenceFiles.length}}</p>
+        <div class="evidence-section">
+            {{#each evidenceFiles}}
+            <div style="margin-bottom: 20px;">
+                <p><strong>{{this.name}}</strong> ({{this.size}} bytes)</p>
+                <img src="{{this.url}}" alt="{{this.name}}" class="evidence-image" />
+            </div>
+            {{/each}}
+        </div>
+    </div>
+    {{/if}}
+
     <div class="section admin-notes">
         <h2>Admin Notes</h2>
         <p style="color: #6b7280; font-style: italic;">
             [Space for admin verification notes and approval decision]
         </p>
-        <br><br><br><br>
-        <div style="border-top: 1px solid #d1d5db; padding-top: 10px;">
+        <br><br>
+        <div style="border-top: 1px solid #d1d5db; padding-top: 8px;">
             <p><strong>Admin Signature:</strong> _________________________</p>
             <p><strong>Date:</strong> _________________________</p>
             <p><strong>Status:</strong> □ Approved □ Rejected □ Needs Review</p>

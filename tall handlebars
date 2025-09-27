@@ -1,0 +1,144 @@
+[1mdiff --git a/lib/pdf-generator.ts b/lib/pdf-generator.ts[m
+[1mindex 39c038d..24ca06e 100644[m
+[1m--- a/lib/pdf-generator.ts[m
+[1m+++ b/lib/pdf-generator.ts[m
+[36m@@ -33,6 +33,8 @@[m [masync function getBrowser() {[m
+   })[m
+   return browser[m
+ }[m
+[32m+[m
+[32m+[m[32mimport Handlebars from 'handlebars'[m
+ import { EvidenceFile } from './r2-storage'[m
+ [m
+ export interface RegistrationPDFData {[m
+[36m@@ -61,90 +63,37 @@[m [mexport interface RegistrationPDFData {[m
+ }[m
+ [m
+ export class PDFGenerator {[m
+[31m-  private htmlTemplate: string[m
+[32m+[m[32m  private template: HandlebarsTemplateDelegate[m
+ [m
+   constructor() {[m
+[31m-    this.htmlTemplate = this.getHTMLTemplate()[m
+[32m+[m[32m    const htmlTemplate = this.getHTMLTemplate()[m
+[32m+[m[32m    this.template = Handlebars.compile(htmlTemplate)[m
+   }[m
+ [m
+[31m-  private replaceTemplateVariables(template: string, data: RegistrationPDFData): string {[m
+[31m-    const fullName = `${data.user.first_name} ${data.user.middle_name ? data.user.middle_name + ' ' : ''}${data.user.last_name}`[m
+[31m-    const phoneDisplay = data.user.phone || 'Not provided'[m
+[31m-    const startClassDisplay = data.user.start_class ? `Class ${data.user.start_class}` : ''[m
+[31m-    const startYearDisplay = data.user.start_year ? data.user.start_year.toString() : ''[m
+[32m+[m[32m  private prepareTemplateData(data: RegistrationPDFData): any {[m
+[32m+[m[32m    // Build full name properly[m
+[32m+[m[32m    const fullName = `${data.user.first_name}${data.user.middle_name ? ' ' + data.user.middle_name : ''} ${data.user.last_name}`[m
+     [m
+[31m-    // Evidence section[m
+[31m-    const evidenceSection = data.evidenceFiles.length > 0 ? `[m
+[31m-    <div class="section">[m
+[31m-        <h2>Evidence Documents</h2>[m
+[31m-        <p><strong>Total Files:</strong> ${data.evidenceFiles.length}</p>[m
+[31m-        <div class="evidence-section">[m
+[31m-            ${data.evidenceFiles.map(file => `[m
+[31m-            <div style="margin-bottom: 20px;">[m
+[31m-                <p><strong>${file.name}</strong> (${file.size} bytes)</p>[m
+[31m-                <img src="${file.url}" alt="${file.name}" class="evidence-image" />[m
+[31m-            </div>[m
+[31m-            `).join('')}[m
+[31m-        </div>[m
+[31m-    </div>` : ''[m
+[31m-    [m
+[31m-    // Reference section[m
+[31m-    const referenceSection = data.referenceValidation.reference_1 ? `[m
+[31m-    <div class="section">[m
+[31m-        <h2>Reference Validation</h2>[m
+[31m-        <div class="info-grid">[m
+[31m-            ${data.referenceValidation.reference_1 ? `[m
+[31m-            <div class="info-label">Reference 1:</div>[m
+[31m-            <div class="info-value">[m
+[31m-                ${data.referenceValidation.reference_1}[m
+[31m-                ${data.referenceValidation.reference_1_valid === true ? [m
+[31m-                  '<span class="reference-status status-valid">VALID</span>' :[m
+[31m-                  data.referenceValidation.reference_1_valid === false ?[m
+[31m-                  '<span class="reference-status status-invalid">INVALID</span>' :[m
+[31m-                  '<span class="reference-status status-pending">PENDING</span>'}[m
+[31m-            </div>` : ''}[m
+[31m-            [m
+[31m-            ${data.referenceValidation.reference_2 ? `[m
+[31m-            <div class="info-label">Reference 2:</div>[m
+[31m-            <div class="info-value">[m
+[31m-                ${data.referenceValidation.reference_2}[m
+[31m-                ${data.referenceValidation.reference_2_valid === true ? [m
+[31m-                  '<span class="reference-status status-valid">VALID</span>' :[m
+[31m-                  data.referenceValidation.reference_2_valid === false ?[m
+[31m-                  '<span class="reference-status status-invalid">INVALID</span>' :[m
+[31m-                  '<span class="reference-status status-pending">PENDING</span>'}[m
+[31m-            </div>` : ''}[m
+[31m-        </div>[m
+[31m-    </div>` : ''[m
+[32m+[m[32m    // Prepare phone display[m
+[32m+[m[32m    const phoneDisplay = data.user.phone || 'Not provided'[m
+     [m
+[31m-    // Verification method[m
+[32m+[m[32m    // Prepare verification method[m
+     const verificationMethod = data.evidenceFiles.length > 0 [m
+       ? (data.referenceValidation.reference_1 ? 'Evidence + References' : 'Evidence Only')[m
+       : 'References Only'[m
+[31m-    [m
+[31m-    return template[m
+[31m-      .replace(/\{\{registrationId\}\}/g, data.registrationId)[m
+[31m-      .replace(/\{\{submissionDate\}\}/g, data.submissionDate)[m
+[31m-      .replace(/\{\{user\.first_name\}\}/g, data.user.first_name)[m
+[31m-      .replace(/\{\{user\.middle_name\}\}/g, data.user.middle_name || '')[m
+[31m-      .replace(/\{\{user\.last_name\}\}/g, data.user.last_name)[m
+[31m-      .replace(/\{\{user\.email\}\}/g, data.user.email)[m
+[31m-      .replace(/\{\{user\.phone\}\}/g, phoneDisplay)[m
+[31m-      .replace(/\{\{user\.last_class\}\}/g, data.user.last_class.toString())[m
+[31m-      .replace(/\{\{user\.year_of_leaving\}\}/g, data.user.year_of_leaving.toString())[m
+[31m-      .replace(/\{\{user\.start_class\}\}/g, data.user.start_class?.toString() || '')[m
+[31m-      .replace(/\{\{user\.start_year\}\}/g, data.user.start_year?.toString() || '')[m
+[31m-      .replace(/\{\{user\.created_at\}\}/g, data.user.created_at)[m
+[31m-      .replace(/\{\{user\.id\}\}/g, data.user.id)[m
+[31m-      .replace(/\{\{#if user\.start_class\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.start_class ? `[m
+[31m-            <div class="info-label">Start Class:</div>[m
+[31m-            <div class="info-value">Class ${data.user.start_class}</div>` : '')[m
+[31m-      .replace(/\{\{#if user\.start_year\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.start_year ? `[m
+[31m-            <div class="info-label">Start Year:</div>[m
+[31m-            <div class="info-value">${data.user.start_year}</div>` : '')[m
+[31m-      .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)[m
+[31m-      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?\{\{\/if\}\}/g, referenceSection)[m
+[31m-      .replace(/\{\{#if evidenceFiles\.length\}\}\{\{#if referenceValidation\.reference_1\}\}Evidence \+ References\{\{else\}\}Evidence Only\{\{\/if\}\}\{\{else\}\}References Only\{\{\/if\}\}/g, verificationMethod)[m
+[32m+[m
+[32m+[m[32m    return {[m
+[32m+[m[32m      registrationId: data.registrationId,[m
+[32m+[m[32m      submissionDate: data.submissionDate,[m
+[32m+[m[32m      user: {[m
+[32m+[m[32m        ...data.user,[m
+[32m+[m[32m        full_name: fullName,[m
+[32m+[m[32m        phone_display: phoneDisplay[m
+[32m+[m[32m      },[m
+[32m+[m[32m      evidenceFiles: data.evidenceFiles,[m
+[32m+[m[32m      referenceValidation: data.referenceValidation,[m
+[32m+[m[32m      verificationMethod[m
+[32m+[m[32m    }[m
+   }[m
+ [m
+   private getHTMLTemplate(): string {[m
+[36m@@ -265,13 +214,13 @@[m [mexport class PDFGenerator {[m
+         <h2>Personal Information</h2>[m
+         <div class="info-grid">[m
+             <div class="info-label">Full Name:</div>[m
+[31m-            <div class="info-value">{{user.first_name}} {{#if user.middle_name}}{{user.middle_name}} {{/if}}{{user.last_name}}</div>[m
+[32m+[m[32m            <div class="info-value">{{user.full_name}}</div>[m
+             [m
+             <div class="info-label">Email:</div>[m
+             <div class="info-value">{{user.email}}</div>[m
+             [m
+             <div class="info-label">Phone:</div>[m
+[31m-            <div class="info-value">{{#if user.phone}}{{user.phone}}{{else}}Not provided{{/if}}</div>[m
+[32m+[m[32m            <div class="info-value">{{user.phone_display}}</div>[m
+             [m
+             <div class="info-label">Registration ID:</div>[m
+             <div class="info-value">{{user.id}}</div>[m
+[36m@@ -356,9 +305,7 @@[m [mexport class PDFGenerator {[m
+             <div class="info-value">{{user.created_at}}</
