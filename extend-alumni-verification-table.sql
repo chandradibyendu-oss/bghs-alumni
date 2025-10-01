@@ -19,3 +19,4 @@ COMMENT ON COLUMN alumni_verification.pdf_generation_status IS 'Status of PDF ge
 UPDATE alumni_verification 
 SET pdf_generation_status = 'pending' 
 WHERE pdf_generation_status IS NULL;
+

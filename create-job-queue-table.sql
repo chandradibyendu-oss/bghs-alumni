@@ -39,3 +39,4 @@ CREATE POLICY "Users can view own jobs" ON job_queue
   FOR SELECT USING (
     auth.uid()::text = (payload->>'userId')
   );
+

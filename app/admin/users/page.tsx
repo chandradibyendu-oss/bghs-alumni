@@ -31,6 +31,7 @@ interface UserProfile {
   email: string
   phone?: string | null
   full_name: string
+  registration_id?: string | null
   last_class?: number | null
   year_of_leaving?: number | null
   start_class?: number | null
@@ -411,9 +412,16 @@ export default function AdminUsersPage() {
   }
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = user.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         user.profession?.toLowerCase().includes(searchTerm.toLowerCase())
+    const term = searchTerm.trim().toLowerCase()
+    const matchesNameEmailProfession = user.full_name.toLowerCase().includes(term) ||
+                         user.email.toLowerCase().includes(term) ||
+                         user.profession?.toLowerCase().includes(term)
+    // Allow search by full or last 5 digits of registration_id
+    const regId = (user.registration_id || '').toLowerCase()
+    const matchesRegId = term
+      ? (regId.includes(term) || (term.length <= 5 && regId.endsWith(term)))
+      : true
+    const matchesSearch = matchesNameEmailProfession || matchesRegId
     const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
     return matchesSearch && matchesYear
   })
@@ -764,6 +772,9 @@ export default function AdminUsersPage() {
                       User
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Member ID
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Last Class
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -814,6 +825,9 @@ export default function AdminUsersPage() {
                             </div>
                           </div>
                         </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                        {user.registration_id ? user.registration_id : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {user.last_class ?? '-'}

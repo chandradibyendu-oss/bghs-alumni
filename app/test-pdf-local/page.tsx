@@ -18,7 +18,7 @@ export default function TestPDFLocalPage() {
     reference_2: 'Mr. Bob Johnson (Teacher)',
     reference_1_valid: true,
     reference_2_valid: false,
-    registrationId: 'REG-2024-001'
+    registrationId: 'test-user-456'
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -78,7 +78,7 @@ export default function TestPDFLocalPage() {
       reference_2: 'Mr. Bob Johnson (Teacher)',
       reference_1_valid: true,
       reference_2_valid: false,
-      registrationId: 'REG-2024-001'
+      registrationId: 'test-user-456'
     })
   }
 

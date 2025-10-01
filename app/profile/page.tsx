@@ -27,6 +27,7 @@ interface Profile {
   website_url: string | null
   phone: string | null
   is_approved?: boolean
+  registration_id?: string | null
 }
 
 export default function ProfilePage() {
@@ -220,6 +221,15 @@ export default function ProfilePage() {
               </Link>
             </div>
           </div>
+
+          {profile.is_approved && profile.registration_id && (
+            <div className="mb-4">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-50 border border-primary-200 text-primary-800 text-sm">
+                <span className="font-semibold">Member ID:</span>
+                <span className="font-mono tracking-wider">{profile.registration_id}</span>
+              </div>
+            </div>
+          )}
 
           {/* Avatar */}
           <div className="mb-6 flex items-center gap-4">

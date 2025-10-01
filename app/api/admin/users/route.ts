@@ -85,7 +85,10 @@ export async function POST(request: NextRequest) {
         location: location || null,
         bio: bio || null,
         linkedin_url: linkedin_url || null,
-        website_url: website_url || null
+        website_url: website_url || null,
+        // Admin-created users are immediately approved and get registration IDs
+        is_approved: true,
+        import_source: 'admin_created'
       })
 
     if (profileError) {

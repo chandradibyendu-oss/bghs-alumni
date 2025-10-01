@@ -1,6 +1,6 @@
 /**
  * Registration ID utilities for generating memorable alumni registration IDs
- * Format: BGHS-YYYY-XXXX (e.g., BGHS-2024-0001)
+ * Format: <PREFIX>-YYYY-XXXXX (e.g., BGHSA-2024-00001)
  */
 
 import { createClient } from '@supabase/supabase-js'
@@ -18,9 +18,9 @@ const supabaseAdmin = () => {
 export async function generateRegistrationId(): Promise<string> {
   try {
     const supabase = supabaseAdmin()
-    
+    const prefix = process.env.REGISTRATION_ID_PREFIX || 'BGHSA'
     const { data, error } = await supabase
-      .rpc('generate_registration_id')
+      .rpc('generate_registration_id', { prefix })
     
     if (error) {
       console.error('Error generating registration ID:', error)
@@ -40,7 +40,8 @@ export async function generateRegistrationId(): Promise<string> {
  * @returns boolean indicating if the format is valid
  */
 export function validateRegistrationIdFormat(registrationId: string): boolean {
-  const pattern = /^BGHS-\d{4}-\d{4}$/
+  const prefix = process.env.REGISTRATION_ID_PREFIX || 'BGHSA'
+  const pattern = new RegExp(`^${prefix}-\\d{4}-\\d{5}$`)
   return pattern.test(registrationId)
 }
 
@@ -54,7 +55,8 @@ export function extractYearFromRegistrationId(registrationId: string): number | 
     return null
   }
   
-  const match = registrationId.match(/^BGHS-(\d{4})-\d{4}$/)
+  const prefix = process.env.REGISTRATION_ID_PREFIX || 'BGHSA'
+  const match = registrationId.match(new RegExp(`^${prefix}-(\\d{4})-\\d{5}$`))
   return match ? parseInt(match[1], 10) : null
 }
 
@@ -68,7 +70,8 @@ export function extractSequenceFromRegistrationId(registrationId: string): numbe
     return null
   }
   
-  const match = registrationId.match(/^BGHS-\d{4}-(\d{4})$/)
+  const prefix = process.env.REGISTRATION_ID_PREFIX || 'BGHSA'
+  const match = registrationId.match(new RegExp(`^${prefix}-\\d{4}-(\\d{5})$`))
   return match ? parseInt(match[1], 10) : null
 }
 
@@ -91,10 +94,11 @@ export async function getRegistrationStats(): Promise<{
       .select('*', { count: 'exact', head: true })
     
     // Get current year registrations
+    const prefix = process.env.REGISTRATION_ID_PREFIX || 'BGHSA'
     const { count: yearCount } = await supabase
       .from('profiles')
       .select('*', { count: 'exact', head: true })
-      .like('registration_id', `BGHS-${currentYear}-%`)
+      .like('registration_id', `${prefix}-${currentYear}-%`)
     
     // Get last registration ID
     const { data: lastReg } = await supabase
@@ -147,6 +151,7 @@ export async function findAlumniByRegistrationId(registrationId: string) {
     throw error
   }
 }
+
 
 
 
