@@ -62,20 +62,42 @@ const createSupabaseClient = () => {
   return createClient(supabaseUrl, supabaseKey)
 }
 
-// Get user permissions from Supabase
+// Get user permissions from Supabase (Dynamic lookup from role definitions)
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   try {
     const supabase = createSupabaseClient()
     
-    const { data, error } = await supabase
-      .rpc('get_user_permissions', { user_uuid: userId })
+    // First, get the user's role from profiles table
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single()
     
-    if (error) {
-      console.error('Error fetching user permissions:', error)
+    if (profileError) {
+      console.error('Error fetching user profile:', profileError)
       return null
     }
     
-    return data as UserPermissions
+    if (!profile?.role) {
+      // If no role assigned, return empty permissions (public user)
+      return {} as UserPermissions
+    }
+    
+    // Get permissions from the role definition in user_roles table
+    const { data: roleData, error: roleError } = await supabase
+      .from('user_roles')
+      .select('permissions')
+      .eq('name', profile.role)
+      .single()
+    
+    if (roleError) {
+      console.error('Error fetching role permissions:', roleError)
+      return null
+    }
+    
+    // Return the permissions from the role definition (always current)
+    return (roleData?.permissions || {}) as UserPermissions
   } catch (error) {
     console.error('Error in getUserPermissions:', error)
     return null
@@ -103,7 +125,7 @@ export function canAccess(
   )
 }
 
-// Get user profile with permissions
+// Get user profile with permissions (Dynamic lookup)
 export async function getUserProfile(userId: string): Promise<UserProfile | null> {
   try {
     const supabase = createSupabaseClient()
@@ -119,7 +141,7 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
       return null
     }
     
-    // Get permissions for the user
+    // Get permissions dynamically from role definition
     const permissions = await getUserPermissions(userId)
     
     return {
@@ -154,7 +176,7 @@ export async function getAvailableRoles(): Promise<UserRole[]> {
   }
 }
 
-// Update user role
+// Update user role (Dynamic permissions - no need to update permissions column)
 export async function updateUserRole(
   userId: string, 
   newRole: string,
@@ -163,7 +185,8 @@ export async function updateUserRole(
   try {
     const supabase = createSupabaseClient()
     
-    // Update the profile with new role
+    // Update the profile with new role only
+    // Permissions will be dynamically looked up from user_roles table
     const { error: profileError } = await supabase
       .from('profiles')
       .update({ role: newRole })
@@ -174,29 +197,7 @@ export async function updateUserRole(
       return false
     }
     
-    // Get the role permissions
-    const { data: roleData, error: roleError } = await supabase
-      .from('user_roles')
-      .select('permissions')
-      .eq('name', newRole)
-      .single()
-    
-    if (roleError) {
-      console.error('Error fetching role permissions:', roleError)
-      return false
-    }
-    
-    // Update profile with new permissions
-    const { error: permError } = await supabase
-      .from('profiles')
-      .update({ permissions: roleData.permissions })
-      .eq('id', userId)
-    
-    if (permError) {
-      console.error('Error updating profile permissions:', permError)
-      return false
-    }
-    
+    // No need to update permissions column - they're now dynamically looked up
     return true
   } catch (error) {
     console.error('Error in updateUserRole:', error)

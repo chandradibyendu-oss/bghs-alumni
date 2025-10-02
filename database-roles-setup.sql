@@ -45,7 +45,7 @@ SET role = 'super_admin',
     permissions = (SELECT permissions FROM user_roles WHERE name = 'super_admin')
 WHERE email = 'admin@bghs.edu.in' OR email LIKE '%admin%';
 
--- 6. Create function to get user permissions
+-- 6. Create function to get user permissions (Dynamic lookup from role definitions)
 CREATE OR REPLACE FUNCTION get_user_permissions(user_uuid UUID)
 RETURNS JSONB AS $$
 DECLARE
@@ -60,7 +60,7 @@ BEGIN
     user_role := 'public';
   END IF;
   
-  -- Get permissions for the role
+  -- Get permissions from the role definition in user_roles table (always current)
   SELECT permissions INTO role_permissions FROM user_roles WHERE name = user_role;
   
   -- Return permissions or empty object if none found

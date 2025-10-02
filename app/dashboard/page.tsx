@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart } from 'lucide-react'
+import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield } from 'lucide-react'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [canManageUsers, setCanManageUsers] = useState(false)
+  const [canManageRoles, setCanManageRoles] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -25,10 +26,12 @@ export default function DashboardPage() {
         try {
           const perms = await getUserPermissions(user.id)
           setCanManageUsers(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+          setCanManageRoles(hasPermission(perms, 'can_manage_roles'))
         } catch {
           // Fallback: allow only super_admin
           const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
           setCanManageUsers(data?.role === 'super_admin')
+          setCanManageRoles(data?.role === 'super_admin')
         }
       } else {
         router.push('/login')
@@ -118,6 +121,14 @@ export default function DashboardPage() {
               <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
               <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
+            </Link>
+          )}
+          
+          {canManageRoles && (
+            <Link href="/admin/roles-simple" className="card text-center hover:shadow-lg transition-shadow group">
+              <Shield className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Role Management</h3>
+              <p className="text-gray-600">Create, edit, and manage user roles and permissions</p>
             </Link>
           )}
           

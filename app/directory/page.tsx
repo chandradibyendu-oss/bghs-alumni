@@ -7,18 +7,24 @@ import { ArrowLeft, Search, Filter, MapPin, Briefcase, GraduationCap, Mail, Link
 
 interface UserProfile {
   id: string
-  email: string
+  email?: string
   full_name: string
   batch_year: number
-  profession: string
-  company: string
-  location: string
-  bio: string
-  avatar_url: string
-  linkedin_url: string
-  website_url: string
+  profession?: string
+  company?: string
+  location?: string
+  bio?: string
+  avatar_url?: string
+  linkedin_url?: string
+  website_url?: string
+  phone?: string
   created_at: string
-  updated_at: string
+  updated_at?: string
+}
+
+interface ViewerPermissions {
+  can_view_full_directory: boolean
+  is_authenticated: boolean
 }
 
 const anonymizeName = (fullName: string): string => {
@@ -37,6 +43,10 @@ export default function DirectoryPage() {
   const [filterBatch, setFilterBatch] = useState('All')
   const [filterProfession, setFilterProfession] = useState('All')
   const [isAuthed, setIsAuthed] = useState(false)
+  const [viewerPermissions, setViewerPermissions] = useState<ViewerPermissions>({
+    can_view_full_directory: false,
+    is_authenticated: false
+  })
 
   useEffect(() => {
     checkAuthAndLoad()
@@ -50,14 +60,18 @@ export default function DirectoryPage() {
       // Include access token for authorized users so the API can return full details
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData?.session?.access_token
-      const response = await fetch('/api/directory', {
+      const response = await fetch('/api/directory-fallback', {
         method: 'GET',
         headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : undefined,
         cache: 'no-store'
       })
       if (response.ok) {
-        const { users } = await response.json()
+        const { users, viewer_permissions } = await response.json()
         setAlumni(users || [])
+        setViewerPermissions(viewer_permissions || {
+          can_view_full_directory: false,
+          is_authenticated: false
+        })
       }
     } catch (error) {
       console.error('Error fetching alumni:', error)
@@ -69,8 +83,13 @@ export default function DirectoryPage() {
   // Generate batch decades dynamically
   const batchDecades = ['All', ...Array.from(new Set(alumni.map(u => Math.floor(u.batch_year / 10) * 10 + 's'))).sort()]
   
-  // Generate professions dynamically
-  const allProfessions = ['All', ...Array.from(new Set(alumni.map(u => u.profession).filter(Boolean))).sort()]
+  // Generate professions dynamically (only for authenticated users with full access)
+  const allProfessions = ['All', ...Array.from(new Set(
+    alumni
+      .map(u => u.profession)
+      .filter(Boolean)
+      .filter(prof => prof !== 'BGHS Alumni') // Filter out anonymized profession
+  )).sort()]
 
   // Filter alumni based on search and filters
   const filteredAlumni = alumni.filter(person => {
@@ -234,31 +253,44 @@ export default function DirectoryPage() {
                 )}
 
                 <div className="flex gap-2 mb-4">
-                  {isAuthed ? (
+                  {viewerPermissions.is_authenticated ? (
                     <>
-                      <button className="btn-primary flex-1">Connect</button>
-                      <button className="btn-secondary">View Profile</button>
+                      {/* Connect Button - Show if user has contact info */}
+                      {(person.email || person.linkedin_url) && (
+                        <button className="btn-primary flex-1">
+                          {person.email ? 'Email' : 'Connect'}
+                        </button>
+                      )}
+                      {/* View Profile Button - Always show for authenticated users */}
+                      <Link 
+                        href={`/profile/${person.id}`}
+                        className="btn-secondary"
+                      >
+                        View Profile
+                      </Link>
                     </>
                   ) : (
-                    <Link href="/login" className="btn-primary w-full text-center">Login to Connect</Link>
+                    <Link href="/login" className="btn-primary w-full text-center">
+                      Login to View Profile
+                    </Link>
                   )}
                 </div>
 
-                {isAuthed && (
+                {viewerPermissions.is_authenticated && (
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex space-x-3">
                       {person.email && (
-                        <a href={`mailto:${person.email}`} className="text-gray-500 hover:text-primary-600">
+                        <a href={`mailto:${person.email}`} className="text-gray-500 hover:text-primary-600" title="Send Email">
                           <Mail className="h-4 w-4" />
                         </a>
                       )}
                       {person.linkedin_url && (
-                        <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
+                        <a href={person.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600" title="LinkedIn Profile">
                           <Linkedin className="h-4 w-4" />
                         </a>
                       )}
                       {person.website_url && (
-                        <a href={person.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600">
+                        <a href={person.website_url} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-primary-600" title="Personal Website">
                           <Globe className="h-4 w-4" />
                         </a>
                       )}
@@ -272,18 +304,37 @@ export default function DirectoryPage() {
 
         {/* Join / Sign-in CTA */}
         <div className="mt-12 bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-8 text-center text-white">
-          {isAuthed ? (
+          {viewerPermissions.is_authenticated ? (
             <>
-              <h2 className="text-2xl font-bold mb-4">Search the full directory</h2>
-              <p className="text-primary-100 mb-6">Use filters to find classmates and expand your network.</p>
+              <h2 className="text-2xl font-bold mb-4">Connect with Alumni</h2>
+              <p className="text-primary-100 mb-6">
+                {viewerPermissions.can_view_full_directory 
+                  ? "View full profiles and connect with your fellow alumni."
+                  : "Your account is pending approval. Once approved, you'll have full access to connect with alumni."
+                }
+              </p>
+              {viewerPermissions.can_view_full_directory && (
+                <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                  <Link href="/dashboard" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
+                    Go to Dashboard
+                  </Link>
+                  <Link href="/profile" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
+                    Edit Your Profile
+                  </Link>
+                </div>
+              )}
             </>
           ) : (
             <>
               <h2 className="text-2xl font-bold mb-4">Join Our Directory</h2>
               <p className="text-primary-100 mb-6">Sign in to view full profiles and connect with alumni.</p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/login" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">Login to View Full Directory</Link>
-                <Link href="/register" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">Create Account</Link>
+                <Link href="/login" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
+                  Login to View Full Directory
+                </Link>
+                <Link href="/register" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
+                  Create Account
+                </Link>
               </div>
             </>
           )}

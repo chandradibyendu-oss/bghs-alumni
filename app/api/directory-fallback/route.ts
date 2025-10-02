@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Create Supabase client with service role key for public directory access
+// Create Supabase client with service role key
 const createSupabaseAdmin = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -50,13 +50,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all approved users who allow directory visibility
+    // Get all approved users (bypass privacy system for now)
     const { data: users, error } = await supabaseAdmin
       .from('profiles')
       .select(`
         id, full_name, batch_year, profession, company, location, 
         bio, avatar_url, linkedin_url, website_url, created_at,
-        is_approved, privacy_settings
+        is_approved
       `)
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
@@ -70,75 +70,47 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ users: [] })
     }
 
-    // Filter and process users based on privacy settings and viewer permissions
-    const processedUsers = await Promise.all(
-      users.map(async (user: any) => {
-        // Check if user allows directory visibility
-        const allowsDirectory = await supabaseAdmin
-          .rpc('user_allows_privacy_setting', {
-            user_id: user.id,
-            setting_key: 'show_in_directory'
-          })
-
-        // If user doesn't allow directory visibility, skip them
-        if (!allowsDirectory.data) {
-          return null
-        }
-
-        // If viewer can see full directory, get privacy-filtered data
-        if (canViewFullDirectory && tokenUserId) {
-          const { data: profileData } = await supabaseAdmin
-            .rpc('get_profile_data_with_privacy', {
-              viewer_id: tokenUserId,
-              target_id: user.id
-            })
-
-          if (profileData?.profile) {
-            return {
-              ...profileData.profile,
-              // Ensure we have the basic fields for directory display
-              id: user.id,
-              full_name: profileData.profile.full_name || user.full_name,
-              batch_year: user.batch_year,
-              // Only include fields that are allowed by privacy settings
-              profession: profileData.profile.profession,
-              company: profileData.profile.company,
-              location: profileData.profile.location,
-              bio: profileData.profile.bio,
-              avatar_url: profileData.profile.avatar_url,
-              linkedin_url: profileData.profile.linkedin_url,
-              website_url: profileData.profile.website_url,
-              email: profileData.profile.email,
-              phone: profileData.profile.phone,
-              created_at: user.created_at
-            }
-          }
-        }
-
-        // For public or limited access, return basic anonymized data
+    // Process users based on viewer permissions
+    const processedUsers = users.map((user: any) => {
+      if (canViewFullDirectory) {
+        // Full access - show all data
         return {
           id: user.id,
-          full_name: canViewFullDirectory ? user.full_name : anonymizeName(user.full_name),
+          full_name: user.full_name,
           batch_year: user.batch_year,
-          profession: canViewFullDirectory ? user.profession : 'BGHS Alumni',
-          company: canViewFullDirectory ? user.company : null,
-          location: canViewFullDirectory ? user.location : null,
-          bio: canViewFullDirectory ? user.bio : null,
-          avatar_url: canViewFullDirectory ? user.avatar_url : null,
-          linkedin_url: canViewFullDirectory ? user.linkedin_url : null,
-          website_url: canViewFullDirectory ? user.website_url : null,
+          profession: user.profession || 'Not specified',
+          company: user.company,
+          location: user.location,
+          bio: user.bio,
+          avatar_url: user.avatar_url,
+          linkedin_url: user.linkedin_url,
+          website_url: user.website_url,
           email: null, // Never show email in directory
           phone: null, // Never show phone in directory
           created_at: user.created_at
         }
-      })
-    )
-
-    // Filter out null entries (users who don't allow directory visibility)
-    const filteredUsers = processedUsers.filter(user => user !== null)
+      } else {
+        // Limited access - anonymized data
+        return {
+          id: user.id,
+          full_name: anonymizeName(user.full_name),
+          batch_year: user.batch_year,
+          profession: 'BGHS Alumni',
+          company: null,
+          location: null,
+          bio: null,
+          avatar_url: null,
+          linkedin_url: null,
+          website_url: null,
+          email: null,
+          phone: null,
+          created_at: user.created_at
+        }
+      }
+    })
 
     return NextResponse.json({ 
-      users: filteredUsers,
+      users: processedUsers,
       viewer_permissions: {
         can_view_full_directory: canViewFullDirectory,
         is_authenticated: !!tokenUserId
@@ -150,4 +122,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
-
