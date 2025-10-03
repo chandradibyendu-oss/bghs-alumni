@@ -25,44 +25,29 @@ async function getBrowser() {
     puppeteerCore = mod.default || mod
   }
   
-  try {
-    // Configure chromium for serverless environment
-    await chromium.font('https://raw.githack.com/googlei18n/noto-emoji/master/fonts/NotoColorEmoji.ttf')
-    
-    // Use newer @sparticuz/chromium API with proper configuration
-    const executablePath = await chromium.executablePath()
-    
-    console.log('Launching browser with executable path:', executablePath)
-    
-    const browser = await puppeteerCore.launch({
-      args: [
-        ...chromium.args,
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu',
-        '--disable-web-security',
-        '--disable-features=VizDisplayCompositor',
-        '--disable-background-timer-throttling',
-        '--disable-backgrounding-occluded-windows',
-        '--disable-renderer-backgrounding'
-      ],
-      defaultViewport: chromium.defaultViewport,
-      executablePath,
-      headless: chromium.headless !== false,
-      ignoreHTTPSErrors: true,
-    })
-    
-    console.log('Browser launched successfully')
-    return browser
-  } catch (error) {
-    console.error('Failed to launch browser with @sparticuz/chromium:', error)
-    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
+  const executablePath = await chromium.executablePath()
+  
+  // Set environment variable to help Chrome detection
+  process.env.PUPPETEER_EXECUTABLE_PATH = executablePath
+  
+  const browser = await puppeteerCore.launch({
+    args: [
+      ...chromium.args,
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ],
+    defaultViewport: chromium.defaultViewport,
+    executablePath,
+    headless: chromium.headless !== false,
+    ignoreHTTPSErrors: true,
+  })
+  return browser
 }
 
 import { EvidenceFile } from './r2-storage'
