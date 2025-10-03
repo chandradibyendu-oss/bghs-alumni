@@ -47,3 +47,4 @@ SELECT
     COUNT(*) - COUNT(email) as profiles_with_null_email
 FROM profiles;
 
+

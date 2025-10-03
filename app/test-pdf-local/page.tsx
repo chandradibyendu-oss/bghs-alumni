@@ -14,11 +14,12 @@ export default function TestPDFLocalPage() {
     year_of_leaving: 2020,
     start_class: 5,
     start_year: 2015,
-    reference_1: 'Dr. Jane Smith (Principal)',
-    reference_2: 'Mr. Bob Johnson (Teacher)',
+    reference_1: 'BGHSA-2005-00025',
+    reference_2: 'BGHSA-2005-00125',
     reference_1_valid: true,
     reference_2_valid: false,
-    registrationId: 'test-user-456'
+    registrationId: 'test-user-456',
+    includeEvidence: true
   })
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -74,11 +75,12 @@ export default function TestPDFLocalPage() {
       year_of_leaving: 2020,
       start_class: 5,
       start_year: 2015,
-      reference_1: 'Dr. Jane Smith (Principal)',
-      reference_2: 'Mr. Bob Johnson (Teacher)',
+      reference_1: 'BGHSA-2005-00025',
+      reference_2: 'BGHSA-2005-00125',
       reference_1_valid: true,
       reference_2_valid: false,
-      registrationId: 'test-user-456'
+      registrationId: 'test-user-456',
+      includeEvidence: true
     })
   }
 
@@ -268,6 +270,27 @@ export default function TestPDFLocalPage() {
                   </label>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Evidence */}
+          <div className="mt-6 space-y-4">
+            <h2 className="text-lg font-semibold text-gray-700 border-b pb-2">Evidence</h2>
+            
+            <div>
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  name="includeEvidence"
+                  checked={formData.includeEvidence}
+                  onChange={handleInputChange}
+                  className="mr-2"
+                />
+                <span className="text-sm text-gray-600">Include Evidence Documents</span>
+              </label>
+              <p className="text-xs text-gray-500 mt-1">
+                When checked, includes sample marksheet and school certificate in the PDF
+              </p>
             </div>
           </div>
 

@@ -25,26 +25,44 @@ async function getBrowser() {
     puppeteerCore = mod.default || mod
   }
   
-  // Use newer @sparticuz/chromium API with proper configuration
-  const executablePath = await chromium.executablePath()
-  const browser = await puppeteerCore.launch({
-    args: [
-      ...chromium.args,
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-      '--single-process',
-      '--disable-gpu'
-    ],
-    defaultViewport: chromium.defaultViewport,
-    executablePath,
-    headless: chromium.headless !== false,
-    ignoreHTTPSErrors: true,
-  })
-  return browser
+  try {
+    // Configure chromium for serverless environment
+    await chromium.font('https://raw.githack.com/googlei18n/noto-emoji/master/fonts/NotoColorEmoji.ttf')
+    
+    // Use newer @sparticuz/chromium API with proper configuration
+    const executablePath = await chromium.executablePath()
+    
+    console.log('Launching browser with executable path:', executablePath)
+    
+    const browser = await puppeteerCore.launch({
+      args: [
+        ...chromium.args,
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu',
+        '--disable-web-security',
+        '--disable-features=VizDisplayCompositor',
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding'
+      ],
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless !== false,
+      ignoreHTTPSErrors: true,
+    })
+    
+    console.log('Browser launched successfully')
+    return browser
+  } catch (error) {
+    console.error('Failed to launch browser with @sparticuz/chromium:', error)
+    throw new Error(`PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
 }
 
 import { EvidenceFile } from './r2-storage'
@@ -87,11 +105,22 @@ export class PDFGenerator {
     const startClassDisplay = data.user.start_class ? `Class ${data.user.start_class}` : ''
     const startYearDisplay = data.user.start_year ? data.user.start_year.toString() : ''
     
-    // Evidence section - moved to separate page after References
-    const evidenceSection = data.evidenceFiles.length > 0 ? `
+    // Format the date for display
+    const formattedDate = new Date(data.submissionDate).toLocaleString('en-IN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'Asia/Kolkata'
+    })
+    
+    // Evidence section - always show, with content based on whether files are provided
+    const evidenceSection = `
     <div class="page-break"></div>
     <div class="section">
         <h2>Evidence Documents</h2>
+        ${data.evidenceFiles.length > 0 ? `
         <p><strong>Total Files:</strong> ${data.evidenceFiles.length}</p>
         <div class="evidence-section">
             ${data.evidenceFiles.map(file => `
@@ -100,44 +129,93 @@ export class PDFGenerator {
                 <img src="${file.url}" alt="${file.name}" class="evidence-image" />
             </div>
             `).join('')}
-        </div>
-    </div>` : ''
+        </div>` : `
+        <div class="info-grid">
+            <div class="info-label">Status:</div>
+            <div class="info-value">Not provided</div>
+        </div>`}
+    </div>`
     
     // Reference section (render if either reference exists)
     const hasRef1 = !!data.referenceValidation.reference_1
     const hasRef2 = !!data.referenceValidation.reference_2
-    const referenceSection = (hasRef1 || hasRef2) ? `
+    
+    const formatReferenceInfo = (referenceId: string, isValid: boolean | undefined) => {
+      if (isValid === true) {
+        // For valid references, show detailed info (this would come from database lookup)
+        return `
+        <div class="reference-details">
+            <div class="info-label">Registration ID:</div>
+            <div class="info-value">${referenceId}</div>
+            
+            <div class="info-label">Alumni Name:</div>
+            <div class="info-value">[Alumni Name from Database]</div>
+            
+            <div class="info-label">Passout Year:</div>
+            <div class="info-value">[Passout Year from Database]</div>
+            
+            <div class="info-label">Last Class Attended:</div>
+            <div class="info-value">[Last Class from Database]</div>
+            
+            <div class="info-label">Email:</div>
+            <div class="info-value">[Email from Database]</div>
+            
+            <div class="info-label">Phone:</div>
+            <div class="info-value">[Phone from Database]</div>
+            
+            <div class="info-label">Status:</div>
+            <div class="info-value">Valid</div>
+        </div>`
+      } else if (isValid === false) {
+        return `
+        <div class="reference-details">
+            <div class="info-label">Registration ID:</div>
+            <div class="info-value">${referenceId}</div>
+            
+            <div class="info-label">Status:</div>
+            <div class="info-value">Not Found</div>
+        </div>`
+      } else {
+        return `
+        <div class="reference-details">
+            <div class="info-label">Registration ID:</div>
+            <div class="info-value">${referenceId}</div>
+            
+            <div class="info-label">Status:</div>
+            <div class="info-value">Pending Verification</div>
+        </div>`
+      }
+    }
+    
+    const referenceSection = `
     <div class="section">
         <h2>Reference Validation</h2>
-        <div class="info-grid">
+        <div class="reference-container">
             ${hasRef1 ? `
-            <div class="info-label">Reference 1:</div>
-            <div class="info-value">
-                ${data.referenceValidation.reference_1}
-                ${data.referenceValidation.reference_1_valid === true ? 
-                  '<span class="reference-status status-valid">VALID</span>' :
-                  data.referenceValidation.reference_1_valid === false ?
-                  '<span class="reference-status status-invalid">INVALID</span>' :
-                  '<span class="reference-status status-pending">PENDING</span>'}
-            </div>` : ''}
+            <div class="reference-item reference-left">
+                <h3>Reference 1</h3>
+                ${formatReferenceInfo(data.referenceValidation.reference_1!, data.referenceValidation.reference_1_valid)}
+            </div>` : `
+            <div class="reference-item reference-left">
+                <h3>Reference 1</h3>
+                <div class="reference-details">
+                    <div class="info-label">Registration ID:</div>
+                    <div class="info-value">Not provided</div>
+                </div>
+            </div>`}
             
             ${hasRef2 ? `
-            <div class="info-label">Reference 2:</div>
-            <div class="info-value">
-                ${data.referenceValidation.reference_2}
-                ${data.referenceValidation.reference_2_valid === true ? 
-                  '<span class="reference-status status-valid">VALID</span>' :
-                  data.referenceValidation.reference_2_valid === false ?
-                  '<span class="reference-status status-invalid">INVALID</span>' :
-                  '<span class="reference-status status-pending">PENDING</span>'}
-            </div>` : ''}
-        </div>
-    </div>` : `
-    <div class="section">
-        <h2>Reference Validation</h2>
-        <div class="info-grid">
-            <div class="info-label">Status:</div>
-            <div class="info-value">No references provided - Evidence-based verification only</div>
+            <div class="reference-item reference-right">
+                <h3>Reference 2</h3>
+                ${formatReferenceInfo(data.referenceValidation.reference_2!, data.referenceValidation.reference_2_valid)}
+            </div>` : `
+            <div class="reference-item reference-right">
+                <h3>Reference 2</h3>
+                <div class="reference-details">
+                    <div class="info-label">Registration ID:</div>
+                    <div class="info-value">Not provided</div>
+                </div>
+            </div>`}
         </div>
     </div>`
     
@@ -153,6 +231,7 @@ export class PDFGenerator {
       .replace(/\{\{#if user\.phone\}\}\{\{user\.phone\}\}\{\{else\}\}Not provided\{\{\/if\}\}/g, phoneDisplay)
       .replace(/\{\{registrationId\}\}/g, data.registrationId)
       .replace(/\{\{submissionDate\}\}/g, data.submissionDate)
+      .replace(/\{\{formattedDate\}\}/g, formattedDate)
       // Handle any remaining middle name conditional blocks
       .replace(/\{\{#if user\.middle_name\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.middle_name && String(data.user.middle_name).trim() ? `${String(data.user.middle_name).trim()} ` : '')
       // Handle any remaining phone conditional blocks
@@ -166,24 +245,49 @@ export class PDFGenerator {
       .replace(/\{\{user\.phone\}\}/g, phoneDisplay)
       .replace(/\{\{user\.last_class\}\}/g, data.user.last_class.toString())
       .replace(/\{\{user\.year_of_leaving\}\}/g, data.user.year_of_leaving.toString())
-      .replace(/\{\{user\.start_class\}\}/g, data.user.start_class?.toString() || '')
-      .replace(/\{\{user\.start_year\}\}/g, data.user.start_year?.toString() || '')
       .replace(/\{\{user\.created_at\}\}/g, data.user.created_at)
       .replace(/\{\{user\.id\}\}/g, data.user.id)
-      // (The conditional blocks above already collapsed middle name and phone)
-      .replace(/\{\{#if user\.start_class\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.start_class ? `
-            <div class="info-label">Start Class:</div>
-            <div class="info-value">Class ${data.user.start_class}</div>` : '')
-      .replace(/\{\{#if user\.start_year\}\}[\s\S]*?\{\{\/if\}\}/g, data.user.start_year ? `
-            <div class="info-label">Start Year:</div>
-            <div class="info-value">${data.user.start_year}</div>` : '')
       .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)
-      // Replace the entire reference section - simple approach: match from {{#if referenceValidation.reference_1}} to <div class="section"> with System Information
-      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?<div class="section">\s*<h2>System Information<\/h2>/g, (hasRef1 || hasRef2) ? referenceSection + '\n\n    <div class="section">\n        <h2>System Information</h2>' : '\n\n    <div class="section">\n        <h2>System Information</h2>')
+      // Always include evidence section (even if no files)
+      .replace(/\{\{#if evidenceFiles\.length\}\}[\s\S]*?\{\{\/if\}\}/g, evidenceSection)
+      // Replace the entire reference section - match from {{#if referenceValidation.reference_1}} to the next section or end
+      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?\{\{\/if\}\}/g, referenceSection)
+      // Handle any remaining nested conditionals in the reference section
+      .replace(/\{\{#if referenceValidation\.reference_1\}\}[\s\S]*?\{\{\/if\}\}/g, '')
+      .replace(/\{\{#if referenceValidation\.reference_2\}\}[\s\S]*?\{\{\/if\}\}/g, '')
+      .replace(/\{\{#if referenceValidation\.reference_1_valid\}\}[\s\S]*?\{\{\/if\}\}/g, '')
+      .replace(/\{\{#if referenceValidation\.reference_2_valid\}\}[\s\S]*?\{\{\/if\}\}/g, '')
+      .replace(/\{\{else if referenceValidation\.reference_1_valid === false\}\}[\s\S]*?\{\{else\}\}/g, '')
+      .replace(/\{\{else if referenceValidation\.reference_2_valid === false\}\}[\s\S]*?\{\{else\}\}/g, '')
+      .replace(/\{\{else\}\}[\s\S]*?\{\{\/if\}\}/g, '')
+      .replace(/\{\{referenceValidation\.reference_1\}\}/g, '')
+      .replace(/\{\{referenceValidation\.reference_2\}\}/g, '')
+      // Clean up any remaining template closing tags
+      .replace(/\{\{\/if\}\}/g, '')
+      .replace(/\{\{else\}\}/g, '')
+      .replace(/\{\{else if[^}]*\}\}/g, '')
+      // Clean up any remaining template opening tags
+      .replace(/\{\{#if[^}]*\}\}/g, '')
+      .replace(/\{\{#each[^}]*\}\}/g, '')
+      .replace(/\{\{\/each\}\}/g, '')
       .replace(/\{\{#if evidenceFiles\.length\}\}\{\{#if referenceValidation\.reference_1\}\}Evidence \+ References\{\{else\}\}Evidence Only\{\{\/if\}\}\{\{else\}\}References Only\{\{\/if\}\}/g, verificationMethod)
   }
 
+  private getLogoSource(): string {
+    // For local development, use localhost
+    // For production, use the domain or base64 fallback
+    const isLocal = process.env.NODE_ENV === 'development' || process.env.VERCEL !== 'true'
+    
+    if (isLocal) {
+      return 'http://localhost:3000/bghs-logo.png'
+    } else {
+      // For production, use the domain or fallback to base64
+      return 'https://alumnibghs.org/bghs-logo.png'
+    }
+  }
+
   private getHTMLTemplate(): string {
+    const logoSource = this.getLogoSource()
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -203,12 +307,29 @@ export class PDFGenerator {
             font-size: 12px;
         }
         .header {
-            text-align: center;
+            display: flex;
+            align-items: center;
             background-color: #1e40af;
             color: white;
             padding: 15px;
             border-radius: 6px;
             margin-bottom: 15px;
+        }
+        .header-logo {
+            flex-shrink: 0;
+            margin-right: 15px;
+        }
+        .header-logo img {
+            height: 60px;
+            width: auto;
+            border-radius: 4px;
+            background-color: white;
+            padding: 5px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header-content {
+            flex: 1;
+            text-align: center;
         }
         .header h1 {
             margin: 0;
@@ -275,6 +396,34 @@ export class PDFGenerator {
             background-color: #fef3c7;
             color: #d97706;
         }
+        .reference-container {
+            display: flex;
+            gap: 15px;
+            align-items: flex-start;
+        }
+        .reference-item {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            background-color: #f9fafb;
+        }
+        .reference-left {
+            margin-right: 7px;
+        }
+        .reference-right {
+            margin-left: 7px;
+        }
+        .reference-item h3 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+            color: #374151;
+            border-bottom: 1px solid #d1d5db;
+            padding-bottom: 5px;
+        }
+        .reference-details {
+            margin-bottom: 8px;
+        }
         .footer {
             text-align: center;
             margin-top: 10px;
@@ -297,9 +446,15 @@ export class PDFGenerator {
 </head>
 <body>
     <div class="header">
-        <h1>BGHS Alumni Registration Verification</h1>
-        <p>Barasat Paricharan Sarkar Government High School</p>
-        <p>System ID: {{registrationId}} | Generated: {{submissionDate}}</p>
+        <div class="header-logo">
+            <img src="${logoSource}" alt="BGHS Logo" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjYwIiByeD0iNCIgZmlsbD0iIzFmMjkzNyIvPgo8dGV4dCB4PSIzMCIgeT0iMzUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIxMCIgZm9udC13ZWlnaHQ9ImJvbGQiIGZpbGw9IndoaXRlIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj5CR0hTPC90ZXh0Pgo8L3N2Zz4K';" />
+        </div>
+        <div class="header-content">
+            <h1>BARASAT GOVT. HIGH SCHOOL EX-STUDENTS ASSOCIATION</h1>
+            <p>Registration No.: S/31084</p>
+            <p>K.N.C. ROAD, BARASAT, NORTH 24 PARGANAS, KOLKATA - 700124</p>
+            <p style="margin-top: 10px; font-size: 10px; opacity: 0.8;">System ID: {{registrationId}} | Generated: {{formattedDate}}</p>
+        </div>
     </div>
 
     <div class="section">
@@ -332,16 +487,6 @@ export class PDFGenerator {
             
             <div class="info-label">Year of Leaving:</div>
             <div class="info-value">{{user.year_of_leaving}}</div>
-            
-            {{#if user.start_class}}
-            <div class="info-label">Start Class:</div>
-            <div class="info-value">Class {{user.start_class}}</div>
-            {{/if}}
-            
-            {{#if user.start_year}}
-            <div class="info-label">Start Year:</div>
-            <div class="info-value">{{user.start_year}}</div>
-            {{/if}}
         </div>
     </div>
 
@@ -380,18 +525,6 @@ export class PDFGenerator {
     </div>
     {{/if}}
 
-    <div class="section">
-        <h2>System Information</h2>
-        <div class="info-grid">
-            <div class="info-label">Registration Date:</div>
-            <div class="info-value">{{user.created_at}}</div>
-            
-            <div class="info-label">Verification Method:</div>
-            <div class="info-value">
-                {{#if evidenceFiles.length}}{{#if referenceValidation.reference_1}}Evidence + References{{else}}Evidence Only{{/if}}{{else}}References Only{{/if}}
-            </div>
-        </div>
-    </div>
 
     {{#if evidenceFiles.length}}
     <div class="section">
@@ -415,15 +548,31 @@ export class PDFGenerator {
         </p>
         <br><br>
         <div style="border-top: 1px solid #d1d5db; padding-top: 8px;">
-            <p><strong>Admin Signature:</strong> _________________________</p>
-            <p><strong>Date:</strong> _________________________</p>
             <p><strong>Status:</strong> □ Approved □ Rejected □ Needs Review</p>
+            <br>
+            <div style="display: flex; justify-content: space-between; margin-top: 20px;">
+                <div style="flex: 1; margin-right: 20px;">
+                    <p><strong>President Signature:</strong></p>
+                    <div style="margin-top: 20px; border-bottom: 1px solid #000; padding-bottom: 2px; min-height: 25px;">
+                        <span style="color: #9ca3af; font-size: 11px;">[Signature]</span>
+                    </div>
+                    <p style="margin-top: 8px; font-size: 11px; color: #6b7280;">Date: _________________</p>
+                </div>
+                <div style="flex: 1; margin-left: 20px;">
+                    <p><strong>Secretary Signature:</strong></p>
+                    <div style="margin-top: 20px; border-bottom: 1px solid #000; padding-bottom: 2px; min-height: 25px;">
+                        <span style="color: #9ca3af; font-size: 11px;">[Signature]</span>
+                    </div>
+                    <p style="margin-top: 8px; font-size: 11px; color: #6b7280;">Date: _________________</p>
+                </div>
+            </div>
         </div>
     </div>
 
     <div class="footer">
         <p>This document was automatically generated by the BGHS Alumni System</p>
-        <p>Generated on {{submissionDate}} | System ID: {{registrationId}}</p>
+        <p>BARASAT GOVT. HIGH SCHOOL EX-STUDENTS ASSOCIATION | Registration No.: S/31084</p>
+        <p>Generated on {{formattedDate}} | System ID: {{registrationId}}</p>
     </div>
 </body>
 </html>

@@ -4,5 +4,13 @@
       "path": "/api/admin/process-pdf/next",
       "schedule": "0 0 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/admin/process-pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/admin/process-pdf/next/route.ts": {
+      "maxDuration": 60
+    }
+  }
 }

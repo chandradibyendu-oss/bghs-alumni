@@ -20,3 +20,4 @@ UPDATE alumni_verification
 SET pdf_generation_status = 'pending' 
 WHERE pdf_generation_status IS NULL;
 
+

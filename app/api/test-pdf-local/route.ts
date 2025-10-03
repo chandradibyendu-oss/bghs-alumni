@@ -20,23 +20,23 @@ export async function POST(request: NextRequest) {
         start_year: body.start_year || body.user?.start_year || undefined, // optional - allow null
         created_at: new Date().toISOString()
       },
-      evidenceFiles: body.evidenceFiles || [
+      evidenceFiles: body.includeEvidence ? (body.evidenceFiles || [
         {
-          name: 'certificate-of-excellence.jpg',
+          name: 'sample_marksheet.jpg',
           size: 1024000,
-          url: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=400&h=300&fit=crop&crop=center',
+          url: 'http://localhost:3000/sample_marksheet.jpg',
           type: 'image/jpeg'
         },
         {
-          name: 'academic-transcript.pdf',
+          name: 'school-certificate.png',
           size: 512000,
-          url: 'https://via.placeholder.com/300x200/1e40af/ffffff?text=Academic+Transcript',
-          type: 'application/pdf'
+          url: 'http://localhost:3000/school-certificate.png',
+          type: 'image/png'
         }
-      ],
+      ]) : [],
       referenceValidation: {
-        reference_1: body.reference_1 || undefined, // optional - allow null
-        reference_2: body.reference_2 || undefined, // optional - allow null
+        reference_1: body.reference_1 || undefined, // only use if provided
+        reference_2: body.reference_2 || undefined, // only use if provided
         reference_1_valid: body.reference_1_valid || undefined,
         reference_2_valid: body.reference_2_valid || undefined
       },
