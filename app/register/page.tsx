@@ -391,11 +391,8 @@ export default function RegisterPage() {
       setReference2Touched(true)
     }
     
-    // Mock validation - will be replaced with real API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Mock validation logic
-    const isValid = /^[A-Z0-9]{6,12}$/i.test(refValue.trim())
+    // Validate registration ID format: BGHSA-YYYY-XXXXX
+    const isValid = /^BGHSA-\d{4}-\d{5}$/.test(refValue.trim())
     
     if (isFirst) {
       setReference1Valid(isValid)
