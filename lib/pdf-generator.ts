@@ -278,14 +278,17 @@ export class PDFGenerator {
   }
 
   private getLogoSource(): string {
-    // For local development, use localhost
-    // For production, use the domain or base64 fallback
-    const isLocal = process.env.NODE_ENV === 'development' && !process.env.VERCEL
+    // Use R2 public URL for logo (same approach as evidence images)
+    const customDomain = process.env.CLOUDFLARE_R2_CUSTOM_DOMAIN
+    const accountId = process.env.CLOUDFLARE_ACCOUNT_ID
+    const bucketName = process.env.CLOUDFLARE_R2_BUCKET_NAME || 'bghs-gallery'
     
-    if (isLocal) {
-      return 'http://localhost:3000/bghs-logo.png'
+    if (customDomain) {
+      return `https://${customDomain}/static/logos/bghs-logo.png`
+    } else if (accountId) {
+      return `https://pub-${accountId}.r2.dev/${bucketName}/static/logos/bghs-logo.png`
     } else {
-      // For production, use the domain or fallback to base64
+      // Fallback to domain-based URL
       return 'https://alumnibghs.org/bghs-logo.png'
     }
   }
