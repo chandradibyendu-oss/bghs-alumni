@@ -280,7 +280,7 @@ export class PDFGenerator {
   private getLogoSource(): string {
     // For local development, use localhost
     // For production, use the domain or base64 fallback
-    const isLocal = process.env.NODE_ENV === 'development' || process.env.VERCEL !== 'true'
+    const isLocal = process.env.NODE_ENV === 'development' && !process.env.VERCEL
     
     if (isLocal) {
       return 'http://localhost:3000/bghs-logo.png'
