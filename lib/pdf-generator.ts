@@ -4,7 +4,7 @@ let puppeteerCore: any
 
 async function getBrowser() {
   // Check if we're in a local development environment
-  const isLocal = process.env.NODE_ENV === 'development' || process.env.VERCEL !== 'true'
+  const isLocal = process.env.NODE_ENV === 'development' && !process.env.VERCEL
   
   if (isLocal) {
     // Use local puppeteer for development
@@ -25,10 +25,13 @@ async function getBrowser() {
     puppeteerCore = mod.default || mod
   }
   
+  // Configure chromium for serverless environment
   const executablePath = await chromium.executablePath()
   
-  // Set environment variable to help Chrome detection
+  // Set environment variables for serverless Chrome detection
   process.env.PUPPETEER_EXECUTABLE_PATH = executablePath
+  process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true'
+  process.env.PUPPETEER_CACHE_DIR = '/tmp/.cache/puppeteer'
   
   const browser = await puppeteerCore.launch({
     args: [
@@ -40,7 +43,23 @@ async function getBrowser() {
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu'
+      '--disable-gpu',
+      '--disable-web-security',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-extensions',
+      '--disable-plugins',
+      '--disable-default-apps',
+      '--disable-sync',
+      '--disable-translate',
+      '--hide-scrollbars',
+      '--mute-audio',
+      '--safebrowsing-disable-auto-update',
+      '--disable-background-networking',
+      '--disable-field-trial-config',
+      '--disable-ipc-flooding-protection'
     ],
     defaultViewport: chromium.defaultViewport,
     executablePath,
