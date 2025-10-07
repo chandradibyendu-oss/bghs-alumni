@@ -371,6 +371,30 @@ export default function RegisterPage() {
     // For now, we'll let the cleanup job handle expired temp files
   }
 
+  // Auto-format registration ID as user types: BGHSA-YYYY-XXXXX
+  // User only types numbers, we auto-add BGHSA- prefix
+  const formatRegistrationId = (value: string): string => {
+    // Extract only digits from the input
+    const digitsOnly = value.replace(/\D/g, '')
+    
+    // If empty, return empty
+    if (!digitsOnly) return ''
+    
+    // Limit to 9 digits max (YYYY + XXXXX)
+    const limited = digitsOnly.substring(0, 9)
+    
+    // Format: BGHSA-YYYY-XXXXX
+    if (limited.length <= 4) {
+      // Just year part: BGHSA-YYYY
+      return `BGHSA-${limited}`
+    } else {
+      // Year + sequence: BGHSA-YYYY-XXXXX
+      const year = limited.substring(0, 4)
+      const sequence = limited.substring(4)
+      return `BGHSA-${year}-${sequence}`
+    }
+  }
+
   const validateReference = async (refValue: string, isFirst: boolean) => {
     if (!refValue.trim()) {
       // Mark as touched even if empty so validation message can show
@@ -626,12 +650,20 @@ export default function RegisterPage() {
             </div>
 
             <div className="p-4 space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-6">
                   {/* Evidence Upload Section */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Upload Evidence
                     </label>
+                    <div className="mb-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-900">
+                        <strong>Required Documents:</strong> Please upload a clear copy of your <strong>Admit Card</strong>, <strong>School Leaving Certificate</strong>, or <strong>Transfer Certificate</strong> for alumni verification.
+                      </p>
+                      <p className="text-xs text-blue-700 mt-1">
+                        ℹ️ These documents help us verify your attendance at BGHS and expedite your registration approval.
+                      </p>
+                    </div>
                   <div
                     className={`border-2 border-dashed rounded-lg p-6 lg:p-8 text-center transition-colors flex flex-col justify-center min-h-[200px] lg:min-h-[240px] ${
                       dragActive ? 'border-blue-400 bg-blue-50' : 'border-gray-300 hover:border-gray-400'
@@ -697,69 +729,118 @@ export default function RegisterPage() {
                   )}
                   </div>
 
+                  {/* OR Separator - Horizontal on mobile, Vertical on desktop */}
+                  <div className="relative py-4 lg:py-0 lg:px-4">
+                    {/* Mobile: Horizontal separator */}
+                    <div className="lg:hidden">
+                      <div className="absolute inset-0 flex items-center">
+                        <div className="w-full border-t border-gray-300"></div>
+                      </div>
+                      <div className="relative flex justify-center text-sm">
+                        <span className="px-4 bg-white text-gray-500 font-medium">OR</span>
+                      </div>
+                    </div>
+                    {/* Desktop: Vertical separator */}
+                    <div className="hidden lg:flex lg:flex-col lg:items-center lg:justify-center lg:h-full">
+                      <div className="absolute inset-y-0 left-1/2 transform -translate-x-1/2 w-px bg-gray-300"></div>
+                      <div className="relative bg-white px-3 py-2 text-sm text-gray-500 font-medium">OR</div>
+                    </div>
+                  </div>
+
                   {/* Reference Section */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Alumni References
                     </label>
-                    <p className="text-xs text-gray-500 mb-3">Provide registration IDs of two existing alumni members who can verify your identity</p>
+                    <div className="mb-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                      <p className="text-sm text-amber-900">
+                        <strong>Alternative verification:</strong> Provide registration IDs of two existing alumni members who can confirm your identity.
+                      </p>
+                      <p className="text-xs text-amber-700 mt-1">
+                        💡 Just type the numbers only (e.g., type "200500125" and it will auto-format to "BGHSA-2005-00125")
+                      </p>
+                    </div>
                     
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Reference 1</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Reference 1
+                      </label>
                       <div className="relative">
                         <input
                           type="text"
-                          className="input-field pr-20"
+                          inputMode="numeric"
+                          className={`input-field pr-10 font-mono text-sm ${reference1Valid ? 'border-green-500 bg-green-50' : ''}`}
                           value={reference1}
                           onChange={(e) => {
-                            setReference1(e.target.value)
+                            const formatted = formatRegistrationId(e.target.value)
+                            setReference1(formatted)
                             setReference1Valid(false)
                             setReference1Touched(false)
                           }}
                           onBlur={() => validateReference(reference1, true)}
-                          placeholder="Enter registration ID"
+                          placeholder="200500125"
+                          maxLength={18}
                         />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
                           {reference1Checking && (
                             <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                           )}
                           {!reference1Checking && reference1 && (
-                            <CheckCircle2 className={`h-4 w-4 ${reference1Valid ? 'text-green-600' : 'text-red-500'}`} />
+                            <CheckCircle2 className={`h-5 w-5 ${reference1Valid ? 'text-green-600' : 'text-red-500'}`} />
                           )}
                         </div>
                       </div>
+                      {reference1Valid && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          ✓ Valid format
+                        </p>
+                      )}
                       {reference1Touched && reference1 && !reference1Valid && !reference1Checking && (
-                        <p className="text-xs text-red-600 mt-1">Invalid registration ID format</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          ✗ Invalid format. Expected 9 digits: YYYY + XXXXX (e.g., type "200500125")
+                        </p>
                       )}
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Reference 2</label>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">
+                        Reference 2
+                      </label>
                       <div className="relative">
                         <input
                           type="text"
-                          className="input-field pr-20"
+                          inputMode="numeric"
+                          className={`input-field pr-10 font-mono text-sm ${reference2Valid ? 'border-green-500 bg-green-50' : ''}`}
                           value={reference2}
                           onChange={(e) => {
-                            setReference2(e.target.value)
+                            const formatted = formatRegistrationId(e.target.value)
+                            setReference2(formatted)
                             setReference2Valid(false)
                             setReference2Touched(false)
                           }}
                           onBlur={() => validateReference(reference2, false)}
-                          placeholder="Enter registration ID"
+                          placeholder="201000456"
+                          maxLength={18}
                         />
-                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
                           {reference2Checking && (
                             <div className="animate-spin h-4 w-4 border-2 border-blue-500 border-t-transparent rounded-full"></div>
                           )}
                           {!reference2Checking && reference2 && (
-                            <CheckCircle2 className={`h-4 w-4 ${reference2Valid ? 'text-green-600' : 'text-red-500'}`} />
+                            <CheckCircle2 className={`h-5 w-5 ${reference2Valid ? 'text-green-600' : 'text-red-500'}`} />
                           )}
                         </div>
                       </div>
+                      {reference2Valid && (
+                        <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                          ✓ Valid format
+                        </p>
+                      )}
                       {reference2Touched && reference2 && !reference2Valid && !reference2Checking && (
-                        <p className="text-xs text-red-600 mt-1">Invalid registration ID format</p>
+                        <p className="text-xs text-red-600 mt-1">
+                          ✗ Invalid format. Expected 9 digits: YYYY + XXXXX (e.g., type "201000456")
+                        </p>
                       )}
                       </div>
                     </div>
