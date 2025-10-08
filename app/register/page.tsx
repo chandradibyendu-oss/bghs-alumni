@@ -865,9 +865,9 @@ export default function RegisterPage() {
                       </svg>
                     </div>
                     <div>
-                      <h4 className="text-sm font-medium text-green-800">Membership Fee Information</h4>
+                      <h4 className="text-sm font-medium text-green-800">Life Membership Fee Information</h4>
                       <p className="text-sm text-green-700 mt-1">
-                        After your registration is approved, you'll be required to pay a <strong>token membership fee</strong> to activate your alumni membership. 
+                        After your registration is approved, you'll be required to pay a <strong>one-time life membership fee</strong> to activate your alumni membership. 
                         This helps support our alumni association activities and events.
                       </p>
                       <p className="text-xs text-green-600 mt-2">
