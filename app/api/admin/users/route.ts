@@ -172,6 +172,17 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
     }
 
+    // Fetch current profile to detect approval changes
+    const { data: currentProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('is_approved, email, first_name, last_name, full_name, payment_status, registration_payment_status')
+      .eq('id', id)
+      .single()
+    
+    const wasApproved = currentProfile?.is_approved === true
+    const isNowApproved = is_approved === true
+    const approvalStatusChanged = !wasApproved && isNowApproved
+
     // Optional: normalize inputs
     const normalizedEmail = typeof email === 'string' && email ? String(email).trim().toLowerCase() : undefined
     const normalizedPhone = typeof phone === 'string' && phone ? String(phone).trim() : undefined
@@ -282,6 +293,97 @@ export async function PUT(request: NextRequest) {
           .from('profiles')
           .update({ permissions: roleData.permissions })
           .eq('id', id)
+      }
+    }
+
+    // PAYMENT WORKFLOW: If user was just approved, check for registration payment requirement
+    if (approvalStatusChanged) {
+      try {
+        // Check if user already paid (don't send duplicate payment requests)
+        const shouldRequestPayment = currentProfile?.payment_status !== 'completed' && 
+                                     currentProfile?.registration_payment_status !== 'paid'
+        
+        if (!shouldRequestPayment) {
+          console.log(`[Payment Workflow] User ${id} already completed payment, skipping email`)
+        } else {
+          // Check if registration payment is required and active
+          const { data: paymentConfig } = await supabaseAdmin
+            .from('payment_configurations')
+            .select('*')
+            .eq('category', 'registration_fee')
+            .eq('is_active', true)
+            .single()
+
+          if (paymentConfig && paymentConfig.is_mandatory) {
+          // Import payment utilities dynamically
+          const { createPaymentTokenForRegistration } = await import('@/lib/payment-link-service')
+          const { generatePaymentLinkEmail } = await import('@/lib/email-service')
+          const { getPaymentConfig } = await import('@/lib/payment-config')
+          const { getBaseUrl } = await import('@/lib/url-utils')
+          
+          const userEmail = normalizedEmail || currentProfile?.email
+          const userName = (first_name || currentProfile?.first_name || '') + ' ' + (last_name || currentProfile?.last_name || '')
+          const userFullName = full_name || currentProfile?.full_name || userName.trim()
+          
+          if (userEmail && paymentConfig.amount > 0) {
+            // Generate secure payment token
+            const tokenData = await createPaymentTokenForRegistration(
+              id,
+              paymentConfig.amount,
+              paymentConfig.currency,
+              paymentConfig.id
+            )
+
+            // Build payment link
+            const baseUrl = getBaseUrl()
+            const paymentLink = `${baseUrl}/payments/registration/${tokenData.token}`
+
+            // Generate email
+            const emailConfig = getPaymentConfig()
+            const emailData = generatePaymentLinkEmail({
+              full_name: userFullName || 'Alumni Member',
+              email: userEmail,
+              amount: paymentConfig.amount,
+              currency: paymentConfig.currency,
+              payment_link: paymentLink,
+              expiry_hours: emailConfig.receipt.linkExpiryHours
+            })
+
+            // Queue email notification
+            // Note: transaction_id is null since payment hasn't happened yet
+            await supabaseAdmin
+              .from('payment_notification_queue')
+              .insert({
+                transaction_id: null, // Will be linked after payment
+                recipient_user_id: id,
+                notification_type: 'payment_link',
+                channel: 'email',
+                status: 'queued',
+                metadata: {
+                  payment_type: 'registration',
+                  amount: paymentConfig.amount,
+                  currency: paymentConfig.currency,
+                  token: tokenData.token,
+                  payment_link: paymentLink,
+                  email: userEmail,
+                  subject: emailData.subject,
+                  body: emailData.html
+                }
+              })
+
+            // Update user's payment status to pending
+            await supabaseAdmin
+              .from('profiles')
+              .update({ payment_status: 'pending' })
+              .eq('id', id)
+
+            console.log(`[Payment Workflow] Payment link sent to ${userEmail} for registration approval`)
+          }
+        }
+        }
+      } catch (paymentError) {
+        console.error('[Payment Workflow] Error sending payment link:', paymentError)
+        // Don't fail the approval if payment email fails - log and continue
       }
     }
 

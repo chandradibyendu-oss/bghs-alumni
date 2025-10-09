@@ -28,6 +28,7 @@
     "postcss": "^8.4.32",
     "puppeteer": "^24.22.3",
     "puppeteer-core": "^24.2.0",
+    "razorpay": "^2.9.6",
     "react": "^18",
     "react-dom": "^18",
     "react-hook-form": "^7.48.2",

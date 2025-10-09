@@ -254,3 +254,139 @@ BGHS Alumni System
     `
   }
 }
+
+/**
+ * Generate payment link email after registration approval
+ */
+export function generatePaymentLinkEmail(userData: {
+  full_name: string;
+  email: string;
+  amount: number;
+  currency: string;
+  payment_link: string;
+  expiry_hours: number;
+}): EmailOptions {
+  const currencySymbol = userData.currency === 'INR' ? '₹' : userData.currency === 'USD' ? '$' : '€';
+  
+  return {
+    to: userData.email,
+    subject: `Registration Approved - Complete Payment of ${currencySymbol}${userData.amount}`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <img src="https://alumnibghs.org/bghs-logo.png" alt="BGHS Alumni" style="height: 60px; width: auto;">
+          <h1 style="color: #1f2937; margin: 10px 0;">BGHS Alumni</h1>
+          <p style="color: #6b7280; font-size: 14px; margin: 0;">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয় প্রাক্তন ছাত্র সমিতি</p>
+        </div>
+        
+        <div style="background-color: #ecfdf5; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #10b981;">
+          <h2 style="color: #065f46; margin-top: 0;">🎉 Registration Approved!</h2>
+          <p style="color: #065f46; margin: 0;">Congratulations! Your registration has been approved.</p>
+        </div>
+        
+        <div style="background-color: #f9fafb; padding: 30px; border-radius: 8px; margin-bottom: 20px;">
+          <h2 style="color: #1f2937; margin-top: 0;">Complete Your Registration</h2>
+          <p style="color: #374151; line-height: 1.6;">
+            Dear ${userData.full_name},
+          </p>
+          <p style="color: #374151; line-height: 1.6;">
+            Welcome to the BGHS Alumni Association! Your registration has been approved by our admin team.
+          </p>
+          <p style="color: #374151; line-height: 1.6;">
+            To activate your account and gain full access to all alumni features, please complete the one-time registration payment.
+          </p>
+          
+          <div style="background-color: #ffffff; border: 2px solid #3b82f6; border-radius: 8px; padding: 30px; text-align: center; margin: 30px 0;">
+            <p style="color: #6b7280; font-size: 14px; margin: 0 0 10px 0;">Registration Fee</p>
+            <h1 style="color: #3b82f6; font-size: 42px; margin: 0 0 20px 0; font-weight: bold;">${currencySymbol}${userData.amount.toFixed(2)}</h1>
+            
+            <a href="${userData.payment_link}" 
+               style="display: inline-block; background-color: #3b82f6; color: white; text-decoration: none; 
+                      padding: 16px 40px; border-radius: 8px; font-weight: bold; font-size: 18px; margin: 10px 0;">
+              Pay ${currencySymbol}${userData.amount.toFixed(2)} Now
+            </a>
+            
+            <p style="color: #6b7280; font-size: 12px; margin: 20px 0 0 0;">
+              Secure payment powered by RazorPay
+            </p>
+          </div>
+          
+          <p style="color: #374151; line-height: 1.6; font-size: 14px;">
+            <strong>Important:</strong>
+          </p>
+          <ul style="color: #374151; line-height: 1.8; font-size: 14px;">
+            <li>This payment link is valid for ${userData.expiry_hours} hours</li>
+            <li>You can pay directly from this email - no login required</li>
+            <li>After payment, you can login and access all features</li>
+            <li>Your account will be automatically activated upon payment</li>
+          </ul>
+        </div>
+        
+        <div style="background-color: #e0f2fe; padding: 20px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #0ea5e9;">
+          <h3 style="color: #0c4a6e; margin-top: 0;">What You'll Get</h3>
+          <ul style="color: #0c4a6e; line-height: 1.8; margin: 0; padding-left: 20px;">
+            <li>Access to alumni directory</li>
+            <li>Event registration and participation</li>
+            <li>Photo gallery access and uploads</li>
+            <li>Blog posts and community updates</li>
+            <li>Networking with fellow alumni</li>
+            <li>Exclusive member benefits</li>
+          </ul>
+        </div>
+        
+        <div style="background-color: #fef3c7; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+          <p style="color: #92400e; margin: 0; font-size: 14px;">
+            <strong>Need Help?</strong> If you have any questions or face issues with payment, 
+            please contact us at <a href="mailto:admin@alumnibghs.org" style="color: #3b82f6;">admin@alumnibghs.org</a>
+          </p>
+        </div>
+        
+        <div style="text-align: center; color: #6b7280; font-size: 12px; margin-top: 30px;">
+          <p>This is an automated email from BGHS Alumni System</p>
+          <p>© 2024 BGHS Alumni Association. All rights reserved.</p>
+          <p>Barasat Peary Charan Sarkar Government High School</p>
+        </div>
+      </div>
+    `,
+    text: `
+BGHS Alumni - Registration Approved!
+
+Dear ${userData.full_name},
+
+Congratulations! Your registration has been approved.
+
+COMPLETE YOUR REGISTRATION
+==========================
+
+To activate your account, please complete the one-time registration payment:
+
+Amount: ${currencySymbol}${userData.amount.toFixed(2)}
+
+Payment Link:
+${userData.payment_link}
+
+IMPORTANT DETAILS:
+- This link is valid for ${userData.expiry_hours} hours
+- You can pay directly from this email - no login required
+- Your account will be activated automatically after payment
+- Secure payment powered by RazorPay
+
+WHAT YOU'LL GET:
+✓ Access to alumni directory
+✓ Event registration and participation
+✓ Photo gallery access and uploads
+✓ Blog posts and community updates
+✓ Networking with fellow alumni
+✓ Exclusive member benefits
+
+Need help? Contact us at admin@alumnibghs.org
+
+Best regards,
+BGHS Alumni Association
+Barasat Peary Charan Sarkar Government High School
+
+---
+This is an automated email. Please do not reply to this email.
+    `
+  };
+}

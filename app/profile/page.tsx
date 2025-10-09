@@ -216,6 +216,9 @@ export default function ProfilePage() {
               {!profile.is_approved && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Pending approval</span>
               )}
+              <Link href="/profile/payments" className="btn-secondary">
+                My Payments
+              </Link>
               <Link href="/" className="btn-secondary">
                 Back to Home
               </Link>

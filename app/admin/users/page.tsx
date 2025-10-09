@@ -45,6 +45,7 @@ interface UserProfile {
   website_url: string
   role: string
   is_approved?: boolean
+  payment_status?: string | null
   created_at: string
   updated_at: string
 }
@@ -791,6 +792,9 @@ export default function AdminUsersPage() {
                       Approved
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Payment
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Joined
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider w-40">
@@ -867,6 +871,19 @@ export default function AdminUsersPage() {
                         >
                           {user.is_approved ? 'Approved' : 'Pending'}
                         </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {user.payment_status === 'pending' ? (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
+                            Pending
+                          </span>
+                        ) : user.payment_status === 'completed' ? (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                            Paid
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(user.created_at).toLocaleDateString()}

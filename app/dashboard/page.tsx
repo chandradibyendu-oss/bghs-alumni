@@ -3,12 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield } from 'lucide-react'
+import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail } from 'lucide-react'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
+  const [userProfile, setUserProfile] = useState<any>(null)
   const [canManageUsers, setCanManageUsers] = useState(false)
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -23,15 +24,24 @@ export default function DashboardPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setUser(user)
+        
+        // Fetch user profile including payment status
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role, payment_status, is_approved, first_name, last_name, full_name')
+          .eq('id', user.id)
+          .single()
+        
+        setUserProfile(profile)
+        
         try {
           const perms = await getUserPermissions(user.id)
           setCanManageUsers(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
           setCanManageRoles(hasPermission(perms, 'can_manage_roles'))
         } catch {
           // Fallback: allow only super_admin
-          const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-          setCanManageUsers(data?.role === 'super_admin')
-          setCanManageRoles(data?.role === 'super_admin')
+          setCanManageUsers(profile?.role === 'super_admin')
+          setCanManageRoles(profile?.role === 'super_admin')
         }
       } else {
         router.push('/login')
@@ -114,14 +124,59 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* Payment Pending Banner */}
+        {userProfile?.payment_status === 'pending' && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 rounded-lg p-6 mb-8 shadow-sm">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                <CreditCard className="h-6 w-6 text-amber-600" />
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-semibold text-amber-900 mb-2">
+                  Payment Pending
+                </h3>
+                <p className="text-amber-800 mb-4">
+                  Your registration has been approved! Please complete the payment to activate your account and access all features.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link 
+                    href="/profile/payments" 
+                    className="inline-flex items-center px-4 py-2 bg-amber-600 text-white rounded-lg hover:bg-amber-700 transition-colors font-medium shadow-sm"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    View Payment Details
+                  </Link>
+                  <p className="text-sm text-amber-700 flex items-center">
+                    Check your email for the payment link or contact support if needed.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {canManageUsers && (
-            <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
-              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
-              <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
-            </Link>
+            <>
+              <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
+                <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
+                <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
+              </Link>
+              
+              <Link href="/admin/payments" className="card text-center hover:shadow-lg transition-shadow group">
+                <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Settings</h3>
+                <p className="text-gray-600">Configure payment amounts and categories</p>
+              </Link>
+              
+              <Link href="/admin/payment-queue" className="card text-center hover:shadow-lg transition-shadow group">
+                <Mail className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Queue</h3>
+                <p className="text-gray-600">View queued payment emails (testing)</p>
+              </Link>
+            </>
           )}
           
           {canManageRoles && (
@@ -148,6 +203,12 @@ export default function DashboardPage() {
             <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog</h3>
             <p className="text-gray-600">Read latest news and stories</p>
+          </Link>
+          
+          <Link href="/profile/payments" className="card text-center hover:shadow-lg transition-shadow group">
+            <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">My Payments</h3>
+            <p className="text-gray-600">View payment history and receipts</p>
           </Link>
         </div>
 
