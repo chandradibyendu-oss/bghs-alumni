@@ -19,6 +19,12 @@ const createSupabaseAdmin = () => {
 export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = createSupabaseAdmin()
+    
+    // Parse pagination parameters
+    const { searchParams } = new URL(request.url)
+    const page = parseInt(searchParams.get('page') || '1')
+    const limit = parseInt(searchParams.get('limit') || '12')
+    const offset = (page - 1) * limit
 
     // Helper to anonymize names for public responses
     const anonymizeName = (fullName: string | null): string => {
@@ -50,16 +56,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get all approved users (bypass privacy system for now)
+    // Get total count for pagination
+    const { count: totalCount, error: countError } = await supabaseAdmin
+      .from('profiles')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_approved', true)
+
+    if (countError) {
+      console.error('Error fetching total count:', countError)
+      return NextResponse.json({ error: 'Failed to fetch alumni count' }, { status: 500 })
+    }
+
+    // Get paginated approved users
     const { data: users, error } = await supabaseAdmin
       .from('profiles')
       .select(`
-        id, full_name, batch_year, profession, company, location, 
+        id, full_name, batch_year, year_of_leaving, last_class, profession, company, location, 
         bio, avatar_url, linkedin_url, website_url, created_at,
         is_approved
       `)
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     if (error) {
       console.error('Error fetching directory users:', error)
@@ -67,7 +85,17 @@ export async function GET(request: NextRequest) {
     }
 
     if (!users || users.length === 0) {
-      return NextResponse.json({ users: [] })
+      return NextResponse.json({ 
+        users: [], 
+        pagination: {
+          page,
+          limit,
+          totalCount: totalCount || 0,
+          totalPages: Math.ceil((totalCount || 0) / limit),
+          hasNextPage: false,
+          hasPrevPage: false
+        }
+      })
     }
 
     // Process users based on viewer permissions
@@ -78,6 +106,8 @@ export async function GET(request: NextRequest) {
           id: user.id,
           full_name: user.full_name,
           batch_year: user.batch_year,
+          year_of_leaving: user.year_of_leaving,
+          last_class: user.last_class,
           profession: user.profession || 'Not specified',
           company: user.company,
           location: user.location,
@@ -95,6 +125,8 @@ export async function GET(request: NextRequest) {
           id: user.id,
           full_name: anonymizeName(user.full_name),
           batch_year: user.batch_year,
+          year_of_leaving: user.year_of_leaving,
+          last_class: user.last_class,
           profession: 'BGHS Alumni',
           company: null,
           location: null,
@@ -111,6 +143,14 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ 
       users: processedUsers,
+      pagination: {
+        page,
+        limit,
+        totalCount: totalCount || 0,
+        totalPages: Math.ceil((totalCount || 0) / limit),
+        hasNextPage: page < Math.ceil((totalCount || 0) / limit),
+        hasPrevPage: page > 1
+      },
       viewer_permissions: {
         can_view_full_directory: canViewFullDirectory,
         is_authenticated: !!tokenUserId

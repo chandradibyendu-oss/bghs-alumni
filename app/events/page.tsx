@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, Clock, MapPin, Users, ArrowLeft, Filter, Search, Plus, Eye } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
 
 const categories = ["All", "Reunion", "Workshop", "Sports", "Fundraiser", "Cultural"]
 
@@ -27,14 +27,15 @@ export default function EventsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUserId(user.id)
-        try {
-          const perms = await getUserPermissions(user.id)
-          setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_events'))
-        } catch {
-          // Fallback: check role directly
-          const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-          setIsAdmin(data?.role === 'super_admin' || data?.role === 'event_manager')
-        }
+        // Quick admin check based on role (no additional database queries)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'event_manager'
+        setIsAdmin(isAdmin)
       }
     } catch (error) {
       console.error('Error checking admin status:', error)

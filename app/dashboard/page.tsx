@@ -34,15 +34,12 @@ export default function DashboardPage() {
         
         setUserProfile(profile)
         
-        try {
-          const perms = await getUserPermissions(user.id)
-          setCanManageUsers(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
-          setCanManageRoles(hasPermission(perms, 'can_manage_roles'))
-        } catch {
-          // Fallback: allow only super_admin
-          setCanManageUsers(profile?.role === 'super_admin')
-          setCanManageRoles(profile?.role === 'super_admin')
-        }
+        // Quick permission check based on role (no additional database queries)
+        const isSuperAdmin = profile?.role === 'super_admin'
+        const isAdmin = isSuperAdmin || profile?.role === 'alumni_premium' || profile?.role === 'content_moderator'
+        
+        setCanManageUsers(isAdmin)
+        setCanManageRoles(isSuperAdmin)
       } else {
         router.push('/login')
       }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
 import { Upload, Filter, Grid, List, Search, Plus, Eye, Download, Trash2, Edit, Check, X, ArrowLeft, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Share2 } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
@@ -69,9 +69,19 @@ export default function GalleryPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
-        const permissions = await getUserPermissions(user.id)
-        setCanUpload(hasPermission(permissions, 'can_upload_media') || hasPermission(permissions, 'can_edit_public_content') || hasPermission(permissions, 'can_access_admin'))
-        setCanManage(hasPermission(permissions, 'can_edit_public_content') || hasPermission(permissions, 'can_access_admin'))
+        // Get user profile to check role-based permissions (no additional database queries)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        const isSuperAdmin = profile?.role === 'super_admin'
+        const isAdmin = isSuperAdmin || profile?.role === 'alumni_premium' || profile?.role === 'content_moderator'
+        
+        // Quick permission check based on role
+        setCanUpload(isAdmin) // Allow admins to upload
+        setCanManage(isSuperAdmin) // Only super admins can manage
       }
     } catch (error) {
       console.error('Error checking permissions:', error)

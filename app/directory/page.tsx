@@ -10,6 +10,8 @@ interface UserProfile {
   email?: string
   full_name: string
   batch_year: number
+  year_of_leaving: number
+  last_class: number
   profession?: string
   company?: string
   location?: string
@@ -27,6 +29,15 @@ interface ViewerPermissions {
   is_authenticated: boolean
 }
 
+interface PaginationInfo {
+  page: number
+  limit: number
+  totalCount: number
+  totalPages: number
+  hasNextPage: boolean
+  hasPrevPage: boolean
+}
+
 const anonymizeName = (fullName: string): string => {
   if (!fullName) return 'Alumni Member'
   const parts = fullName.trim().split(/\s+/)
@@ -40,9 +51,19 @@ export default function DirectoryPage() {
   const [alumni, setAlumni] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
-  const [filterBatch, setFilterBatch] = useState('All')
+  const [filterYear, setFilterYear] = useState('All')
+  const [filterClass, setFilterClass] = useState('All')
   const [filterProfession, setFilterProfession] = useState('All')
   const [isAuthed, setIsAuthed] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState<PaginationInfo>({
+    page: 1,
+    limit: 12,
+    totalCount: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPrevPage: false
+  })
   const [viewerPermissions, setViewerPermissions] = useState<ViewerPermissions>({
     can_view_full_directory: false,
     is_authenticated: false
@@ -52,27 +73,18 @@ export default function DirectoryPage() {
     checkAuthAndLoad()
   }, [])
 
+  useEffect(() => {
+    if (currentPage > 1) {
+      loadPage(currentPage)
+    }
+  }, [currentPage])
+
   const checkAuthAndLoad = async () => {
     try {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       setIsAuthed(!!user)
-      // Include access token for authorized users so the API can return full details
-      const { data: sessionData } = await supabase.auth.getSession()
-      const accessToken = sessionData?.session?.access_token
-      const response = await fetch('/api/directory-fallback', {
-        method: 'GET',
-        headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : undefined,
-        cache: 'no-store'
-      })
-      if (response.ok) {
-        const { users, viewer_permissions } = await response.json()
-        setAlumni(users || [])
-        setViewerPermissions(viewer_permissions || {
-          can_view_full_directory: false,
-          is_authenticated: false
-        })
-      }
+      await loadPage(1)
     } catch (error) {
       console.error('Error fetching alumni:', error)
     } finally {
@@ -80,8 +92,74 @@ export default function DirectoryPage() {
     }
   }
 
-  // Generate batch decades dynamically
-  const batchDecades = ['All', ...Array.from(new Set(alumni.map(u => Math.floor(u.batch_year / 10) * 10 + 's'))).sort()]
+  const loadPage = async (page: number) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      setIsAuthed(!!user)
+      
+      // Include access token for authorized users so the API can return full details
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+      
+      const response = await fetch(`/api/directory-fallback?page=${page}&limit=12`, {
+        method: 'GET',
+        headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : undefined,
+        cache: 'no-store'
+      })
+      
+      if (response.ok) {
+        const { users, pagination: paginationData, viewer_permissions } = await response.json()
+        
+        if (page === 1) {
+          // First page - replace data
+          setAlumni(users || [])
+        } else {
+          // Subsequent pages - append data
+          setAlumni(prev => [...prev, ...(users || [])])
+        }
+        
+        setPagination(paginationData || {
+          page: 1,
+          limit: 12,
+          totalCount: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPrevPage: false
+        })
+        
+        setViewerPermissions(viewer_permissions || {
+          can_view_full_directory: false,
+          is_authenticated: false
+        })
+      }
+    } catch (error) {
+      console.error('Error fetching alumni:', error)
+    }
+  }
+
+  // Generate year decades dynamically from year_of_leaving
+  const yearDecades = ['All', ...Array.from(new Set(alumni.map(u => Math.floor(u.year_of_leaving / 10) * 10 + 's'))).sort()]
+  
+  // Generate class options dynamically from last_class
+  const generateClassOptions = () => {
+    const allClasses = ['All']
+    const existingClasses = Array.from(new Set(alumni.map(u => u.last_class).filter(Boolean))).sort()
+    
+    // Add specific class options based on existing data
+    if (existingClasses.includes(12)) allClasses.push('Class 12')
+    if (existingClasses.includes(10)) allClasses.push('Class 10')
+    
+    // Add range options if classes in those ranges exist
+    const midSchoolClasses = existingClasses.filter(c => c >= 6 && c <= 9)
+    if (midSchoolClasses.length > 0) allClasses.push('Class 6-9')
+    
+    const primaryClasses = existingClasses.filter(c => c >= 1 && c <= 5)
+    if (primaryClasses.length > 0) allClasses.push('Class 1-5')
+    
+    return allClasses
+  }
+  
+  const classOptions = generateClassOptions()
   
   // Generate professions dynamically (only for authenticated users with full access)
   const allProfessions = ['All', ...Array.from(new Set(
@@ -97,16 +175,24 @@ export default function DirectoryPage() {
                          person.profession?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          person.company?.toLowerCase().includes(searchTerm.toLowerCase())
     
-    const matchesBatch = filterBatch === 'All' || 
-                        (filterBatch === '1980s' && person.batch_year >= 1980 && person.batch_year < 1990) ||
-                        (filterBatch === '1990s' && person.batch_year >= 1990 && person.batch_year < 2000) ||
-                        (filterBatch === '2000s' && person.batch_year >= 2000 && person.batch_year < 2010) ||
-                        (filterBatch === '2010s' && person.batch_year >= 2010 && person.batch_year < 2020) ||
-                        (filterBatch === '2020s' && person.batch_year >= 2020)
+    // Enhanced year of leaving filter (decade-based)
+    const matchesYear = filterYear === 'All' || 
+                       (filterYear === '1980s' && person.year_of_leaving >= 1980 && person.year_of_leaving < 1990) ||
+                       (filterYear === '1990s' && person.year_of_leaving >= 1990 && person.year_of_leaving < 2000) ||
+                       (filterYear === '2000s' && person.year_of_leaving >= 2000 && person.year_of_leaving < 2010) ||
+                       (filterYear === '2010s' && person.year_of_leaving >= 2010 && person.year_of_leaving < 2020) ||
+                       (filterYear === '2020s' && person.year_of_leaving >= 2020)
+    
+    // Enhanced last class filter (class-based)
+    const matchesClass = filterClass === 'All' ||
+                        (filterClass === 'Class 12' && person.last_class === 12) ||
+                        (filterClass === 'Class 10' && person.last_class === 10) ||
+                        (filterClass === 'Class 6-9' && person.last_class >= 6 && person.last_class <= 9) ||
+                        (filterClass === 'Class 1-5' && person.last_class >= 1 && person.last_class <= 5)
     
     const matchesProfession = filterProfession === 'All' || person.profession === filterProfession
     
-    return matchesSearch && matchesBatch && matchesProfession
+    return matchesSearch && matchesYear && matchesClass && matchesProfession
   })
 
   if (loading) {
@@ -155,12 +241,21 @@ export default function DirectoryPage() {
             </div>
             <div className="flex gap-2">
               <select 
-                value={filterBatch}
-                onChange={(e) => setFilterBatch(e.target.value)}
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
                 className="input-field"
               >
-                {batchDecades.map(batch => (
-                  <option key={batch} value={batch}>{batch}</option>
+                {yearDecades.map(year => (
+                  <option key={year} value={year}>{year === 'All' ? 'All Years' : year}</option>
+                ))}
+              </select>
+              <select 
+                value={filterClass}
+                onChange={(e) => setFilterClass(e.target.value)}
+                className="input-field"
+              >
+                {classOptions.map(classOption => (
+                  <option key={classOption} value={classOption}>{classOption === 'All' ? 'All Classes' : classOption}</option>
                 ))}
               </select>
               <select 
@@ -175,6 +270,43 @@ export default function DirectoryPage() {
             </div>
           </div>
         </div>
+
+        {/* Public User Notice */}
+        {!isAuthed && (
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div className="flex items-start space-x-4">
+              <div className="flex-shrink-0">
+                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                  <User className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-blue-900 mb-2">
+                  🔍 Sample Profiles Preview
+                </h3>
+                <p className="text-blue-800 mb-4">
+                  The profiles shown below are <strong>sample examples</strong> to demonstrate our alumni directory features. 
+                  To find and connect with <strong>real BGHS alumni members</strong>, batchmates, and classmates, 
+                  please register for full access to our exclusive alumni network.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <Link 
+                    href="/register" 
+                    className="inline-flex items-center justify-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200"
+                  >
+                    Join Alumni Network
+                  </Link>
+                  <Link 
+                    href="/login" 
+                    className="inline-flex items-center justify-center px-6 py-3 border border-blue-600 text-blue-600 font-semibold rounded-lg hover:bg-blue-50 transition-colors duration-200"
+                  >
+                    Already a Member? Login
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Directory Stats */}
         <div className="grid md:grid-cols-4 gap-4 mb-8">
@@ -191,8 +323,8 @@ export default function DirectoryPage() {
             <div className="text-sm text-gray-600">Professions</div>
           </div>
           <div className="bg-white rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary-600">{batchDecades.length - 1}</div>
-            <div className="text-sm text-gray-600">Batch Decades</div>
+            <div className="text-2xl font-bold text-primary-600">{yearDecades.length - 1}</div>
+            <div className="text-sm text-gray-600">Year Decades</div>
           </div>
         </div>
 
@@ -202,14 +334,25 @@ export default function DirectoryPage() {
             <User className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No alumni found</h3>
             <p className="text-gray-500">
-              {searchTerm || filterBatch !== 'All' || filterProfession !== 'All' 
+              {searchTerm || filterYear !== 'All' || filterClass !== 'All' || filterProfession !== 'All' 
                 ? 'Try adjusting your search or filters.' 
                 : 'No alumni profiles have been added yet.'}
             </p>
           </div>
         ) : (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(isAuthed ? filteredAlumni : filteredAlumni.slice(0, 6)).map((person) => (
+          <div>
+            {/* Sample Profiles Header for Public Users */}
+            {!isAuthed && (
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center px-4 py-2 bg-amber-50 border border-amber-200 rounded-full text-amber-800 text-sm font-medium">
+                  <span className="mr-2">📋</span>
+                  Sample Profiles - Register to see real alumni
+                </div>
+              </div>
+            )}
+            
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {(isAuthed ? filteredAlumni : filteredAlumni.slice(0, 6)).map((person) => (
               <div key={person.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start space-x-4 mb-4">
                   <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
@@ -225,7 +368,7 @@ export default function DirectoryPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h3 className="text-lg font-semibold text-gray-900 truncate">{isAuthed ? person.full_name : anonymizeName(person.full_name)}</h3>
-                    <p className="text-sm text-gray-600">Batch of {person.batch_year}</p>
+                    <p className="text-sm text-gray-600">Left in {person.year_of_leaving} (Class {person.last_class})</p>
                     <p className="text-sm font-medium text-primary-600">{isAuthed ? (person.profession || 'Not specified') : 'BGHS Alumni'}</p>
                   </div>
                 </div>
@@ -300,6 +443,34 @@ export default function DirectoryPage() {
               </div>
             ))}
           </div>
+          
+          {/* Load More Button */}
+          {pagination.hasNextPage && (
+            <div className="text-center mt-8">
+              <button
+                onClick={() => setCurrentPage(prev => prev + 1)}
+                disabled={loading}
+                className="btn-secondary px-8 py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <span className="flex items-center">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current mr-2"></div>
+                    Loading...
+                  </span>
+                ) : (
+                  `Load More Alumni (${pagination.totalCount - alumni.length} remaining)`
+                )}
+              </button>
+            </div>
+          )}
+          
+          {/* Pagination Info */}
+          {pagination.totalCount > 0 && (
+            <div className="text-center mt-4 text-gray-600">
+              Showing {alumni.length} of {pagination.totalCount} alumni
+            </div>
+          )}
+          </div>
         )}
 
         {/* Join / Sign-in CTA */}
@@ -326,15 +497,23 @@ export default function DirectoryPage() {
             </>
           ) : (
             <>
-              <h2 className="text-2xl font-bold mb-4">Join Our Directory</h2>
-              <p className="text-primary-100 mb-6">Sign in to view full profiles and connect with alumni.</p>
+              <h2 className="text-2xl font-bold mb-4">🎓 Find Your BGHS Batchmates & Alumni</h2>
+              <p className="text-primary-100 mb-6">
+                The profiles above are sample examples. Join our exclusive alumni network to discover and connect with 
+                <strong> real BGHS graduates</strong>, find your batchmates, and expand your professional network!
+              </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/login" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
-                  Login to View Full Directory
+                <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 flex items-center justify-center">
+                  <span className="mr-2">🚀</span>
+                  Join Alumni Network
                 </Link>
-                <Link href="/register" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-6 rounded-lg transition-colors duration-200">
-                  Create Account
+                <Link href="/login" className="border border-white text-white hover:bg-white hover:text-primary-600 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 flex items-center justify-center">
+                  <span className="mr-2">👋</span>
+                  Already a Member? Login
                 </Link>
+              </div>
+              <div className="mt-6 text-primary-200 text-sm">
+                ✨ Connect with classmates • 🤝 Professional networking • 📈 Career opportunities
               </div>
             </>
           )}

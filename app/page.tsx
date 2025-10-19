@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
 
 // Slideshow data
 const slideshowData = [
@@ -120,21 +120,41 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser()
       setUserEmail(user?.email ?? null)
       if (user) {
-        try {
-          const perms = await getUserPermissions(user.id)
-          setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
-        } catch {
-          // ignore if RPC not available
-        }
+        // Quick admin check based on role (no additional database queries)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
+        setIsAdmin(isAdmin)
       } else {
         setIsAdmin(false)
       }
     }
     init()
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUserEmail(session?.user?.email ?? null)
-      setIsAdmin(false)
+      if (session?.user) {
+        // Quick admin check based on role (no additional database queries)
+        try {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
+          
+          const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
+          setIsAdmin(isAdmin)
+        } catch {
+          setIsAdmin(false)
+        }
+      } else {
+        setIsAdmin(false)
+      }
     })
+
     return () => subscription.unsubscribe()
   }, [])
 

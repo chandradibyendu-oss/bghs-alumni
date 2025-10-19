@@ -23,7 +23,7 @@ import {
   KeyRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
 import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
 
 interface UserProfile {
@@ -93,15 +93,9 @@ export default function AdminUsersPage() {
         router.push('/login')
         return
       }
-      // Enforce admin permission based on profiles.role if RPC is unavailable
-      let canAccess = false
-      try {
-        const permissions = await getUserPermissions(user.id)
-        canAccess = hasPermission(permissions, 'can_access_admin') || hasPermission(permissions, 'can_manage_users')
-      } catch {
-        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-        canAccess = data?.role === 'super_admin' || data?.role === 'donation_manager' || data?.role === 'event_manager' || data?.role === 'content_moderator'
-      }
+      // Enforce admin permission based on profiles.role (optimized - no redundant queries)
+      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const canAccess = data?.role === 'super_admin' || data?.role === 'donation_manager' || data?.role === 'event_manager' || data?.role === 'content_moderator'
       if (!canAccess) {
         alert('You do not have permission to access User Management.')
         router.push('/dashboard')
