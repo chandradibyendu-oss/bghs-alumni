@@ -156,6 +156,12 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const [loading, setLoading] = useState(true)
   const [photosLoading, setPhotosLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [userRegistration, setUserRegistration] = useState<any>(null)
+  const [expandedRegistration, setExpandedRegistration] = useState(false)
+  const [guestCount, setGuestCount] = useState<number>(1)
+  const [registering, setRegistering] = useState(false)
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [isEventCreator, setIsEventCreator] = useState(false)
 
   // Get sponsors from event metadata, fallback to mock data if none
   const eventSponsors = event?.metadata?.sponsors || []
@@ -178,8 +184,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   useEffect(() => {
     if (event) {
       fetchEventPhotos()
+      fetchUserRegistration()
+      checkUserPermissions()
     }
   }, [event])
+
+  useEffect(() => {
+    checkUserPermissions()
+  }, [])
 
   const fetchEvent = async () => {
     try {
@@ -231,6 +243,493 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const handlePhotoClick = (photo: any) => {
     // Redirect to gallery with event filter
     window.location.href = `/gallery?event=${params.id}`
+  }
+
+  const fetchUserRegistration = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: registration, error } = await supabase
+        .from('event_registrations')
+        .select('*')
+        .eq('event_id', params.id)
+        .eq('user_id', user.id)
+        .single()
+
+      if (!error && registration) {
+        setUserRegistration(registration)
+      }
+    } catch (error) {
+      // User not registered - this is normal
+    }
+  }
+
+  const checkUserPermissions = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Get user profile and role
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (!error && profile) {
+        setUserRole(profile.role)
+        
+        // Check if user is event creator or super admin
+        const isSuperAdmin = profile.role === 'super_admin'
+        const isEventCreator = event && event.created_by === user.id
+        
+        setIsEventCreator(isEventCreator || isSuperAdmin)
+      }
+    } catch (error) {
+      console.error('Error checking user permissions:', error)
+    }
+  }
+
+  const handleRegister = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('Please login to register for events')
+        return
+      }
+
+      setRegistering(true)
+
+      // Get session for API call
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        alert('Authentication error. Please login again.')
+        return
+      }
+
+      // Call registration API
+      const response = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ eventId: params.id, guestCount })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setUserRegistration({
+          ...userRegistration,
+          guest_count: guestCount,
+          status: data.status
+        })
+        
+        // Update event attendee count
+        setEvent((prev: any) => ({
+          ...prev,
+          current_attendees: prev.current_attendees + guestCount
+        }))
+
+        alert(`Registered ${guestCount} people successfully!`)
+        setExpandedRegistration(false)
+      } else {
+        alert(data.error || 'Failed to register for event')
+      }
+    } catch (error) {
+      console.error('Registration error:', error)
+      alert('An error occurred while registering')
+    } finally {
+      setRegistering(false)
+    }
+  }
+
+  const handleManageRegistration = () => {
+    setExpandedRegistration(true)
+    setGuestCount(userRegistration?.guest_count || 1)
+  }
+
+  const handleCancelRegistration = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('Please login to manage registrations')
+        return
+      }
+
+      if (!confirm('Are you sure you want to cancel your registration?')) {
+        return
+      }
+
+      // Get session for API call
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        alert('Authentication error. Please login again.')
+        return
+      }
+
+      // Call cancellation API
+      const response = await fetch('/api/events/register', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ eventId: params.id })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Update event attendee count
+        setEvent((prev: any) => ({
+          ...prev,
+          current_attendees: Math.max(0, prev.current_attendees - (userRegistration?.guest_count || 1))
+        }))
+
+        setUserRegistration(null)
+        setExpandedRegistration(false)
+        alert('Registration cancelled successfully!')
+      } else {
+        alert(data.error || 'Failed to cancel registration')
+      }
+    } catch (error) {
+      console.error('Cancellation error:', error)
+      alert('An error occurred while cancelling registration')
+    }
+  }
+
+  // Registration Button Component
+  const RegistrationButton = ({ className = "", size = "normal" }: { className?: string, size?: "normal" | "large" }) => {
+    // Event Creator/Admin Interface
+    if (isEventCreator) {
+      return (
+        <div className="space-y-4">
+          {/* Event Management Actions */}
+          <div className="flex gap-2">
+            <Link 
+              href={`/admin/events/${params.id}/edit`}
+              className="btn-primary flex-1 flex items-center justify-center gap-2 text-sm"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Edit Event
+            </Link>
+            <Link 
+              href={`/admin/events/${params.id}/registrations`}
+              className="btn-secondary flex-1 flex items-center justify-center gap-2 text-sm"
+            >
+              <Users className="h-4 w-4" />
+              View Registrations
+            </Link>
+          </div>
+          
+          {/* Creator Registration Section */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs text-gray-500 mb-2 text-center">As event creator, you can also register:</p>
+            {expandedRegistration ? (
+              /* Registration Form for Creator */
+              <div className="space-y-3 p-3 bg-white rounded-lg border border-gray-200">
+                <div className="text-center">
+                  <h4 className="font-semibold text-gray-900 mb-2">Register for Event</h4>
+                  <p className="text-sm text-gray-600 mb-4">How many people will attend?</p>
+                </div>
+                
+                <div className="flex items-center justify-center space-x-4">
+                  <button 
+                    onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                    className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                    disabled={guestCount <= 1}
+                  >
+                    -
+                  </button>
+                  
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+                    <div className="text-xs text-gray-500">
+                      {guestCount === 1 ? 'person' : 'people'}
+                    </div>
+                  </div>
+                  
+                  <button 
+                    onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+                    className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                    disabled={guestCount >= 10}
+                  >
+                    +
+                  </button>
+                </div>
+
+                <div className="text-center text-xs text-gray-500">
+                  Including yourself • Max 10 people per registration
+                </div>
+
+                <div className="flex gap-2">
+                  <button 
+                    className="btn-primary flex-1" 
+                    onClick={handleRegister}
+                    disabled={registering}
+                  >
+                    {registering ? 'Registering...' : `Register ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+                  </button>
+                  <button 
+                    className="btn-secondary" 
+                    onClick={() => setExpandedRegistration(false)}
+                    disabled={registering}
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : userRegistration ? (
+              expandedRegistration ? (
+                /* Registration Management Form for Creator */
+                <div className="space-y-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <div className="text-center">
+                    <h4 className="font-semibold text-gray-900 mb-2">Manage Registration</h4>
+                    <p className="text-sm text-gray-600 mb-2">
+                      Currently registered for {userRegistration.guest_count || 1} people
+                    </p>
+                    <p className="text-xs text-gray-500 mb-4">Status: {userRegistration.status || 'confirmed'}</p>
+                  </div>
+                  
+                  <div className="flex items-center justify-center space-x-4">
+                    <button 
+                      onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                      disabled={guestCount <= 1}
+                    >
+                      -
+                    </button>
+                    
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+                      <div className="text-xs text-gray-500">
+                        {guestCount === 1 ? 'person' : 'people'}
+                      </div>
+                    </div>
+                    
+                    <button 
+                      onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+                      className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                      disabled={guestCount >= 10}
+                    >
+                      +
+                    </button>
+                  </div>
+
+                  <div className="text-center text-xs text-gray-500">
+                    Including yourself • Max 10 people per registration
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      className="btn-primary flex-1" 
+                      onClick={handleRegister}
+                      disabled={registering}
+                    >
+                      {registering ? 'Updating...' : `Update to ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+                    </button>
+                    <button 
+                      className="btn-secondary" 
+                      onClick={() => setExpandedRegistration(false)}
+                      disabled={registering}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button 
+                      className="btn-danger flex-1" 
+                      onClick={handleCancelRegistration}
+                      disabled={registering}
+                    >
+                      Cancel Registration
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  className={`btn-secondary w-full flex items-center justify-center gap-2 whitespace-nowrap text-sm ${className}`}
+                  onClick={handleManageRegistration}
+                >
+                  <Ticket className="h-4 w-4 flex-shrink-0" />
+                  <span className="flex flex-col items-center">
+                    <span>✓ Registered ({userRegistration.guest_count || 1} people)</span>
+                    <span className="text-xs opacity-75">Manage your attendance</span>
+                  </span>
+                </button>
+              )
+            ) : (
+              <button 
+                className={`btn-secondary w-full flex items-center justify-center gap-2 whitespace-nowrap text-sm ${className}`}
+                onClick={() => setExpandedRegistration(true)}
+              >
+                <Ticket className="h-4 w-4 flex-shrink-0" />
+                <span>Register for Event</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )
+    }
+
+    // Regular User Interface
+    if (userRegistration) {
+      return expandedRegistration ? (
+        /* Registration Management Form */
+        <div className={`space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200 ${className}`}>
+          <div className="text-center">
+            <h4 className="font-semibold text-gray-900 mb-2">Manage Registration</h4>
+            <p className="text-sm text-gray-600 mb-2">
+              Currently registered for {userRegistration.guest_count || 1} people
+            </p>
+            <p className="text-xs text-gray-500 mb-4">Status: {userRegistration.status || 'confirmed'}</p>
+          </div>
+          
+          <div className="flex items-center justify-center space-x-4">
+            <button 
+              onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+              className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+              disabled={guestCount <= 1}
+            >
+              -
+            </button>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+              <div className="text-xs text-gray-500">
+                {guestCount === 1 ? 'person' : 'people'}
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+              className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+              disabled={guestCount >= 10}
+            >
+              +
+            </button>
+          </div>
+
+          <div className="text-center text-xs text-gray-500">
+            Including yourself • Max 10 people per registration
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              className="btn-primary flex-1" 
+              onClick={handleRegister}
+              disabled={registering}
+            >
+              {registering ? 'Updating...' : `Update to ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+            </button>
+            <button 
+              className="btn-secondary" 
+              onClick={() => setExpandedRegistration(false)}
+              disabled={registering}
+            >
+              Cancel
+            </button>
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              className="btn-danger flex-1" 
+              onClick={handleCancelRegistration}
+              disabled={registering}
+            >
+              Cancel Registration
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Registered State - Show Management Options */
+        <button 
+          className={`btn-secondary flex items-center justify-center gap-2 whitespace-nowrap ${className}`}
+          onClick={handleManageRegistration}
+        >
+          <Ticket className="h-4 w-4 flex-shrink-0" />
+          <span className="flex flex-col items-center">
+            <span>✓ Manage Registration</span>
+            <span className="text-xs opacity-75">({userRegistration.guest_count || 1} people)</span>
+          </span>
+        </button>
+      )
+    } else {
+      return expandedRegistration ? (
+        /* Registration Form */
+        <div className={`space-y-4 p-4 bg-gray-50 rounded-lg border ${className}`}>
+          <div className="text-center">
+            <h4 className="font-semibold text-gray-900 mb-2">Register for Event</h4>
+            <p className="text-sm text-gray-600 mb-4">How many people will attend?</p>
+          </div>
+          
+          <div className="flex items-center justify-center space-x-4">
+            <button 
+              onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+              className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+              disabled={guestCount <= 1}
+            >
+              -
+            </button>
+            
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+              <div className="text-xs text-gray-500">
+                {guestCount === 1 ? 'person' : 'people'}
+              </div>
+            </div>
+            
+            <button 
+              onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+              className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+              disabled={guestCount >= 10}
+            >
+              +
+            </button>
+          </div>
+
+          <div className="text-center text-xs text-gray-500">
+            Including yourself • Max 10 people per registration
+          </div>
+
+          <div className="flex gap-2">
+            <button 
+              className="btn-primary flex-1" 
+              onClick={handleRegister}
+              disabled={registering}
+            >
+              {registering ? 'Registering...' : `Register ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+            </button>
+            <button 
+              className="btn-secondary" 
+              onClick={() => setExpandedRegistration(false)}
+              disabled={registering}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Not Registered - Show Register Button */
+        <button 
+          className={`btn-primary flex items-center justify-center gap-2 whitespace-nowrap ${className}`}
+          onClick={() => setExpandedRegistration(true)}
+        >
+          <Ticket className="h-4 w-4 flex-shrink-0" />
+          <span>Register Now</span>
+        </button>
+      )
+    }
   }
 
   if (loading) {
@@ -346,14 +845,13 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap gap-4 mt-6">
-                <button className="bg-white text-primary-700 hover:bg-gray-100 font-bold px-8 py-4 rounded-xl flex items-center gap-3 text-lg transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1">
-                  <Ticket className="h-5 w-5" /> 
-                  Register Now
-                </button>
-                <button className="bg-white/20 backdrop-blur-md border-2 border-white/30 text-white hover:bg-white/30 font-semibold px-8 py-4 rounded-xl flex items-center gap-3 text-lg transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1">
-                  <Share2 className="h-5 w-5" /> 
-                  Share Event
+              <div className="flex flex-col sm:flex-row gap-4 mt-6">
+                <div className="flex-1">
+                  <RegistrationButton className="w-full" />
+                </div>
+                <button className="bg-white/20 backdrop-blur-md border-2 border-white/30 text-white hover:bg-white/30 font-semibold px-6 py-4 rounded-xl flex items-center justify-center gap-2 text-base transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 min-w-[140px]">
+                  <Share2 className="h-4 w-4" /> 
+                  Share
                 </button>
               </div>
             </div>
@@ -547,9 +1045,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               <li className="flex items-center gap-2"><Clock className="h-4 w-4 text-gray-400" /> 6:00 PM</li>
               <li className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-400" /> {event.location}</li>
             </ul>
-            <button className="btn-primary w-full mt-4 flex items-center justify-center gap-2">
-              <Ticket className="h-4 w-4" /> Register
-            </button>
+            <RegistrationButton className="w-full mt-4" />
           </div>
 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

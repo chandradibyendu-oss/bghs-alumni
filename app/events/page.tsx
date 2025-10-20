@@ -16,11 +16,23 @@ export default function EventsPage() {
   const [events, setEvents] = useState<any[]>([])
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
+  const [userRegistrations, setUserRegistrations] = useState<Set<string>>(new Set())
+  const [registeringEvents, setRegisteringEvents] = useState<Set<string>>(new Set())
+  const [expandedEventId, setExpandedEventId] = useState<string | null>(null)
+  const [guestCount, setGuestCount] = useState<number>(1)
+  const [userRegistrationDetails, setUserRegistrationDetails] = useState<Map<string, any>>(new Map())
+  const [userRole, setUserRole] = useState<string | null>(null)
 
   useEffect(() => {
     checkAdminStatus()
     fetchEvents()
   }, [])
+
+  useEffect(() => {
+    if (currentUserId) {
+      fetchUserRegistrations()
+    }
+  }, [currentUserId])
 
   const checkAdminStatus = async () => {
     try {
@@ -36,6 +48,7 @@ export default function EventsPage() {
         
         const isAdmin = profile?.role === 'super_admin' || profile?.role === 'event_manager'
         setIsAdmin(isAdmin)
+        setUserRole(profile?.role || null)
       }
     } catch (error) {
       console.error('Error checking admin status:', error)
@@ -55,6 +68,245 @@ export default function EventsPage() {
       console.error('Error fetching events:', error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchUserRegistrations = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: registrations, error } = await supabase
+        .from('event_registrations')
+        .select('event_id, status, guest_count, registration_date')
+        .eq('user_id', user.id)
+
+      if (!error && registrations) {
+        const registrationSet = new Set(registrations.map(r => r.event_id))
+        setUserRegistrations(registrationSet)
+        
+        // Store registration details for management
+        const detailsMap = new Map()
+        registrations.forEach(reg => {
+          detailsMap.set(reg.event_id, reg)
+        })
+        setUserRegistrationDetails(detailsMap)
+      }
+    } catch (error) {
+      console.error('Error fetching user registrations:', error)
+    }
+  }
+
+  const handleRegister = async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('Please login to register for events')
+        return
+      }
+
+      // Check if already registered
+      if (userRegistrations.has(eventId)) {
+        alert('You are already registered for this event')
+        return
+      }
+
+      // Set loading state
+      setRegisteringEvents(prev => new Set(prev).add(eventId))
+
+      // Get session for API call
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        alert('Authentication error. Please login again.')
+        return
+      }
+
+      // Call registration API
+      const response = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ eventId, guestCount })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Add to user registrations
+        setUserRegistrations(prev => new Set(prev).add(eventId))
+        
+        // Update event attendee count
+        setEvents(prev => prev.map(event => 
+          event.id === eventId 
+            ? { ...event, current_attendees: event.current_attendees + guestCount }
+            : event
+        ))
+
+        alert(data.status === 'waitlist' 
+          ? `Registered ${guestCount} people for waitlist successfully!` 
+          : `Registered ${guestCount} people for event successfully!`)
+      } else {
+        alert(data.error || 'Failed to register for event')
+      }
+    } catch (error) {
+      console.error('Registration error:', error)
+      alert('An error occurred while registering')
+    } finally {
+      // Remove loading state
+      setRegisteringEvents(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(eventId)
+        return newSet
+      })
+    }
+  }
+
+  const handleRegisterClick = (eventId: string) => {
+    setExpandedEventId(eventId)
+    setGuestCount(1) // Reset to default
+  }
+
+  const handleConfirmRegistration = async (eventId: string) => {
+    await handleRegister(eventId)
+    setExpandedEventId(null) // Close the form
+  }
+
+  const handleCancelRegistration = () => {
+    setExpandedEventId(null)
+    setGuestCount(1)
+  }
+
+  const handleCancelEventRegistration = async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('Please login to manage registrations')
+        return
+      }
+
+      if (!confirm('Are you sure you want to cancel your registration?')) {
+        return
+      }
+
+      // Get session for API call
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        alert('Authentication error. Please login again.')
+        return
+      }
+
+      // Call cancellation API
+      const response = await fetch('/api/events/register', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ eventId })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Remove from user registrations
+        setUserRegistrations(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(eventId)
+          return newSet
+        })
+        
+        // Remove from registration details
+        setUserRegistrationDetails(prev => {
+          const newMap = new Map(prev)
+          newMap.delete(eventId)
+          return newMap
+        })
+
+        // Update event attendee count
+        const registration = userRegistrationDetails.get(eventId)
+        const cancelledCount = registration?.guest_count || 1
+        setEvents(prev => prev.map(event => 
+          event.id === eventId 
+            ? { ...event, current_attendees: Math.max(0, event.current_attendees - cancelledCount) }
+            : event
+        ))
+
+        alert('Registration cancelled successfully!')
+      } else {
+        alert(data.error || 'Failed to cancel registration')
+      }
+    } catch (error) {
+      console.error('Cancellation error:', error)
+      alert('An error occurred while cancelling registration')
+    }
+  }
+
+  const handleModifyRegistration = async (eventId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        alert('Please login to modify registrations')
+        return
+      }
+
+      const currentRegistration = userRegistrationDetails.get(eventId)
+      const currentCount = currentRegistration?.guest_count || 1
+
+      // Get session for API call
+      const { data: sessionData } = await supabase.auth.getSession()
+      const accessToken = sessionData?.session?.access_token
+
+      if (!accessToken) {
+        alert('Authentication error. Please login again.')
+        return
+      }
+
+      // Call registration API with new guest count
+      const response = await fetch('/api/events/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify({ eventId, guestCount })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        // Update registration details
+        setUserRegistrationDetails(prev => {
+          const newMap = new Map(prev)
+          newMap.set(eventId, {
+            ...currentRegistration,
+            guest_count: guestCount,
+            status: data.status
+          })
+          return newMap
+        })
+
+        // Update event attendee count (adjust for the difference)
+        const countDifference = guestCount - currentCount
+        setEvents(prev => prev.map(event => 
+          event.id === eventId 
+            ? { ...event, current_attendees: event.current_attendees + countDifference }
+            : event
+        ))
+
+        alert(`Registration updated to ${guestCount} people successfully!`)
+        setExpandedEventId(null) // Close the form
+      } else {
+        alert(data.error || 'Failed to update registration')
+      }
+    } catch (error) {
+      console.error('Modification error:', error)
+      alert('An error occurred while updating registration')
     }
   }
 
@@ -194,14 +446,193 @@ export default function EventsPage() {
                 </div>
               </div>
 
-                <div className="flex gap-2">
-                  {/* Public events page - only show Register and Details */}
-                  <button className="btn-primary flex-1">Register</button>
-                  <Link href={`/events/${event.id}`} className="btn-secondary flex items-center justify-center gap-1 text-sm">
-                    <Eye className="h-4 w-4" />
-                    Details
-                  </Link>
-                </div>
+                {/* Registration Section */}
+                {userRegistrations.has(event.id) ? (
+                  expandedEventId === event.id ? (
+                    /* Registration Management Form */
+                    <div className="space-y-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                      <div className="text-center">
+                        <h4 className="font-semibold text-gray-900 mb-2">Manage Registration</h4>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Currently registered for {userRegistrationDetails.get(event.id)?.guest_count || 1} people
+                        </p>
+                        <p className="text-xs text-gray-500 mb-4">Status: {userRegistrationDetails.get(event.id)?.status || 'confirmed'}</p>
+                      </div>
+                      
+                      <div className="flex items-center justify-center space-x-4">
+                        <button 
+                          onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                          className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                          disabled={guestCount <= 1}
+                        >
+                          -
+                        </button>
+                        
+                        <div className="text-center">
+                          <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+                          <div className="text-xs text-gray-500">
+                            {guestCount === 1 ? 'person' : 'people'}
+                          </div>
+                        </div>
+                        
+                        <button 
+                          onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+                          className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                          disabled={guestCount >= 10}
+                        >
+                          +
+                        </button>
+                      </div>
+
+                      <div className="text-center text-xs text-gray-500">
+                        Including yourself • Max 10 people per registration
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button 
+                          className="btn-primary flex-1" 
+                          onClick={() => handleModifyRegistration(event.id)}
+                          disabled={registeringEvents.has(event.id)}
+                        >
+                          {registeringEvents.has(event.id) ? 'Updating...' : `Update to ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+                        </button>
+                        <button 
+                          className="btn-secondary" 
+                          onClick={() => handleCancelRegistration()}
+                          disabled={registeringEvents.has(event.id)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button 
+                          className="btn-danger flex-1" 
+                          onClick={() => handleCancelEventRegistration(event.id)}
+                          disabled={registeringEvents.has(event.id)}
+                        >
+                          Cancel Registration
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Registered State - Show Management Options */
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        className="btn-secondary w-full flex items-center justify-center gap-2 whitespace-nowrap text-sm" 
+                        onClick={() => {
+                          setExpandedEventId(event.id)
+                          setGuestCount(userRegistrationDetails.get(event.id)?.guest_count || 1)
+                        }}
+                      >
+                        <span className="flex-shrink-0">✓</span>
+                        <span className="flex flex-col items-center min-w-0">
+                          <span className="text-sm">Manage Registration</span>
+                          <span className="text-xs opacity-75">({userRegistrationDetails.get(event.id)?.guest_count || 1} people)</span>
+                        </span>
+                      </button>
+                      <div className="flex gap-2">
+                        <Link href={`/events/${event.id}`} className="btn-secondary flex-1 flex items-center justify-center gap-1 text-sm">
+                          <Eye className="h-4 w-4" />
+                          Details
+                        </Link>
+                        {/* Admin Options */}
+                        {(userRole === 'super_admin' || event.created_by === currentUserId) && (
+                          <Link 
+                            href={`/admin/events/${event.id}/edit`}
+                            className="btn-secondary flex-1 flex items-center justify-center gap-1 text-sm"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  )
+                ) : expandedEventId === event.id ? (
+                  /* Expanded Registration Form */
+                  <div className="space-y-4 p-4 bg-gray-50 rounded-lg border">
+                    <div className="text-center">
+                      <h4 className="font-semibold text-gray-900 mb-2">Register for Event</h4>
+                      <p className="text-sm text-gray-600 mb-4">How many people will attend?</p>
+                    </div>
+                    
+                    <div className="flex items-center justify-center space-x-4">
+                      <button 
+                        onClick={() => setGuestCount(Math.max(1, guestCount - 1))}
+                        className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                        disabled={guestCount <= 1}
+                      >
+                        -
+                      </button>
+                      
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary-600">{guestCount}</div>
+                        <div className="text-xs text-gray-500">
+                          {guestCount === 1 ? 'person' : 'people'}
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={() => setGuestCount(Math.min(10, guestCount + 1))}
+                        className="w-10 h-10 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-lg font-semibold"
+                        disabled={guestCount >= 10}
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <div className="text-center text-xs text-gray-500">
+                      Including yourself • Max 10 people per registration
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button 
+                        className="btn-primary flex-1" 
+                        onClick={() => handleConfirmRegistration(event.id)}
+                        disabled={registeringEvents.has(event.id)}
+                      >
+                        {registeringEvents.has(event.id) ? 'Registering...' : `Register ${guestCount} ${guestCount === 1 ? 'Person' : 'People'}`}
+                      </button>
+                      <button 
+                        className="btn-secondary" 
+                        onClick={handleCancelRegistration}
+                        disabled={registeringEvents.has(event.id)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <button 
+                      className="btn-primary w-full" 
+                      onClick={() => handleRegisterClick(event.id)}
+                    >
+                      Register
+                    </button>
+                    <div className="flex gap-2">
+                      <Link href={`/events/${event.id}`} className="btn-secondary flex-1 flex items-center justify-center gap-1 text-sm">
+                        <Eye className="h-4 w-4" />
+                        Details
+                      </Link>
+                      {/* Admin Options */}
+                      {(userRole === 'super_admin' || event.created_by === currentUserId) && (
+                        <Link 
+                          href={`/admin/events/${event.id}/edit`}
+                          className="btn-secondary flex-1 flex items-center justify-center gap-1 text-sm"
+                        >
+                          <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Edit
+                        </Link>
+                      )}
+                    </div>
+                  </div>
+                )}
             </div>
           ))}
           {filteredEvents.length === 0 && (
