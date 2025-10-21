@@ -43,7 +43,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get the request body
-    const { registrationId, attendanceStatus, eventId, actualAttendanceCount } = await request.json()
+    const { registrationId, attendanceStatus, eventId, actualAttendanceCount, updateStatusToConfirmed } = await request.json()
     
     if (!registrationId || !attendanceStatus || !eventId) {
       return NextResponse.json({ error: 'Registration ID, attendance status, and event ID are required' }, { status: 400 })
@@ -65,15 +65,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Registration not found' }, { status: 404 })
     }
 
-    if (currentRegistration.status !== 'confirmed') {
-      return NextResponse.json({ error: 'Can only update attendance for confirmed registrations' }, { status: 400 })
+    // Allow attendance updates for any active registration (not cancelled)
+    if (currentRegistration.status === 'cancelled') {
+      return NextResponse.json({ error: 'Cannot update attendance for cancelled registrations' }, { status: 400 })
     }
 
-    // Validate actual attendance count if provided
+    // Validate actual attendance count if provided (allow up to 10 people)
     if (actualAttendanceCount !== undefined) {
-      if (actualAttendanceCount < 1 || actualAttendanceCount > (currentRegistration.guest_count || 1)) {
+      if (actualAttendanceCount < 1 || actualAttendanceCount > 10) {
         return NextResponse.json({ 
-          error: `Actual attendance count must be between 1 and ${currentRegistration.guest_count || 1}` 
+          error: 'Actual attendance count must be between 1 and 10' 
         }, { status: 400 })
       }
     }
@@ -88,6 +89,11 @@ export async function PUT(request: NextRequest) {
     // Include actual attendance count if provided
     if (actualAttendanceCount !== undefined) {
       updateData.actual_attendance_count = actualAttendanceCount
+    }
+
+    // Auto-confirm registration status when marking attendance (if requested)
+    if (updateStatusToConfirmed && currentRegistration.status !== 'confirmed') {
+      updateData.status = 'confirmed'
     }
 
     // Update the attendance status

@@ -108,6 +108,9 @@ export default function AdminEventsPage() {
             <Link href="/events" className="btn-secondary">
               View Public Events
             </Link>
+            <Link href="/admin/events/attendance" className="btn-secondary inline-flex items-center gap-2">
+              <Users className="h-5 w-5" /> Take Attendance
+            </Link>
             <Link href="/admin/events/new" className="btn-primary inline-flex items-center gap-2">
               <Plus className="h-5 w-5" /> Create Event
             </Link>

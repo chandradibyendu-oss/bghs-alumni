@@ -189,6 +189,14 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Events</h3>
             <p className="text-gray-600">View and register for upcoming events</p>
           </Link>
+
+          {(userProfile?.role === 'super_admin' || userProfile?.role === 'event_manager') && (
+            <Link href="/admin/events/attendance" className="card text-center hover:shadow-lg transition-shadow group">
+              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Take Attendance</h3>
+              <p className="text-gray-600">Quick attendance capture for events</p>
+            </Link>
+          )}
           
           <Link href="/directory" className="card text-center hover:shadow-lg transition-shadow group">
             <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
