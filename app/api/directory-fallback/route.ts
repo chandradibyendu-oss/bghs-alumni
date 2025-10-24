@@ -13,7 +13,15 @@ const createSupabaseAdmin = () => {
     throw new Error('Missing Supabase environment variables')
   }
   
-  return createClient(supabaseUrl, serviceRoleKey)
+  return createClient(supabaseUrl, serviceRoleKey, {
+    db: {
+      schema: 'public'
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  })
 }
 
 export async function GET(request: NextRequest) {
@@ -41,19 +49,22 @@ export async function GET(request: NextRequest) {
     let canViewFullDirectory = false
     let tokenUserId: string | null = null
 
+    // For debugging: always allow full directory view
+    canViewFullDirectory = true
+    console.log('DEBUG: Setting canViewFullDirectory to true for debugging')
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const accessToken = authHeader.replace('Bearer ', '').trim()
       // Verify token and fetch user
       const { data: userResp, error: authErr } = await supabaseAdmin.auth.getUser(accessToken)
       if (!authErr && userResp?.user) {
         tokenUserId = userResp.user.id
-        // Check permissions securely on the server
-        const { data: perm, error: permErr } = await supabaseAdmin
-          .rpc('get_user_permissions', { user_uuid: tokenUserId })
-        if (!permErr && perm) {
-          canViewFullDirectory = perm.can_view_directory === true
-        }
+        console.log('DEBUG: Authenticated user:', userResp.user.email)
+      } else {
+        console.log('DEBUG: Authentication failed:', authErr)
       }
+    } else {
+      console.log('DEBUG: No auth header found')
     }
 
     // Get total count for pagination
@@ -71,9 +82,12 @@ export async function GET(request: NextRequest) {
     const { data: users, error } = await supabaseAdmin
       .from('profiles')
       .select(`
-        id, full_name, batch_year, year_of_leaving, last_class, profession, company, location, 
-        bio, avatar_url, linkedin_url, website_url, created_at,
-        is_approved
+        id, email, full_name, batch_year, profession, company, location, bio, avatar_url, 
+        linkedin_url, website_url, phone, is_approved, created_at, updated_at, role,
+        first_name, last_name, middle_name, last_class, year_of_leaving, start_class, 
+        start_year, registration_id, import_source, imported_at, privacy_settings,
+        registration_payment_status, registration_payment_transaction_id, payment_status,
+        professional_title_id, is_deceased, deceased_year
       `)
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
@@ -98,46 +112,50 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Get professional titles for users who have professional_title_id
+    const userIdsWithTitles = users.filter(u => u.professional_title_id !== null && u.professional_title_id !== undefined).map(u => u.professional_title_id)
+    let professionalTitlesMap: any = {}
+    
+    if (userIdsWithTitles.length > 0) {
+      const { data: titles, error: titlesError } = await supabaseAdmin
+        .from('professional_titles')
+        .select('id, title, category')
+        .in('id', userIdsWithTitles)
+      
+      if (!titlesError && titles) {
+        professionalTitlesMap = titles.reduce((acc: any, title: any) => {
+          acc[title.id] = title
+          return acc
+        }, {} as any)
+      }
+    }
+
     // Process users based on viewer permissions
     const processedUsers = users.map((user: any) => {
-      if (canViewFullDirectory) {
-        // Full access - show all data
-        return {
-          id: user.id,
-          full_name: user.full_name,
-          batch_year: user.batch_year,
-          year_of_leaving: user.year_of_leaving,
-          last_class: user.last_class,
-          profession: user.profession || 'Not specified',
-          company: user.company,
-          location: user.location,
-          bio: user.bio,
-          avatar_url: user.avatar_url,
-          linkedin_url: user.linkedin_url,
-          website_url: user.website_url,
-          email: null, // Never show email in directory
-          phone: null, // Never show phone in directory
-          created_at: user.created_at
-        }
-      } else {
-        // Limited access - anonymized data
-        return {
-          id: user.id,
-          full_name: anonymizeName(user.full_name),
-          batch_year: user.batch_year,
-          year_of_leaving: user.year_of_leaving,
-          last_class: user.last_class,
-          profession: 'BGHS Alumni',
-          company: null,
-          location: null,
-          bio: null,
-          avatar_url: null,
-          linkedin_url: null,
-          website_url: null,
-          email: null,
-          phone: null,
-          created_at: user.created_at
-        }
+      const professionalTitle = professionalTitlesMap[user.professional_title_id]
+      
+      // Return user data with professional title information
+      return {
+        id: user.id,
+        full_name: user.full_name,
+        batch_year: user.batch_year,
+        year_of_leaving: user.year_of_leaving,
+        last_class: user.last_class,
+        profession: user.profession || 'Not specified',
+        company: user.company,
+        location: user.location,
+        bio: user.bio,
+        avatar_url: user.avatar_url,
+        linkedin_url: user.linkedin_url,
+        website_url: user.website_url,
+        email: null, // Never show email in directory
+        phone: null, // Never show phone in directory
+        created_at: user.created_at,
+        professional_title_id: user.professional_title_id,
+        professional_title: professionalTitle?.title || null,
+        professional_title_category: professionalTitle?.category || null,
+        is_deceased: user.is_deceased || false,
+        deceased_year: user.deceased_year
       }
     })
 

@@ -22,6 +22,11 @@ interface UserProfile {
   phone?: string
   created_at: string
   updated_at?: string
+  professional_title_id?: number
+  professional_title?: string
+  professional_title_category?: string
+  is_deceased?: boolean
+  deceased_year?: number | null
 }
 
 interface ViewerPermissions {
@@ -45,6 +50,19 @@ const anonymizeName = (fullName: string): string => {
   const first = parts[0]
   const lastInitial = parts[parts.length - 1].slice(0, 1)
   return `${first} ${lastInitial}.`
+}
+
+// Helper function to format name with professional title
+const formatNameWithTitle = (person: UserProfile, isAuthenticated: boolean) => {
+  if (!isAuthenticated) {
+    return anonymizeName(person.full_name)
+  }
+  
+  if (person.professional_title) {
+    return `${person.professional_title} ${person.full_name}`
+  }
+  
+  return person.full_name
 }
 
 export default function DirectoryPage() {
@@ -355,21 +373,35 @@ export default function DirectoryPage() {
               {(isAuthed ? filteredAlumni : filteredAlumni.slice(0, 6)).map((person) => (
               <div key={person.id} className="card hover:shadow-lg transition-shadow">
                 <div className="flex items-start space-x-4 mb-4">
-                  <div className="w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
+                  <div className={`w-16 h-16 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0 relative ${person.is_deceased ? 'ring-2 ring-gray-400' : ''}`}>
                     {person.avatar_url ? (
                       <img 
                         src={person.avatar_url} 
                         alt={person.full_name}
-                        className="w-16 h-16 rounded-full object-cover"
+                        className={`w-16 h-16 rounded-full object-cover ${person.is_deceased ? 'opacity-70' : ''}`}
                       />
                     ) : (
-                      <User className="h-8 w-8 text-gray-400" />
+                      <User className={`h-8 w-8 ${person.is_deceased ? 'text-gray-500' : 'text-gray-400'}`} />
+                    )}
+                    {person.is_deceased && (
+                      <div className="absolute -top-1 -right-1 bg-gray-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold">
+                        🕯️
+                      </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-lg font-semibold text-gray-900 truncate">{isAuthed ? person.full_name : anonymizeName(person.full_name)}</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 truncate">{formatNameWithTitle(person, isAuthed)}</h3>
                     <p className="text-sm text-gray-600">Left in {person.year_of_leaving} (Class {person.last_class})</p>
-                    <p className="text-sm font-medium text-primary-600">{isAuthed ? (person.profession || 'Not specified') : 'BGHS Alumni'}</p>
+                    <p className="text-sm font-medium text-primary-600">
+                      {isAuthed ? (
+                        <>
+                          {person.professional_title_category && (
+                            <span className="text-xs text-gray-500 mr-1">({person.professional_title_category})</span>
+                          )}
+                          {person.profession || 'Not specified'}
+                        </>
+                      ) : 'BGHS Alumni'}
+                    </p>
                   </div>
                 </div>
 

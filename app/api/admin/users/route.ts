@@ -166,7 +166,7 @@ export async function PUT(request: NextRequest) {
     }
 
     // Get the request body
-    const { id, email, phone, first_name, middle_name, last_name, full_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role, batch_year } = await request.json()
+    const { id, email, phone, first_name, middle_name, last_name, full_name, last_class, year_of_leaving, start_class, start_year, profession, company, location, bio, linkedin_url, website_url, is_approved, role, batch_year, is_deceased, deceased_year } = await request.json()
 
     if (!id) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 })
@@ -251,6 +251,12 @@ export async function PUT(request: NextRequest) {
     if (website_url !== undefined) updates.website_url = website_url || null
     if (role !== undefined) updates.role = role
     if (typeof is_approved === 'boolean') updates.is_approved = is_approved
+    if (typeof is_deceased === 'boolean') {
+      updates.is_deceased = is_deceased
+      updates.deceased_updated_by = user.id
+      updates.deceased_updated_at = new Date().toISOString()
+    }
+    if (deceased_year !== undefined) updates.deceased_year = deceased_year === null ? null : Number(deceased_year)
 
     const { error: updateError } = await supabaseAdmin
       .from('profiles')

@@ -56,7 +56,8 @@ export async function GET(request: NextRequest) {
       .select(`
         id, full_name, batch_year, profession, company, location, 
         bio, avatar_url, linkedin_url, website_url, created_at,
-        is_approved, privacy_settings
+        is_approved, privacy_settings, professional_title_id,
+        professional_titles(title, category)
       `)
       .eq('is_approved', true)
       .order('created_at', { ascending: false })
@@ -110,7 +111,11 @@ export async function GET(request: NextRequest) {
               website_url: profileData.profile.website_url,
               email: profileData.profile.email,
               phone: profileData.profile.phone,
-              created_at: user.created_at
+              created_at: user.created_at,
+              // Include professional title information
+              professional_title_id: user.professional_title_id,
+              professional_title: user.professional_titles?.title || null,
+              professional_title_category: user.professional_titles?.category || null
             }
           }
         }
@@ -129,7 +134,11 @@ export async function GET(request: NextRequest) {
           website_url: canViewFullDirectory ? user.website_url : null,
           email: null, // Never show email in directory
           phone: null, // Never show phone in directory
-          created_at: user.created_at
+          created_at: user.created_at,
+          // Include professional title information (only for authenticated users)
+          professional_title_id: canViewFullDirectory ? user.professional_title_id : null,
+          professional_title: canViewFullDirectory ? (user.professional_titles?.title || null) : null,
+          professional_title_category: canViewFullDirectory ? (user.professional_titles?.category || null) : null
         }
       })
     )

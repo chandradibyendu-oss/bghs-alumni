@@ -32,8 +32,6 @@ interface Profile {
   professional_title_id?: number | null
   professional_title?: string | null
   professional_title_category?: string | null
-  is_deceased?: boolean
-  deceased_year?: number | null
 }
 
 interface ProfessionalTitle {
@@ -44,7 +42,7 @@ interface ProfessionalTitle {
   description: string
 }
 
-export default function ProfilePage() {
+export default function EnhancedProfilePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -368,16 +366,11 @@ export default function ProfilePage() {
 
         {/* Avatar Section */}
         <div className="mb-6 flex items-center gap-4">
-          <div className={`w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center relative ${profile.is_deceased ? 'ring-2 ring-gray-400' : ''}`}>
+          <div className="w-20 h-20 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
             {profile.avatar_url ? (
-              <img src={profile.avatar_url} alt={profile.full_name} className={`w-20 h-20 object-cover ${profile.is_deceased ? 'opacity-70' : ''}`} />
+              <img src={profile.avatar_url} alt={profile.full_name} className="w-20 h-20 object-cover" />
             ) : (
-              <span className={`text-sm ${profile.is_deceased ? 'text-gray-500' : 'text-gray-500'}`}>No Photo</span>
-            )}
-            {profile.is_deceased && (
-              <div className="absolute -top-1 -right-1 bg-gray-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">
-                🕯️
-              </div>
+              <span className="text-gray-500 text-sm">No Photo</span>
             )}
           </div>
           <div className="flex flex-col sm:flex-row gap-2">

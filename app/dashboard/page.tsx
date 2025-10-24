@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail } from 'lucide-react'
+import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail, Upload } from 'lucide-react'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
@@ -172,6 +172,12 @@ export default function DashboardPage() {
                 <Mail className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Queue</h3>
                 <p className="text-gray-600">View queued payment emails (testing)</p>
+              </Link>
+              
+              <Link href="/admin/alumni-migration" className="card text-center hover:shadow-lg transition-shadow group">
+                <Upload className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Alumni Migration</h3>
+                <p className="text-gray-600">Upload Excel files to migrate alumni data</p>
               </Link>
             </>
           )}

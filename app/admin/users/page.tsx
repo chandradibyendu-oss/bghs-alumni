@@ -46,6 +46,8 @@ interface UserProfile {
   role: string
   is_approved?: boolean
   payment_status?: string | null
+  is_deceased?: boolean
+  deceased_year?: number | null
   created_at: string
   updated_at: string
 }
@@ -57,6 +59,9 @@ export default function AdminUsersPage() {
   const [filterYear, setFilterYear] = useState('')
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingUser, setEditingUser] = useState<UserProfile | null>(null)
+  const [showDeceasedModal, setShowDeceasedModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null)
+  const [deceasedYear, setDeceasedYear] = useState('')
   const [formData, setFormData] = useState({
     email: '',
     phone: '',
@@ -306,6 +311,53 @@ export default function AdminUsersPage() {
     } catch (e) {
       console.error('Approval toggle error:', e)
       alert('Failed to update approval status')
+    }
+  }
+
+  const handleToggleDeceasedStatus = (user: UserProfile) => {
+    setSelectedUser(user)
+    setDeceasedYear(user.deceased_year ? user.deceased_year.toString() : '')
+    setShowDeceasedModal(true)
+  }
+
+  const handleDeceasedStatusSubmit = async () => {
+    if (!selectedUser) return
+
+    const isCurrentlyDeceased = selectedUser.is_deceased
+    const newDeceasedStatus = !isCurrentlyDeceased
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const res = await fetch('/api/admin/users', {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ 
+          id: selectedUser.id, 
+          is_deceased: newDeceasedStatus,
+          deceased_year: newDeceasedStatus ? (deceasedYear ? parseInt(deceasedYear) : null) : null
+        })
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.error || 'Failed to update deceased status')
+      }
+
+      fetchUsers()
+      setShowDeceasedModal(false)
+      setSelectedUser(null)
+      setDeceasedYear('')
+    } catch (e) {
+      console.error('Deceased status toggle error:', e)
+      alert('Failed to update deceased status')
     }
   }
 
@@ -786,6 +838,9 @@ export default function AdminUsersPage() {
                       Approved
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Payment
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -867,6 +922,18 @@ export default function AdminUsersPage() {
                         </button>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => handleToggleDeceasedStatus(user)}
+                          className={
+                            `px-2 py-1 rounded text-xs font-medium ` +
+                            (user.is_deceased ? 'bg-gray-100 text-gray-800' : 'bg-blue-100 text-blue-800')
+                          }
+                          title={user.is_deceased ? 'Click to mark as living' : 'Click to mark as deceased'}
+                        >
+                          {user.is_deceased ? '🕯️ In Memoriam' : 'Living'}
+                        </button>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         {user.payment_status === 'pending' ? (
                           <span className="px-2 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
                             Pending
@@ -915,6 +982,73 @@ export default function AdminUsersPage() {
           )}
         </div>
       </div>
+
+      {/* Deceased Status Modal */}
+      {showDeceasedModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {selectedUser.is_deceased ? 'Mark as Living' : 'Mark as Deceased'}
+              </h3>
+              <button
+                onClick={() => setShowDeceasedModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                {selectedUser.is_deceased 
+                  ? `Are you sure you want to mark ${selectedUser.full_name} as living?`
+                  : `Are you sure you want to mark ${selectedUser.full_name} as deceased?`
+                }
+              </p>
+              
+              {!selectedUser.is_deceased && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Deceased Year (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    value={deceasedYear}
+                    onChange={(e) => setDeceasedYear(e.target.value)}
+                    className="input-field"
+                    placeholder="e.g., 2023"
+                    min="1900"
+                    max="2030"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Leave blank if the year is unknown
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setShowDeceasedModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeceasedStatusSubmit}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  selectedUser.is_deceased 
+                    ? 'bg-green-600 text-white hover:bg-green-700' 
+                    : 'bg-gray-600 text-white hover:bg-gray-700'
+                }`}
+              >
+                {selectedUser.is_deceased ? 'Mark as Living' : 'Mark as Deceased'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
