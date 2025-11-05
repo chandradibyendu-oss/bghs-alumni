@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon } from 'lucide-react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon, Mail } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 // Removed getUserPermissions import - using direct role check for performance
@@ -81,6 +81,29 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [showEmailPrompt, setShowEmailPrompt] = useState(false)
+
+  // Helper function to detect placeholder email
+  const isPlaceholderEmail = (email: string | null | undefined): boolean => {
+    if (!email) return false
+    const placeholderPattern = /^[A-Za-z0-9]+@alumnibghs\.org$/i
+    return placeholderPattern.test(email.trim())
+  }
+
+  // Check localStorage for dismissal
+  const checkEmailPromptDismissed = (): boolean => {
+    if (typeof window === 'undefined') return false
+    const dismissed = localStorage.getItem('emailPromptDismissed')
+    return dismissed === 'true'
+  }
+
+  // Handle dismissing the email prompt
+  const handleDismissEmailPrompt = () => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('emailPromptDismissed', 'true')
+    }
+    setShowEmailPrompt(false)
+  }
 
   // Auto-rotate slides
   useEffect(() => {
@@ -129,6 +152,11 @@ export default function Home() {
         
         const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
         setIsAdmin(isAdmin)
+
+        // Check if user has placeholder email and hasn't dismissed the prompt
+        if (isPlaceholderEmail(user.email) && !checkEmailPromptDismissed()) {
+          setShowEmailPrompt(true)
+        }
       } else {
         setIsAdmin(false)
       }
@@ -147,11 +175,19 @@ export default function Home() {
           
           const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
           setIsAdmin(isAdmin)
+
+          // Check if user has placeholder email and hasn't dismissed the prompt
+          if (isPlaceholderEmail(session.user.email) && !checkEmailPromptDismissed()) {
+            setShowEmailPrompt(true)
+          } else {
+            setShowEmailPrompt(false)
+          }
         } catch {
           setIsAdmin(false)
         }
       } else {
         setIsAdmin(false)
+        setShowEmailPrompt(false)
       }
     })
 
@@ -222,6 +258,42 @@ export default function Home() {
           </div>
         </div>
       </nav>
+
+      {/* Placeholder Email Prompt Banner */}
+      {showEmailPrompt && userEmail && (
+        <div className="bg-amber-50 border-b border-amber-200 sticky top-16 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="flex-shrink-0 mt-0.5">
+                  <Mail className="h-5 w-5 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-amber-900 mb-1">
+                    Update Your Email Address
+                  </h3>
+                  <p className="text-sm text-amber-800 mb-3">
+                    You're currently using a placeholder email address. Please update it to your real email to receive important notifications and stay connected with the alumni community.
+                  </p>
+                  <Link
+                    href="/profile"
+                    className="inline-flex items-center px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 transition-colors"
+                  >
+                    Update Email Now
+                  </Link>
+                </div>
+              </div>
+              <button
+                onClick={handleDismissEmailPrompt}
+                className="flex-shrink-0 text-amber-600 hover:text-amber-800 transition-colors"
+                aria-label="Dismiss"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">

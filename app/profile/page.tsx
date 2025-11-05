@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'react-hot-toast'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { User, Mail, Phone, MapPin, Briefcase, Building, Globe, Linkedin, Camera, Save, Edit3, Award, Upload, X } from 'lucide-react'
+import { User, Mail, Phone, MapPin, Briefcase, Building, Globe, Linkedin, Camera, Save, Edit3, Award, Upload, X, AlertCircle } from 'lucide-react'
 
 interface Profile {
   id: string
@@ -55,11 +55,26 @@ export default function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
   const [videoStream, setVideoStream] = useState<MediaStream | null>(null)
+  
+  // Email change state
+  const [showEmailChangeModal, setShowEmailChangeModal] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [emailOtp, setEmailOtp] = useState('')
+  const [emailOtpSent, setEmailOtpSent] = useState(false)
+  const [emailChangeLoading, setEmailChangeLoading] = useState(false)
+  const [emailChangeError, setEmailChangeError] = useState('')
+  const [emailChangeSuccess, setEmailChangeSuccess] = useState('')
 
   useEffect(() => {
     loadProfile()
     loadProfessionalTitles()
   }, [])
+
+  // Helper function to detect placeholder email
+  const isPlaceholderEmail = (email: string): boolean => {
+    const placeholderPattern = /^[A-Za-z0-9]+@alumnibghs\.org$/i
+    return placeholderPattern.test(email.trim())
+  }
 
   const loadProfile = async () => {
     try {
@@ -275,6 +290,126 @@ export default function ProfilePage() {
     } catch (e) {
       toast.error('Failed to capture photo')
     }
+  }
+
+  // Email change handlers
+  const handleRequestEmailChange = async () => {
+    if (!newEmail || !newEmail.includes('@')) {
+      setEmailChangeError('Please enter a valid email address')
+      return
+    }
+
+    setEmailChangeLoading(true)
+    setEmailChangeError('')
+    setEmailChangeSuccess('')
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch('/api/profile/update-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ newEmail })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send verification code')
+      }
+
+      setEmailOtpSent(true)
+      
+      // If in dev mode and OTP is returned, show it to user
+      if (data.devOtp) {
+        setEmailChangeSuccess(`Verification code sent! (Dev mode: ${data.devOtp})`)
+        toast.success(`Verification code: ${data.devOtp}`, { duration: 10000 })
+        // Auto-fill OTP in dev mode for convenience
+        setEmailOtp(data.devOtp)
+      } else {
+        setEmailChangeSuccess('Verification code sent to your new email address')
+        toast.success('Verification code sent!')
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to send verification code'
+      setEmailChangeError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setEmailChangeLoading(false)
+    }
+  }
+
+  const handleVerifyEmailChange = async () => {
+    if (!emailOtp || emailOtp.length !== 6) {
+      setEmailChangeError('Please enter a valid 6-digit verification code')
+      return
+    }
+
+    setEmailChangeLoading(true)
+    setEmailChangeError('')
+    setEmailChangeSuccess('')
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        router.push('/login')
+        return
+      }
+
+      const response = await fetch('/api/profile/verify-email-change', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ newEmail, otp: emailOtp })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify email change')
+      }
+
+      toast.success('Email updated successfully!')
+      setShowEmailChangeModal(false)
+      // Reset form
+      setNewEmail('')
+      setEmailOtp('')
+      setEmailOtpSent(false)
+      setEmailChangeError('')
+      setEmailChangeSuccess('')
+      // Clear email prompt dismissal flag (so banner can reappear if needed)
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('emailPromptDismissed')
+      }
+      // Reload profile to show new email
+      await loadProfile()
+      // Refresh session to get updated user
+      await supabase.auth.refreshSession()
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to verify email change'
+      setEmailChangeError(errorMessage)
+      toast.error(errorMessage)
+    } finally {
+      setEmailChangeLoading(false)
+    }
+  }
+
+  const handleCloseEmailChangeModal = () => {
+    setShowEmailChangeModal(false)
+    setNewEmail('')
+    setEmailOtp('')
+    setEmailOtpSent(false)
+    setEmailChangeError('')
+    setEmailChangeSuccess('')
   }
 
   if (loading) {
@@ -722,7 +857,21 @@ export default function ProfilePage() {
                       <Mail className="h-4 w-4 text-gray-400" />
                       <p className="text-gray-900 py-2">{profile.email}</p>
                     </div>
-                    <p className="text-xs text-gray-500">Email cannot be changed</p>
+                    {isPlaceholderEmail(profile.email) ? (
+                      <div className="mt-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 mr-2">
+                          Placeholder Email
+                        </span>
+                        <button
+                          onClick={() => setShowEmailChangeModal(true)}
+                          className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        >
+                          Update Email
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-500">Email cannot be changed</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
@@ -829,6 +978,115 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+        {/* Email Change Modal */}
+        {showEmailChangeModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Update Email Address</h3>
+                <button
+                  onClick={handleCloseEmailChangeModal}
+                  className="text-gray-400 hover:text-gray-600"
+                  disabled={emailChangeLoading}
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-2">
+                    Current email: <span className="font-medium">{profile.email}</span>
+                  </p>
+                  <p className="text-xs text-yellow-700 bg-yellow-50 p-2 rounded">
+                    <AlertCircle className="h-4 w-4 inline mr-1" />
+                    You can update your placeholder email to a real email address. A verification code will be sent to your new email.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    New Email Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => {
+                      setNewEmail(e.target.value)
+                      setEmailChangeError('')
+                    }}
+                    className="input-field"
+                    placeholder="your.email@example.com"
+                    disabled={emailOtpSent || emailChangeLoading}
+                  />
+                </div>
+
+                {emailOtpSent && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Verification Code <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={emailOtp}
+                      onChange={(e) => {
+                        setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))
+                        setEmailChangeError('')
+                      }}
+                      className="input-field"
+                      placeholder="Enter 6-digit code"
+                      maxLength={6}
+                      disabled={emailChangeLoading}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter the 6-digit code sent to {newEmail}
+                    </p>
+                  </div>
+                )}
+
+                {emailChangeError && (
+                  <div className="bg-red-50 border border-red-200 rounded p-3">
+                    <p className="text-sm text-red-800">{emailChangeError}</p>
+                  </div>
+                )}
+
+                {emailChangeSuccess && (
+                  <div className="bg-green-50 border border-green-200 rounded p-3">
+                    <p className="text-sm text-green-800">{emailChangeSuccess}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    onClick={handleCloseEmailChangeModal}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                    disabled={emailChangeLoading}
+                  >
+                    Cancel
+                  </button>
+                  {!emailOtpSent ? (
+                    <button
+                      onClick={handleRequestEmailChange}
+                      disabled={emailChangeLoading || !newEmail}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {emailChangeLoading ? 'Sending...' : 'Send Verification Code'}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleVerifyEmailChange}
+                      disabled={emailChangeLoading || emailOtp.length !== 6}
+                      className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {emailChangeLoading ? 'Verifying...' : 'Verify & Update Email'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
     </div>
   )
 }
