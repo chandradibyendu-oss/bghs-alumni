@@ -115,7 +115,7 @@ import { EvidenceFile } from './r2-storage'
 let reactPdfGenerator: ((data: any) => Promise<Buffer>) | null = null
 async function generateWithReactPdf(data: any): Promise<Buffer> {
   if (!reactPdfGenerator) {
-    const mod = await import('./pdf-generator-react')
+    const mod = await import('./react-pdf-engine')
     reactPdfGenerator = (mod as any).generateRegistrationPDFReact
   }
   if (!reactPdfGenerator) {
