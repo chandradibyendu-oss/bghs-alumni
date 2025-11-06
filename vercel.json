@@ -8,16 +8,19 @@
   "functions": {
     "app/api/admin/process-pdf/route.ts": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 3008,
+      "runtime": "nodejs22.x"
     },
     "app/api/admin/process-pdf/next/route.ts": {
       "maxDuration": 60,
-      "memory": 3008
+      "memory": 3008,
+      "runtime": "nodejs22.x"
     }
   },
   "env": {
     "PUPPETEER_SKIP_CHROMIUM_DOWNLOAD": "true",
     "PUPPETEER_CACHE_DIR": "/tmp/.cache/puppeteer",
-    "FONTCONFIG_PATH": "/tmp"
+    "FONTCONFIG_PATH": "/tmp",
+    "AWS_LAMBDA_JS_RUNTIME": "nodejs22.x"
   }
 }
