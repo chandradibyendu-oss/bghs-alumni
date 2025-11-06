@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, Image, StyleSheet, pdf } from '@react-pdf/renderer'
+// Some versions expose renderToStream separately; import lazily when needed
 
 export interface EvidenceFile {
   name: string
@@ -151,11 +152,36 @@ export async function generateRegistrationPDFReact(data: RegistrationPDFData): P
   )
 
   try {
-    const pdfDoc = pdf(Doc)
-    const buffer = await pdfDoc.toBuffer()
-    if (Buffer.isBuffer(buffer)) return buffer
-    if (buffer instanceof Uint8Array) return Buffer.from(buffer)
-    return Buffer.from(buffer as any)
+    const handler: any = (pdf as any)
+    const pdfApi = handler(Doc)
+    // Preferred path: toBuffer Promise on Node
+    if (pdfApi && typeof pdfApi.toBuffer === 'function') {
+      const maybe = await pdfApi.toBuffer()
+      if (Buffer.isBuffer(maybe)) return maybe
+      if (maybe instanceof Uint8Array) return Buffer.from(maybe)
+      // If somehow a PDFDocument slipped through, fall back to stream collect
+      if (maybe && typeof (maybe as any).on === 'function' && typeof (maybe as any).pipe === 'function') {
+        const buf = await new Promise<Buffer>((resolve, reject) => {
+          const chunks: Buffer[] = []
+          ;(maybe as any).on('data', (d: any) => chunks.push(Buffer.isBuffer(d) ? d : Buffer.from(d)))
+          ;(maybe as any).on('end', () => resolve(Buffer.concat(chunks)))
+          ;(maybe as any).on('error', reject)
+        })
+        return buf
+      }
+      return Buffer.from(maybe as any)
+    }
+    // Fallback: dynamic import renderToStream and collect
+    const mod = await import('@react-pdf/renderer')
+    const renderToStream = (mod as any).renderToStream || (mod as any).render
+    const stream = await renderToStream(Doc)
+    const buf = await new Promise<Buffer>((resolve, reject) => {
+      const chunks: Buffer[] = []
+      stream.on('data', (d: any) => chunks.push(Buffer.isBuffer(d) ? d : Buffer.from(d)))
+      stream.on('end', () => resolve(Buffer.concat(chunks)))
+      stream.on('error', reject)
+    })
+    return buf
   } catch (error) {
     throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
