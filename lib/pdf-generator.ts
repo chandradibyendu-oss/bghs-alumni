@@ -112,7 +112,8 @@ async function getBrowser() {
 import { EvidenceFile } from './r2-storage'
 
 // Optional switch to React PDF engine (no-chromium) via env PDF_ENGINE=react-pdf
-let reactPdfGenerator: undefined | (data: any) => Promise<Buffer>
+type ReactPdfGenerator = (data: any) => Promise<Buffer>
+let reactPdfGenerator: ReactPdfGenerator | undefined
 async function generateWithReactPdf(data: any): Promise<Buffer> {
   if (!reactPdfGenerator) {
     const mod = await import('./pdf-generator-react')
