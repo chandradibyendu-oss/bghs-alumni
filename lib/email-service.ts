@@ -1,5 +1,5 @@
-// Email service utility for sending OTP emails
-// In production, integrate with services like SendGrid, AWS SES, etc.
+// Email service utility for sending emails
+// Uses Brevo (formerly Sendinblue) for email delivery
 
 export interface EmailOptions {
   to: string
@@ -7,6 +7,7 @@ export interface EmailOptions {
   html: string
   text?: string
   attachments?: EmailAttachment[]
+  replyTo?: string // Optional Reply-To address (only for emails where replies are expected)
 }
 
 export interface EmailAttachment {
@@ -18,16 +19,37 @@ export interface EmailAttachment {
 
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   try {
-    // Check if we're in production mode (has SendGrid API key)
-    if (process.env.SENDGRID_API_KEY) {
-      // Production: Send real email via SendGrid
-      const sgMail = require('@sendgrid/mail')
-      sgMail.setApiKey(process.env.SENDGRID_API_KEY)
-      
+    // Check if we're in production mode (has Brevo API key)
+    const brevoApiKey = process.env.BREVO_API_KEY?.trim()
+    
+    if (!brevoApiKey) {
+      console.log('⚠️ BREVO_API_KEY not found in environment variables')
+      // Fall through to development mode
+    } else {
+      // Production: Send real email via Brevo REST API (direct HTTP call)
       const rawFrom = process.env.FROM_EMAIL || 'admin@alumnibghs.org'
-      const fromWithName = rawFrom.includes('<') ? rawFrom : `BGHS Alumni <${rawFrom}>`
+      const displayName = process.env.EMAIL_DISPLAY_NAME || 'BGHS Alumni'
+      
+      // Parse from email (handle both formats: "email@domain.com" or "Display Name <email@domain.com>")
+      let fromEmail: string
+      let fromName: string
+      
+      if (rawFrom.includes('<')) {
+        // Format: "Display Name <email@domain.com>"
+        const match = rawFrom.match(/^(.+?)\s*<(.+?)>$/)
+        if (match) {
+          fromName = match[1].trim()
+          fromEmail = match[2].trim()
+        } else {
+          fromEmail = rawFrom
+          fromName = displayName
+        }
+      } else {
+        fromEmail = rawFrom
+        fromName = displayName
+      }
 
-      // SendGrid expects attachment content as base64 string
+      // Prepare attachments for Brevo
       const normalizedAttachments = (options.attachments || []).map(att => {
         let contentBase64: string
         if (typeof att.content === 'string') {
@@ -43,37 +65,82 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
           contentBase64 = Buffer.from(att.content).toString('base64')
         }
         return {
+          name: att.filename,
           content: contentBase64,
-          filename: att.filename,
-          type: att.type,
-          disposition: att.disposition || 'attachment',
         }
       })
 
-      const msg = {
-        to: options.to,
-        from: fromWithName,
+      // Prepare email payload for Brevo API
+      const emailPayload: any = {
+        sender: {
+          name: fromName,
+          email: fromEmail
+        },
+        to: [
+          {
+            email: options.to
+          }
+        ],
         subject: options.subject,
-        html: options.html,
-        text: options.text,
-        attachments: normalizedAttachments.length > 0 ? normalizedAttachments : undefined,
+        htmlContent: options.html,
+        textContent: options.text || undefined
       }
       
-      await sgMail.send(msg)
-      console.log('✅ Email sent successfully to:', options.to)
-      return true
-    } else {
-      // Development: Log the email content
-      console.log('=== EMAIL SENT (DEVELOPMENT MODE) ===')
-      console.log('To:', options.to)
-      console.log('Subject:', options.subject)
-      console.log('Content:', options.html)
-      if (options.attachments && options.attachments.length > 0) {
-        console.log('Attachments:', options.attachments.map(a => `${a.filename} (${a.type})`).join(', '))
+      // Add Reply-To header if provided (only for emails where replies are expected)
+      if (options.replyTo) {
+        emailPayload.replyTo = {
+          email: options.replyTo
+        }
       }
-      console.log('=====================================')
+      
+      // Add attachments if any
+      if (normalizedAttachments.length > 0) {
+        emailPayload.attachment = normalizedAttachments
+      }
+      
+      // Call Brevo REST API directly
+      const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey
+        },
+        body: JSON.stringify(emailPayload)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Brevo API error:', response.status, errorText)
+        // Debug: Check if API key is present (show first 4 chars for debugging)
+        const apiKeyPreview = brevoApiKey ? `${brevoApiKey.substring(0, 4)}...` : 'MISSING'
+        console.error('API Key preview (first 4 chars):', apiKeyPreview)
+        console.error('API Key length:', brevoApiKey?.length || 0)
+        throw new Error(`Brevo API error: ${response.status} - ${errorText}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Email sent successfully to:', options.to)
+      if (options.replyTo) {
+        console.log('   Reply-To:', options.replyTo)
+      }
       return true
     }
+    
+    // Development mode (no API key or API key not found)
+    // Development: Log the email content
+    console.log('=== EMAIL SENT (DEVELOPMENT MODE) ===')
+    console.log('To:', options.to)
+    console.log('Subject:', options.subject)
+    if (options.replyTo) {
+      console.log('Reply-To:', options.replyTo)
+    }
+    console.log('Content:', options.html)
+    if (options.attachments && options.attachments.length > 0) {
+      console.log('Attachments:', options.attachments.map(a => `${a.filename} (${a.type})`).join(', '))
+    }
+    console.log('=====================================')
+    return true
   } catch (error) {
     console.error('Email sending error:', error)
     return false
@@ -152,9 +219,13 @@ export function generateRegistrationNotificationEmail(userData: {
 }): EmailOptions {
   const fullName = `${userData.first_name} ${userData.middle_name ? userData.middle_name + ' ' : ''}${userData.last_name}`
   
+  // Add Reply-To for admin emails so they can reply if needed
+  const replyToEmail = process.env.REPLY_TO_EMAIL || process.env.ADMIN_EMAIL || 'admin@alumnibghs.org'
+  
   return {
     to: process.env.ADMIN_EMAIL || 'admin@alumnibghs.org',
     subject: `New Alumni Registration - ${fullName} (${userData.year_of_leaving})`,
+    replyTo: replyToEmail, // Allow replies to admin email
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">
@@ -268,9 +339,13 @@ export function generatePaymentLinkEmail(userData: {
 }): EmailOptions {
   const currencySymbol = userData.currency === 'INR' ? '₹' : userData.currency === 'USD' ? '$' : '€';
   
+  // Add Reply-To for payment emails so users can ask questions if needed
+  const replyToEmail = process.env.REPLY_TO_EMAIL || process.env.ADMIN_EMAIL || 'admin@alumnibghs.org'
+  
   return {
     to: userData.email,
     subject: `Registration Approved - Complete Payment of ${currencySymbol}${userData.amount}`,
+    replyTo: replyToEmail, // Allow replies for payment support
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
         <div style="text-align: center; margin-bottom: 30px;">

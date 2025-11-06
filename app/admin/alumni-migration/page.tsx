@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import Link from 'next/link'
-import { Upload, FileSpreadsheet, Users, CheckCircle, AlertCircle, X, Download, RefreshCw, Trash2 } from 'lucide-react'
+import { Upload, FileSpreadsheet, Users, CheckCircle, AlertCircle, X, Download, RefreshCw } from 'lucide-react'
 
 interface MigrationResult {
   success: boolean
@@ -97,9 +96,8 @@ export default function AlumniMigrationPage() {
   }
 
   const downloadTemplate = () => {
-    const csvContent = `Old Registration Number,Registration Number,Email,Phone,Title Prefix,First Name,Middle Name,Last Name,Last Class,Year of Leaving,Start Class,Start Year,Batch Year,Profession,Company,Location,Bio,LinkedIn URL,Website URL,Role,Is Deceased,Deceased Year,Notes
-OLD-001,BGHSA-2025-00031,john.doe@example.com,+919876543210,Dr.,John,Kumar,Doe,12,2005,6,1998,2005,Software Engineer,Tech Corp,Bangalore,Alumni member,https://linkedin.com/in/johndoe,https://johndoe.com,alumni_member,false,,Verified alumni
-OLD-002,BGHSA-2025-00032,jane.smith@example.com,+919876543211,Prof.,Jane,,Smith,10,2003,8,1995,2003,Teacher,Education Corp,Kolkata,Alumni member,https://linkedin.com/in/janesmith,https://janesmith.com,alumni_member,true,2022,In memoriam`
+    const csvContent = `Email,Phone,First Name,Last Name,Middle Name,Last Class,Year of Leaving,Start Class,Start Year,Batch Year,Profession,Company,Location,Bio,LinkedIn URL,Website URL,Role,Notes
+john.doe@example.com,+919876543210,John,Doe,Kumar,12,2005,6,1998,2005,Software Engineer,Tech Corp,Bangalore,Alumni member,https://linkedin.com/in/johndoe,https://johndoe.com,alumni_member,Verified alumni`
 
     const blob = new Blob([csvContent], { type: 'text/csv' })
     const url = window.URL.createObjectURL(blob)
@@ -123,19 +121,8 @@ OLD-002,BGHSA-2025-00032,jane.smith@example.com,+919876543211,Prof.,Jane,,Smith,
       <div className="max-w-4xl mx-auto">
         <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="px-6 py-4 border-b border-gray-200">
-            <div className="flex items-start justify-between">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">Alumni Data Migration</h1>
-                <p className="text-gray-600 mt-1">Upload Excel/CSV file to migrate alumni records to the system. Supports registration numbers (optional), title prefixes, and deceased status.</p>
-              </div>
-              <Link
-                href="/admin/alumni-imports"
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-                Manage Imports
-              </Link>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900">Alumni Data Migration</h1>
+            <p className="text-gray-600 mt-1">Upload Excel/CSV file to migrate alumni records to the system</p>
           </div>
 
           <div className="p-6 space-y-6">
@@ -155,22 +142,6 @@ OLD-002,BGHSA-2025-00032,jane.smith@example.com,+919876543211,Prof.,Jane,,Smith,
                   <Download className="h-4 w-4" />
                   Download Template
                 </button>
-              </div>
-            </div>
-
-            {/* Field Information */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <h3 className="text-sm font-medium text-green-900 mb-2">📋 Available Fields</h3>
-              <div className="text-sm text-green-700 space-y-1">
-                <p><strong>Old Registration Number:</strong> Optional - Reference field to map old registration IDs with new system registration IDs. This is stored for mapping purposes only.</p>
-                <p><strong>Registration Number:</strong> Optional - If your CSV has a "Registration Number" column with values (e.g., BGHSA-2025-00031), those will be used as the registration_id. If not provided or empty, system will auto-generate one.</p>
-                <p><strong>Title Prefix:</strong> Add professional titles like Dr., Prof., Adv., Shri, Smt., Mr., Ms., etc.</p>
-                <p><strong>Is Deceased:</strong> Mark as "true", "1", or "yes" for deceased alumni members</p>
-                <p><strong>Deceased Year:</strong> Optional year when the alumni member passed away</p>
-                <p className="text-xs text-green-600 mt-2">
-                  💡 <strong>Note:</strong> Registration numbers must be unique. If a registration number already exists, the record will be skipped with an error message.
-                  Deceased members will automatically display memorial indicators (🕯️) in the alumni directory.
-                </p>
               </div>
             </div>
 

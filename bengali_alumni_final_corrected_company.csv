@@ -1,0 +1,58 @@
+Old Registration Number,Registration Number,Email,Phone,Title Prefix,First Name,Middle Name,Last Name,Last Class,Year of Leaving,Start Class,Start Year,Batch Year,Profession,Company,Location,Bio,LinkedIn URL,Website URL,Role,Is Deceased,Deceased Year,Notes
+1,BGHSA-2025-00001,ratikanta.mukhopadhyay@bghs-alumni.com,,,Ratikanta,,Mukhopadhyay,12,1954,,,1954,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #1
+2,BGHSA-2025-00002,barin.chattopadhyay@bghs-alumni.com,,,Barin,Kumar,Chattopadhyay,12,1954,,,1954,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #2
+3,BGHSA-2025-00003,debi.sengupta@bghs-alumni.com,,,Debi,Prasad,Sengupta,12,1965,,,1965,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #3
+4,BGHSA-2025-00004,tapan.chattopadhyay@bghs-alumni.com,,,Tapan,Kumar,Chattopadhyay,12,1972,,,1972,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #4
+5,BGHSA-2025-00005,anjan.bandyopadhyay@bghs-alumni.com,,,Anjan,Kumar,Bandyopadhyay,12,1967,,,1967,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #5
+6,BGHSA-2025-00006,bishwatosh.basu@bghs-alumni.com,,Dr.,Bishwatosh,,Basu,12,1953,,,1953,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #6
+7,BGHSA-2025-00007,kanak.chattopadhyay@bghs-alumni.com,,,Kanak,,Chattopadhyay,12,1953,,,1953,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #7
+8,BGHSA-2025-00008,kiran.chattopadhyay@bghs-alumni.com,,,Kiran,Shankar,Chattopadhyay,12,1961,,,1961,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #8
+9,BGHSA-2025-00009,debnath.mukhopadhyay@bghs-alumni.com,,Prof.,Debnath,,Mukhopadhyay,12,1965,,,1965,Alumni,Academic Institution,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #9
+10,BGHSA-2025-00010,dilip.chattopadhyay@bghs-alumni.com,,,Dilip,,Chattopadhyay,12,,,,,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #10
+11,BGHSA-2025-00011,bankim.saha@bghs-alumni.com,,,Bankim,,Saha,12,1963,,,1963,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #11
+12,BGHSA-2025-00012,nishith.chattopadhyay@bghs-alumni.com,,,Nishith,,Chattopadhyay,12,1945,,,1945,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #12
+13,BGHSA-2025-00013,manilal.mukhopadhyay@bghs-alumni.com,,Dr.,Manilal,,Mukhopadhyay,12,1945,,,1945,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #13
+14,BGHSA-2025-00014,haradhan.chattopadhyay@bghs-alumni.com,,,Haradhan,,Chattopadhyay,12,,,,,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #14
+15,BGHSA-2025-00015,baidyanath.mukhopadhyay@bghs-alumni.com,,Dr.,Baidyanath,,Mukhopadhyay,12,1956,,,1956,Alumni,Medical Practice,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #15
+16,BGHSA-2025-00016,radhika.samaddar@bghs-alumni.com,,Dr.,Radhika,Ranjan,Samaddar,12,1952,,,1952,Alumni,Medical Practice,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #16
+17,BGHSA-2025-00017,rabindranath.chattopadhyay@bghs-alumni.com,,,Rabindranath,,Chattopadhyay,12,,,,,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #17
+18,BGHSA-2025-00018,prashant.basu@bghs-alumni.com,,Dr.,Prashant,Kumar,Basu,12,1950,,,1950,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #18
+19,BGHSA-2025-00019,malay.de@bghs-alumni.com,,,Malay,Ranjan,De,12,1974,,,1974,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #19
+20,BGHSA-2025-00020,prashant.bandyopadhyay@bghs-alumni.com,,,Prashant,,Bandyopadhyay,12,1957,,,1957,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #20
+21,BGHSA-2025-00021,subrata.mukhopadhyay@bghs-alumni.com,,,Subrata,,Mukhopadhyay,12,1971,,,1971,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #21
+22,BGHSA-2025-00022,hirendranath.maschatak@bghs-alumni.com,,,Hirendranath,,Maschatak,12,1963,,,1963,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #22
+23,BGHSA-2025-00023,dilip.mashtak@bghs-alumni.com,,Dr.,Dilip,Kumar,Mashtak,12,1972,,,1972,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #23
+24,BGHSA-2025-00024,shobhakar.gangopadhyay@bghs-alumni.com,,Prof.,Shobhakar,,Gangopadhyay,12,1956,,,1956,Alumni,Academic Institution,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #24
+25,BGHSA-2025-00025,ashim.roy@bghs-alumni.com,,,Ashim,,Roy,12,1975,,,1975,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #25
+26,BGHSA-2025-00026,anindya.sen@bghs-alumni.com,,,Anindya,,Sen,12,1967,,,1967,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #26
+27,BGHSA-2025-00027,subrata.ghosh@bghs-alumni.com,,Dr.,Subrata,,Ghosh,12,1963,,,1963,Alumni,Medical Practice,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #27
+28,BGHSA-2025-00028,bishwanath.mukhopadhyay@bghs-alumni.com,,,Bishwanath,,Mukhopadhyay,12,1969,,,1969,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #28
+28 ka,BGHSA-2025-00028,ajit.mitra@bghs-alumni.com,,,Ajit,Kumar,Mitra,12,,,,,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #28 ka
+29,BGHSA-2025-00029,barin.chattopadhyay@bghs-alumni.com,,,Barin,Kumar,Chattopadhyay,12,1954,,,1954,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #29
+30,BGHSA-2025-00030,tridib.paik@bghs-alumni.com,,,Tridib,,Paik,12,1966,,,1966,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #30
+31,BGHSA-2025-00031,pabitracharan.bhattacharya@bghs-alumni.com,,,Pabitracharan,,Bhattacharya,12,1954,,,1954,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #31
+32,BGHSA-2025-00032,ajit.mukhopadhyay@bghs-alumni.com,,,Ajit,Roy,Mukhopadhyay,12,1926,,,1926,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #32
+33,BGHSA-2025-00033,sudin.chattopadhyay@bghs-alumni.com,,Prof.,Sudin,,Chattopadhyay,12,1958,,,1958,Alumni,Academic Institution,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #33
+34,BGHSA-2025-00034,girindranath.chakraborty@bghs-alumni.com,,,Girindranath,,Chakraborty,12,1953,,,1953,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #34
+35,BGHSA-2025-00035,gobinda.samaddar@bghs-alumni.com,,,Gobinda,Prasad,Samaddar,12,1967,,,1967,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #35
+36,BGHSA-2025-00036,prabir.sengupta@bghs-alumni.com,,,Prabir,Kumar,Sengupta,12,1969,,,1969,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #36
+37,BGHSA-2025-00037,tarun.roy@bghs-alumni.com,,,Tarun,Kumar,Roy,12,1975,,,1975,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #37
+38,BGHSA-2025-00038,tarun.bhattacharya@bghs-alumni.com,,,Tarun,Kumar,Bhattacharya,12,1954,,,1954,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #38
+39,BGHSA-2025-00039,sanjeeb.ghatak@bghs-alumni.com,,,Sanjeeb,Bhushan,Ghatak,12,1953,,,1953,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #39
+40,BGHSA-2025-00040,dulal.ghosh@bghs-alumni.com,,,Dulal,Krishna,Ghosh,12,1956,,,1956,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #40
+41,BGHSA-2025-00041,jayant.sen@bghs-alumni.com,,Dr.,Jayant,Kumar,Sen,12,1952,,,1952,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #41
+42,BGHSA-2025-00042,shibdas.roy@bghs-alumni.com,,,Shibdas,,Roy,12,1963,,,1963,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #42
+43,BGHSA-2025-00043,kanchan.chattopadhyay@bghs-alumni.com,,Dr.,Kanchan,,Chattopadhyay,12,1963,,,1963,Alumni,Medical Practice,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #43
+44,BGHSA-2025-00044,ashwini.bandyopadhyay@bghs-alumni.com,,,Ashwini,,Bandyopadhyay,12,1941,,,1941,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #44
+45,BGHSA-2025-00045,tapan.sarkar@bghs-alumni.com,,,Tapan,Kumar De,Sarkar,12,1962,,,1962,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #45
+46,BGHSA-2025-00046,subrata.dastidar@bghs-alumni.com,,,Subrata,Ghosh,Dastidar,12,1962,,,1962,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #46
+47,BGHSA-2025-00047,anshu.sengupta@bghs-alumni.com,,,Anshu,,Sengupta,12,1963,,,1963,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #47
+48,BGHSA-2025-00048,ashish.chattopadhyay@bghs-alumni.com,,,Ashish,Kumar,Chattopadhyay,12,1956,,,1956,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #48
+49,BGHSA-2025-00049,kalyan.chattopadhyay@bghs-alumni.com,,Dr.,Kalyan,Kumar,Chattopadhyay,12,1950,,,1950,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #49
+50,BGHSA-2025-00050,sunil.mukhopadhyay@bghs-alumni.com,,,Sunil,Kumar,Mukhopadhyay,12,1949,,,1949,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #50
+51,BGHSA-2025-00051,rabin.chattopadhyay@bghs-alumni.com,,,Rabin,,Chattopadhyay,12,1956,,,1956,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #51
+52,BGHSA-2025-00052,delwar.ahmed@bghs-alumni.com,,,Delwar,,Ahmed,12,1949,,,1949,Alumni,Deceased,Kolkata,BGHS Alumni,,,alumni_member,true,,Entry #52
+53,BGHSA-2025-00053,ajay.bhattacharya@bghs-alumni.com,,,Ajay,,Bhattacharya,12,1961,,,1961,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #53
+54,BGHSA-2025-00054,barun.roy@bghs-alumni.com,,,Barun,Kanti Barman,Roy,12,1958,,,1958,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #54
+55,BGHSA-2025-00055,nandan.chakraborty@bghs-alumni.com,,Dr.,Nandan,Kumar,Chakraborty,12,1957,,,1957,Alumni,Medical Practice,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #55
+56,BGHSA-2025-00056,tamal.chakraborty@bghs-alumni.com,,,Tamal,Kumar,Chakraborty,12,1976,,,1976,Alumni,,Kolkata,BGHS Alumni,,,alumni_member,false,,Entry #56

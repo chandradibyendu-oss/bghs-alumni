@@ -22,7 +22,6 @@ const createSupabaseAdmin = () => {
 interface AlumniRecord {
   email: string
   phone?: string
-  title_prefix?: string
   first_name: string
   last_name: string
   middle_name?: string
@@ -39,11 +38,7 @@ interface AlumniRecord {
   website_url?: string
   role?: string
   professional_title?: string
-  is_deceased?: boolean
-  deceased_year?: number
   notes?: string
-  old_registration_number?: string  // Old Registration Number for reference/mapping
-  registration_number?: string  // Registration Number from CSV
 }
 
 export async function POST(request: NextRequest) {
@@ -193,11 +188,11 @@ async function processBatch(batch: any[], supabaseAdmin: any) {
 
       // Find professional title ID if provided
       let professionalTitleId = null
-      if (alumniRecord.title_prefix) {
+      if (alumniRecord.professional_title) {
         const { data: titleData } = await supabaseAdmin
           .from('professional_titles')
           .select('id')
-          .eq('title_prefix', alumniRecord.title_prefix)
+          .eq('title', alumniRecord.professional_title)
           .eq('is_active', true)
           .single()
         
@@ -206,82 +201,34 @@ async function processBatch(batch: any[], supabaseAdmin: any) {
         }
       }
 
-      // Validate registration_id uniqueness if provided from CSV
-      let registrationId = null
-      if (alumniRecord.registration_number) {
-        const regId = alumniRecord.registration_number.trim()
-        if (regId) {
-          // Check if registration_id already exists
-          const { data: existingRegId } = await supabaseAdmin
-            .from('profiles')
-            .select('id, email')
-            .eq('registration_id', regId)
-            .single()
-          
-          if (existingRegId) {
-            results.failed++
-            results.errors.push(`Registration ID ${regId} already exists for user ${existingRegId.email}`)
-            results.details.push({
-              email: alumniRecord.email,
-              status: 'failed',
-              error: `Registration ID ${regId} already exists`
-            })
-            // Clean up auth user
-            await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
-            continue
-          }
-          registrationId = regId
-        }
-      }
-
       // Create profile
-      const profileData: any = {
-        id: authUser.user.id,
-        email: alumniRecord.email,
-        phone: alumniRecord.phone,
-        first_name: alumniRecord.first_name,
-        last_name: alumniRecord.last_name,
-        middle_name: alumniRecord.middle_name,
-        full_name: `${alumniRecord.title_prefix ? alumniRecord.title_prefix + ' ' : ''}${alumniRecord.first_name} ${alumniRecord.middle_name ? alumniRecord.middle_name + ' ' : ''}${alumniRecord.last_name}`.trim(),
-        last_class: alumniRecord.last_class,
-        year_of_leaving: alumniRecord.year_of_leaving,
-        start_class: alumniRecord.start_class,
-        start_year: alumniRecord.start_year,
-        batch_year: alumniRecord.batch_year,
-        profession: alumniRecord.profession,
-        company: alumniRecord.company,
-        location: alumniRecord.location,
-        bio: alumniRecord.bio,
-        linkedin_url: alumniRecord.linkedin_url,
-        website_url: alumniRecord.website_url,
-        role: alumniRecord.role || 'alumni_member',
-        professional_title_id: professionalTitleId,
-        is_deceased: alumniRecord.is_deceased || false,
-        deceased_year: alumniRecord.deceased_year || null,
-        deceased_updated_by: alumniRecord.is_deceased ? authUser.user.id : null,
-        deceased_updated_at: alumniRecord.is_deceased ? new Date().toISOString() : null,
-        is_approved: true, // Auto-approve migrated records
-        import_source: 'csv_import', // Mark as CSV import
-        imported_at: new Date().toISOString(),
-        registration_payment_status: 'paid', // Existing members are considered paid
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      // Only set registration_id if provided from CSV
-      // If not provided, the database trigger will auto-generate it
-      if (registrationId) {
-        profileData.registration_id = registrationId
-      }
-
-      // Store old_registration_number for reference/mapping purposes
-      if (alumniRecord.old_registration_number) {
-        profileData.old_registration_id = alumniRecord.old_registration_number
-      }
-
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert(profileData)
+        .insert({
+          id: authUser.user.id,
+          email: alumniRecord.email,
+          phone: alumniRecord.phone,
+          first_name: alumniRecord.first_name,
+          last_name: alumniRecord.last_name,
+          middle_name: alumniRecord.middle_name,
+          full_name: `${alumniRecord.first_name} ${alumniRecord.middle_name ? alumniRecord.middle_name + ' ' : ''}${alumniRecord.last_name}`.trim(),
+          last_class: alumniRecord.last_class,
+          year_of_leaving: alumniRecord.year_of_leaving,
+          start_class: alumniRecord.start_class,
+          start_year: alumniRecord.start_year,
+          batch_year: alumniRecord.batch_year,
+          profession: alumniRecord.profession,
+          company: alumniRecord.company,
+          location: alumniRecord.location,
+          bio: alumniRecord.bio,
+          linkedin_url: alumniRecord.linkedin_url,
+          website_url: alumniRecord.website_url,
+          role: alumniRecord.role || 'alumni_member',
+          professional_title_id: professionalTitleId,
+          is_approved: true, // Auto-approve migrated records
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
 
       if (profileError) {
         // Clean up auth user if profile creation fails
@@ -326,9 +273,6 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
   const fieldMappings: Record<string, string> = {
     'Email': 'email',
     'email': 'email',
-    'Title Prefix': 'title_prefix',
-    'TitlePrefix': 'title_prefix',
-    'title_prefix': 'title_prefix',
     'First Name': 'first_name',
     'FirstName': 'first_name',
     'first_name': 'first_name',
@@ -373,21 +317,7 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     'role': 'role',
     'Professional Title': 'professional_title',
     'ProfessionalTitle': 'professional_title',
-    'professional_title': 'professional_title',
-    'Is Deceased': 'is_deceased',
-    'IsDeceased': 'is_deceased',
-    'is_deceased': 'is_deceased',
-    'Deceased Year': 'deceased_year',
-    'DeceasedYear': 'deceased_year',
-    'deceased_year': 'deceased_year',
-    'Old Registration Number': 'old_registration_number',
-    'OldRegistrationNumber': 'old_registration_number',
-    'old_registration_number': 'old_registration_number',
-    'Registration Number': 'registration_number',
-    'RegistrationNumber': 'registration_number',
-    'registration_number': 'registration_number',
-    'Notes': 'notes',
-    'notes': 'notes'
+    'professional_title': 'professional_title'
   }
 
   // Apply field mappings
@@ -397,6 +327,9 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
   })
 
   // Validate required fields
+  if (!normalized.email) {
+    throw new Error('Email is required')
+  }
   if (!normalized.first_name) {
     throw new Error('First name is required')
   }
@@ -410,28 +343,10 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     throw new Error('Year of leaving is required')
   }
 
-  // Generate email: use provided email or create placeholder from registration number
-  let email = normalized.email ? normalized.email.toString().trim() : ''
-  
-  // If email is empty or just whitespace, generate placeholder email
-  if (!email) {
-    const registrationNumber = normalized.registration_number ? normalized.registration_number.toString().trim() : ''
-    
-    if (registrationNumber) {
-      // Sanitize registration number: remove hyphens and special chars, keep only alphanumeric
-      const sanitizedReg = registrationNumber.replace(/[^A-Za-z0-9]/g, '')
-      email = `${sanitizedReg}@alumnibghs.org`
-    } else {
-      // Fallback: throw error if neither email nor registration number is provided
-      throw new Error('Either email or registration number is required to generate placeholder email')
-    }
-  }
-
   // Validate and convert data types
   const alumniRecord: AlumniRecord = {
-    email: email,
+    email: normalized.email.toString().trim(),
     phone: normalized.phone ? normalized.phone.toString().trim() : undefined,
-    title_prefix: normalized.title_prefix ? normalized.title_prefix.toString().trim() : undefined,
     first_name: normalized.first_name.toString().trim(),
     last_name: normalized.last_name.toString().trim(),
     middle_name: normalized.middle_name ? normalized.middle_name.toString().trim() : undefined,
@@ -447,12 +362,7 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     linkedin_url: normalized.linkedin_url ? normalized.linkedin_url.toString().trim() : undefined,
     website_url: normalized.website_url ? normalized.website_url.toString().trim() : undefined,
     role: normalized.role ? normalized.role.toString().trim() : 'alumni_member',
-    professional_title: normalized.professional_title ? normalized.professional_title.toString().trim() : undefined,
-    is_deceased: normalized.is_deceased ? (normalized.is_deceased.toString().toLowerCase() === 'true' || normalized.is_deceased.toString().toLowerCase() === '1' || normalized.is_deceased.toString().toLowerCase() === 'yes') : false,
-    deceased_year: normalized.deceased_year ? parseInt(normalized.deceased_year) : undefined,
-    old_registration_number: normalized.old_registration_number ? normalized.old_registration_number.toString().trim() : undefined,
-    registration_number: normalized.registration_number ? normalized.registration_number.toString().trim() : undefined,
-    notes: normalized.notes ? normalized.notes.toString().trim() : undefined
+    professional_title: normalized.professional_title ? normalized.professional_title.toString().trim() : undefined
   }
 
   // Validate data ranges
@@ -467,12 +377,6 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
   }
   if (alumniRecord.start_year && (alumniRecord.start_year < 1950 || alumniRecord.start_year > new Date().getFullYear())) {
     throw new Error('Start year must be between 1950 and current year')
-  }
-  if (alumniRecord.deceased_year && (alumniRecord.deceased_year < 1950 || alumniRecord.deceased_year > new Date().getFullYear())) {
-    throw new Error('Deceased year must be between 1950 and current year')
-  }
-  if (alumniRecord.is_deceased && alumniRecord.deceased_year && alumniRecord.deceased_year > alumniRecord.year_of_leaving) {
-    throw new Error('Deceased year cannot be greater than year of leaving')
   }
 
   return alumniRecord

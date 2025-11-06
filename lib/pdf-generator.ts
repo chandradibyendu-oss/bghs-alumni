@@ -7,6 +7,7 @@ async function getBrowser() {
   // Check for serverless indicators: /var/task/, AWS_LAMBDA, VERCEL, or production build
   const isServerless = 
     process.env.VERCEL === '1' ||
+    process.env.VERCEL_ENV ||
     process.env.AWS_LAMBDA_FUNCTION_NAME ||
     process.cwd().includes('/var/task/') ||
     process.cwd().includes('/tmp/') ||
@@ -18,9 +19,18 @@ async function getBrowser() {
     // Use local puppeteer for development
     try {
       const puppeteer = await import('puppeteer')
+      console.log('Using local Puppeteer for PDF generation')
       return await puppeteer.default.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu'
+        ]
       })
     } catch (error) {
       console.error('Failed to launch local puppeteer, falling back to serverless chromium:', error)
@@ -29,84 +39,74 @@ async function getBrowser() {
   }
   
   // Use @sparticuz/chromium for production/serverless
-  if (!chromium) {
-    const chromiumModule = await import('@sparticuz/chromium')
-    chromium = chromiumModule.default || chromiumModule
-  }
-  if (!puppeteerCore) {
-    const puppeteerCoreModule = await import('puppeteer-core')
-    puppeteerCore = puppeteerCoreModule.default || puppeteerCoreModule
-  }
-  
-  // Configure chromium for serverless environment
-  // Set font config to avoid missing font issues
-  process.env.FONTCONFIG_PATH = '/tmp'
-  process.env.LD_LIBRARY_PATH = '/tmp'
-  
-  // Ensure Chromium is properly configured for serverless
-  let executablePath: string
   try {
-    executablePath = await chromium.executablePath()
-    
-    // Verify the executable path exists and is accessible
-    if (!executablePath || !executablePath.includes('chromium')) {
-      throw new Error(`Invalid Chromium executable path: ${executablePath}`)
+    if (!chromium) {
+      const chromiumModule = await import('@sparticuz/chromium')
+      chromium = chromiumModule.default || chromiumModule
     }
-  } catch (error) {
-    console.error('Error getting Chromium executable path:', error)
-    throw new Error(`Failed to get Chromium executable: ${error instanceof Error ? error.message : 'Unknown error'}`)
-  }
-  
-  // Set environment variables for serverless Chrome detection
-  process.env.PUPPETEER_EXECUTABLE_PATH = executablePath
-  process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true'
-  process.env.PUPPETEER_CACHE_DIR = '/tmp/.cache/puppeteer'
-  
-  // Log environment for debugging (only in non-production)
-  if (process.env.NODE_ENV !== 'production') {
+    if (!puppeteerCore) {
+      const puppeteerCoreModule = await import('puppeteer-core')
+      puppeteerCore = puppeteerCoreModule.default || puppeteerCoreModule
+    }
+    
+    // Configure chromium for serverless environment
+    // Set font config to avoid missing font issues
+    if (!process.env.FONTCONFIG_PATH) {
+      process.env.FONTCONFIG_PATH = '/tmp'
+    }
+    
+    // Ensure Chromium is properly configured for serverless
+    let executablePath: string
+    try {
+      // Get the executable path - this will extract Chromium if needed
+      executablePath = await chromium.executablePath()
+      
+      // Verify the executable path exists and is accessible
+      if (!executablePath || (!executablePath.includes('chromium') && !executablePath.includes('chrome'))) {
+        throw new Error(`Invalid Chromium executable path: ${executablePath}`)
+      }
+    } catch (error) {
+      console.error('Error getting Chromium executable path:', error)
+      throw new Error(`Failed to get Chromium executable: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+    
+    // Log environment for debugging
     console.log('PDF Generator Environment:', {
       isServerless,
       isLocal,
-      executablePath,
+      executablePath: executablePath.substring(0, 50) + '...',
       cwd: process.cwd(),
-      nodeEnv: process.env.NODE_ENV
+      nodeEnv: process.env.NODE_ENV,
+      chromiumVersion: chromium.version || 'unknown',
+      vercelEnv: process.env.VERCEL_ENV
     })
-  }
-  
-  const browser = await puppeteerCore.launch({
-    args: [
+    
+    // For serverless, use Chromium's pre-configured args which are optimized for serverless
+    // Add additional args for better stability
+    const chromiumArgs = [
       ...chromium.args,
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
       '--single-process',
-      '--disable-gpu',
-      '--disable-web-security',
-      '--disable-features=VizDisplayCompositor',
-      '--disable-background-timer-throttling',
-      '--disable-backgrounding-occluded-windows',
-      '--disable-renderer-backgrounding',
-      '--disable-extensions',
-      '--disable-plugins',
-      '--disable-default-apps',
-      '--disable-sync',
-      '--disable-translate',
-      '--hide-scrollbars',
-      '--mute-audio',
-      '--safebrowsing-disable-auto-update',
-      '--disable-background-networking',
-      '--disable-field-trial-config',
-      '--disable-ipc-flooding-protection'
-    ],
-    defaultViewport: chromium.defaultViewport,
-    executablePath,
-    headless: chromium.headless !== false,
-    ignoreHTTPSErrors: true,
-  })
-  return browser
+      '--disable-gpu'
+    ]
+    
+    const browser = await puppeteerCore.launch({
+      args: chromiumArgs,
+      defaultViewport: chromium.defaultViewport,
+      executablePath,
+      headless: chromium.headless !== false,
+      ignoreHTTPSErrors: true,
+    })
+    
+    console.log('Browser launched successfully')
+    return browser
+  } catch (error) {
+    console.error('Failed to launch serverless Chromium:', error)
+    throw new Error(`Failed to launch browser: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
 }
 
 import { EvidenceFile } from './r2-storage'
@@ -628,23 +628,43 @@ export class PDFGenerator {
 
   async generateRegistrationPDF(data: RegistrationPDFData): Promise<Buffer> {
     let browser: any = null
+    let page: any = null
+    
     try {
+      console.log('Starting PDF generation for user:', data.user.id)
+      
       // Simple template replacement instead of Handlebars
       const html = this.replaceTemplateVariables(this.htmlTemplate, data)
+      console.log('HTML template processed, length:', html.length)
 
       // Launch Puppeteer (serverless vs local)
+      console.log('Launching browser...')
       browser = await getBrowser()
       
       if (!browser) {
-        throw new Error('Failed to launch browser')
+        throw new Error('Failed to launch browser - browser object is null')
       }
 
-      const page = await browser.newPage()
+      console.log('Creating new page...')
+      page = await browser.newPage()
       
-      // Set page content
-      await page.setContent(html, { waitUntil: 'networkidle0' })
+      // Set a longer timeout for page operations
+      page.setDefaultNavigationTimeout(60000)
+      page.setDefaultTimeout(60000)
+      
+      // Set page content with better error handling
+      console.log('Setting page content...')
+      await page.setContent(html, { 
+        waitUntil: 'networkidle0',
+        timeout: 60000
+      })
+      
+      console.log('Waiting for page to be ready...')
+      // Wait a bit more for any dynamic content or images to load
+      await new Promise(resolve => setTimeout(resolve, 2000))
 
-      // Generate PDF
+      // Generate PDF with optimized settings
+      console.log('Generating PDF...')
       const pdfBuffer = await page.pdf({
         format: 'A4',
         printBackground: true,
@@ -653,16 +673,42 @@ export class PDFGenerator {
           right: '15mm',
           bottom: '20mm',
           left: '15mm'
-        }
+        },
+        preferCSSPageSize: false,
+        timeout: 60000
       })
 
-      await browser.close()
-      browser = null
+      console.log('PDF generated successfully, size:', pdfBuffer.length, 'bytes')
+      
+      // Clean up
+      if (page) {
+        await page.close()
+        page = null
+      }
+      
+      if (browser) {
+        await browser.close()
+        browser = null
+      }
+      
       return Buffer.from(pdfBuffer)
     } catch (error) {
       console.error('PDF generation error:', error)
+      console.error('Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        name: error instanceof Error ? error.name : undefined
+      })
       
-      // Ensure browser is closed even on error
+      // Ensure browser and page are closed even on error
+      if (page) {
+        try {
+          await page.close()
+        } catch (closeError) {
+          console.error('Error closing page:', closeError)
+        }
+      }
+      
       if (browser) {
         try {
           await browser.close()
