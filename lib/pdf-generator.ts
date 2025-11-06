@@ -3,35 +3,78 @@ let chromium: any
 let puppeteerCore: any
 
 async function getBrowser() {
-  // Check if we're in a local development environment
-  const isLocal = process.env.NODE_ENV === 'development' && !process.env.VERCEL
+  // Better serverless environment detection
+  // Check for serverless indicators: /var/task/, AWS_LAMBDA, VERCEL, or production build
+  const isServerless = 
+    process.env.VERCEL === '1' ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.cwd().includes('/var/task/') ||
+    process.cwd().includes('/tmp/') ||
+    (process.env.NODE_ENV === 'production' && !process.env.LOCAL_DEV)
+  
+  const isLocal = !isServerless && (process.env.NODE_ENV === 'development' || process.env.LOCAL_DEV === '1')
   
   if (isLocal) {
     // Use local puppeteer for development
-    const puppeteer = await import('puppeteer')
-    return await puppeteer.default.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
-    })
+    try {
+      const puppeteer = await import('puppeteer')
+      return await puppeteer.default.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
+      })
+    } catch (error) {
+      console.error('Failed to launch local puppeteer, falling back to serverless chromium:', error)
+      // Fall through to serverless chromium if local fails
+    }
   }
   
   // Use @sparticuz/chromium for production/serverless
   if (!chromium) {
-    const mod = await import('@sparticuz/chromium')
-    chromium = mod.default || mod
+    const chromiumModule = await import('@sparticuz/chromium')
+    chromium = chromiumModule.default || chromiumModule
+    // Set font path for serverless environments
+    chromium.setGraphicsMode = chromium.setGraphicsMode || (() => {})
+    chromium.font = chromium.font || '/var/task/fonts/NotoSansCJK-Regular.ttc'
   }
   if (!puppeteerCore) {
-    const mod = await import('puppeteer-core')
-    puppeteerCore = mod.default || mod
+    const puppeteerCoreModule = await import('puppeteer-core')
+    puppeteerCore = puppeteerCoreModule.default || puppeteerCoreModule
   }
   
   // Configure chromium for serverless environment
-  const executablePath = await chromium.executablePath()
+  // Set font config to avoid missing font issues
+  process.env.FONTCONFIG_PATH = '/tmp'
+  process.env.LD_LIBRARY_PATH = '/tmp'
+  
+  // Ensure Chromium is properly configured for serverless
+  let executablePath: string
+  try {
+    executablePath = await chromium.executablePath()
+    
+    // Verify the executable path exists and is accessible
+    if (!executablePath || !executablePath.includes('chromium')) {
+      throw new Error(`Invalid Chromium executable path: ${executablePath}`)
+    }
+  } catch (error) {
+    console.error('Error getting Chromium executable path:', error)
+    throw new Error(`Failed to get Chromium executable: ${error instanceof Error ? error.message : 'Unknown error'}`)
+  }
   
   // Set environment variables for serverless Chrome detection
   process.env.PUPPETEER_EXECUTABLE_PATH = executablePath
   process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true'
   process.env.PUPPETEER_CACHE_DIR = '/tmp/.cache/puppeteer'
+  
+  // Log environment for debugging (only in non-production)
+  if (process.env.NODE_ENV !== 'production') {
+    console.log('PDF Generator Environment:', {
+      isServerless,
+      isLocal,
+      executablePath,
+      cwd: process.cwd(),
+      nodeEnv: process.env.NODE_ENV
+    })
+  }
   
   const browser = await puppeteerCore.launch({
     args: [
@@ -587,12 +630,17 @@ export class PDFGenerator {
   }
 
   async generateRegistrationPDF(data: RegistrationPDFData): Promise<Buffer> {
+    let browser: any = null
     try {
       // Simple template replacement instead of Handlebars
       const html = this.replaceTemplateVariables(this.htmlTemplate, data)
 
       // Launch Puppeteer (serverless vs local)
-      const browser = await getBrowser()
+      browser = await getBrowser()
+      
+      if (!browser) {
+        throw new Error('Failed to launch browser')
+      }
 
       const page = await browser.newPage()
       
@@ -612,9 +660,20 @@ export class PDFGenerator {
       })
 
       await browser.close()
+      browser = null
       return Buffer.from(pdfBuffer)
     } catch (error) {
       console.error('PDF generation error:', error)
+      
+      // Ensure browser is closed even on error
+      if (browser) {
+        try {
+          await browser.close()
+        } catch (closeError) {
+          console.error('Error closing browser:', closeError)
+        }
+      }
+      
       throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
