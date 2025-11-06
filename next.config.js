@@ -3,8 +3,8 @@ const nextConfig = {
   // Transpile lucide-react and @react-pdf/renderer to avoid missing vendor-chunk issues
   transpilePackages: ['lucide-react', '@react-pdf/renderer'],
   experimental: {
-    // Ensure chromium packages are externalized
-    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core']
+    // Ensure libraries are externalized for server components runtime
+    serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core', '@react-pdf/renderer']
   },
   images: {
     remotePatterns: [
