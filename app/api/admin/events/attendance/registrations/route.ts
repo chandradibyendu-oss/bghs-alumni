@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 
 // Force dynamic rendering for this API route (uses request.url)
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
 
 const createSupabaseAdmin = () => {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
