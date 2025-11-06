@@ -13,6 +13,7 @@
     "@aws-sdk/s3-request-presigner": "^3.883.0",
     "@azure/msal-node": "3.7.3",
     "@getbrevo/brevo": "^3.0.1",
+    "@react-pdf/renderer": "^4.3.1",
     "@sendgrid/mail": "^8.1.5",
     "@sparticuz/chromium": "^126.0.0",
     "@stripe/stripe-js": "^2.2.0",
