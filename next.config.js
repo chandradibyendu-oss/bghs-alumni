@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Transpile lucide-react to avoid missing vendor-chunk issues on some Windows setups
-  transpilePackages: ['lucide-react'],
+  // Transpile lucide-react and @react-pdf/renderer to avoid missing vendor-chunk issues
+  transpilePackages: ['lucide-react', '@react-pdf/renderer'],
   experimental: {
     // Ensure chromium packages are externalized
     serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core']

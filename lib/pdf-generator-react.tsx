@@ -152,14 +152,23 @@ export async function generateRegistrationPDFReact(data: RegistrationPDFData): P
     </Document>
   )
 
-  const out: any = await pdf(Doc).toBuffer()
-  if (typeof Buffer !== 'undefined' && out) {
-    // out may already be a Buffer/Uint8Array depending on runtime
-    // Coerce safely for Node serverless
-    return Buffer.isBuffer(out) ? out : Buffer.from(out)
+  try {
+    const pdfDoc = pdf(Doc)
+    const buffer = await pdfDoc.toBuffer()
+    // Ensure we return a proper Buffer for Node.js
+    if (Buffer.isBuffer(buffer)) {
+      return buffer
+    }
+    // Handle Uint8Array or other formats
+    if (buffer instanceof Uint8Array) {
+      return Buffer.from(buffer)
+    }
+    // Last resort: convert to buffer
+    return Buffer.from(buffer as any)
+  } catch (error) {
+    console.error('React-PDF generation error:', error)
+    throw new Error(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
   }
-  // Fallback: empty buffer
-  return Buffer.from([])
 }
 
 
