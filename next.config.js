@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Transpile lucide-react and @react-pdf/renderer to avoid missing vendor-chunk issues
-  transpilePackages: ['lucide-react', '@react-pdf/renderer'],
+  // Transpile lucide-react. React-PDF is externalized below, not transpiled.
+  transpilePackages: ['lucide-react'],
   experimental: {
     // Ensure libraries are externalized for server components runtime
     serverComponentsExternalPackages: ['@sparticuz/chromium', 'puppeteer-core', '@react-pdf/renderer']
