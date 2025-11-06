@@ -32,9 +32,6 @@ async function getBrowser() {
   if (!chromium) {
     const chromiumModule = await import('@sparticuz/chromium')
     chromium = chromiumModule.default || chromiumModule
-    // Set font path for serverless environments
-    chromium.setGraphicsMode = chromium.setGraphicsMode || (() => {})
-    chromium.font = chromium.font || '/var/task/fonts/NotoSansCJK-Regular.ttc'
   }
   if (!puppeteerCore) {
     const puppeteerCoreModule = await import('puppeteer-core')
