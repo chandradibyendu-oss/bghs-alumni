@@ -66,11 +66,17 @@ function getLogoSource(): string {
 
 function StatusPill({ valid }: { valid: boolean | undefined }) {
   let text = 'PENDING'
-  // Type as any to satisfy renderer types
-  let style: any = styles.pillPending
-  if (valid === true) { text = 'VALID'; style = styles.pillValid }
-  if (valid === false) { text = 'INVALID'; style = styles.pillInvalid }
-  return <Text style={[styles.pill, style] as any}>{text}</Text>
+  let pillStyle: any = styles.pillPending
+  if (valid === true) { 
+    text = 'VALID'
+    pillStyle = styles.pillValid 
+  }
+  if (valid === false) { 
+    text = 'INVALID'
+    pillStyle = styles.pillInvalid 
+  }
+  const combinedStyle: any = [styles.pill, pillStyle]
+  return <Text style={combinedStyle}>{text}</Text>
 }
 
 export async function generateRegistrationPDFReact(data: RegistrationPDFData): Promise<Buffer> {
