@@ -408,9 +408,9 @@ export default function Home() {
       )}
 
       {/* Hero Slideshow Section - Responsive height for mobile and desktop */}
-      <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden">
+      <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden mt-0">
         {/* Background - Video or Images with smooth transitions */}
-        <div className="absolute inset-0 z-0">
+        <div className="absolute inset-0 z-0 -mt-0">
           {useVideo || heroImagesLoaded.length === 0 ? (
             // Video background (fallback)
             <video 
@@ -445,7 +445,7 @@ export default function Home() {
                   className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
                   style={{
                     backgroundImage: `url('${currentSlideData.backgroundImage}')`,
-                    backgroundSize: 'contain',
+                    backgroundSize: 'cover',
                     backgroundPosition: 'center',
                     backgroundRepeat: 'no-repeat',
                     backgroundColor: '#000',
@@ -467,7 +467,7 @@ export default function Home() {
                       }`}
                       style={{
                         backgroundImage: `url('${img}')`,
-                        backgroundSize: 'contain',
+                        backgroundSize: 'cover',
                         backgroundPosition: 'center',
                         backgroundRepeat: 'no-repeat',
                         backgroundColor: '#000',
@@ -485,67 +485,59 @@ export default function Home() {
           <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-transparent to-accent-900/20 z-20"></div>
         </div>
         
+        {/* Event Badge - Positioned absolutely at top for always visibility */}
+        {currentSlideData.type === 'upcoming-event' && (
+          <div className="absolute top-4 sm:top-6 left-1/2 transform -translate-x-1/2 z-30">
+            <span className="inline-flex items-center gap-2 px-3 sm:px-5 py-2 sm:py-2.5 bg-accent-500/95 backdrop-blur-md text-white rounded-full text-xs sm:text-sm font-bold shadow-2xl ring-2 ring-accent-400/50">
+              <Calendar className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+              <span className="whitespace-nowrap">Upcoming Event</span>
+            </span>
+          </div>
+        )}
+        
         {/* Content */}
-        <div className="relative z-10 h-full flex items-center">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
-            {/* Event Badge for upcoming events */}
-            {currentSlideData.type === 'upcoming-event' && (
-              <div className="mb-4">
-                <span className="inline-flex items-center gap-2 px-4 py-2 bg-accent-500/90 backdrop-blur-sm text-white rounded-full text-sm font-semibold shadow-lg">
-                  <Calendar className="h-4 w-4" />
-                  Upcoming Event
-                </span>
-              </div>
-            )}
-            
-            {/* Icon for non-welcome slides */}
-            {IconComponent && (
-              <div className="mb-6">
-                <div className={`inline-flex items-center justify-center w-16 h-16 backdrop-blur-sm rounded-full ${
-                  currentSlideData.type === 'upcoming-event' 
-                    ? 'bg-accent-500/30 ring-2 ring-accent-400/50' 
-                    : 'bg-white/20'
-                }`}>
-                  <IconComponent className={`h-8 w-8 ${
-                    currentSlideData.type === 'upcoming-event' 
-                      ? 'text-accent-100' 
-                      : 'text-white'
-                  }`} />
+        <div className={`relative z-10 h-full flex items-center justify-center pb-28 sm:pb-0 ${currentSlideData.type === 'upcoming-event' ? 'pt-12 sm:pt-16' : 'pt-12 sm:pt-0'}`}>
+          <div className="max-w-7xl mx-auto px-12 sm:px-6 lg:px-8 text-center w-full py-4 sm:py-0">
+            {/* Icon for non-welcome slides (hide for event slides since we have the badge at top) */}
+            {IconComponent && currentSlideData.type !== 'upcoming-event' && (
+              <div className="mb-4 sm:mb-6">
+                <div className="inline-flex items-center justify-center w-12 h-12 sm:w-16 sm:h-16 backdrop-blur-sm rounded-full bg-white/20">
+                  <IconComponent className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                 </div>
               </div>
             )}
             
-            <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 drop-shadow-2xl">
+            <h1 className="text-2xl sm:text-4xl md:text-6xl font-bold text-white mb-2 sm:mb-4 drop-shadow-2xl leading-tight">
               <span className="bg-gradient-to-r from-white via-white to-accent-100 bg-clip-text text-transparent">
                 {currentSlideData.title}
               </span>
             </h1>
             
-            <h2 className="text-xl md:text-2xl text-white mb-6 drop-shadow-lg font-medium">
+            <h2 className="text-sm sm:text-xl md:text-2xl text-white mb-4 sm:mb-6 drop-shadow-lg font-medium">
               {currentSlideData.subtitle}
             </h2>
             
             {currentSlideData.type === 'upcoming-event' && (currentSlideData as EventSlide).location && (
-              <div className="mb-4 flex items-center justify-center gap-2 text-white/90">
-                <MapPin className="h-5 w-5" />
-                <span className="text-lg drop-shadow-md">{(currentSlideData as EventSlide).location}</span>
+              <div className="mb-3 sm:mb-4 flex items-center justify-center gap-2 text-white/90">
+                <MapPin className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="text-sm sm:text-lg drop-shadow-md">{(currentSlideData as EventSlide).location}</span>
               </div>
             )}
             
-            <p className="text-lg text-white mb-8 max-w-3xl mx-auto drop-shadow-md">
+            <p className="text-base sm:text-lg text-white mb-6 sm:mb-8 max-w-3xl mx-auto drop-shadow-md px-2">
               {currentSlideData.description}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link 
                 href={currentSlideData.cta.primary.href} 
-                className="bg-white text-primary-600 hover:bg-gray-100 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="bg-white text-primary-600 hover:bg-gray-100 font-semibold text-base sm:text-lg px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 {currentSlideData.cta.primary.text}
               </Link>
               <Link 
                 href={currentSlideData.cta.secondary.href} 
-                className="bg-transparent text-white border-2 border-white/90 hover:bg-white hover:text-primary-600 font-semibold text-lg px-8 py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
+                className="bg-transparent text-white border-2 border-white/90 hover:bg-white hover:text-primary-600 font-semibold text-base sm:text-lg px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-1"
               >
                 {currentSlideData.cta.secondary.text}
               </Link>
@@ -556,22 +548,22 @@ export default function Home() {
         {/* Navigation Arrows */}
         <button
           onClick={goToPrevious}
-          className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-200"
+          className="absolute left-2 sm:left-4 top-1/2 transform -translate-y-1/2 z-30 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-2 sm:p-3 rounded-full transition-all duration-200"
           aria-label="Previous slide"
         >
-          <ChevronLeft className="h-6 w-6" />
+          <ChevronLeft className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
         
         <button
           onClick={goToNext}
-          className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-3 rounded-full transition-all duration-200"
+          className="absolute right-2 sm:right-4 top-1/2 transform -translate-y-1/2 z-30 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white p-2 sm:p-3 rounded-full transition-all duration-200"
           aria-label="Next slide"
         >
-          <ChevronRight className="h-6 w-6" />
+          <ChevronRight className="h-5 w-5 sm:h-6 sm:w-6" />
         </button>
 
         {/* Slide Indicators */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
+        <div className="absolute bottom-6 sm:bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
           {allSlides.map((slide, index) => (
             <button
               key={slide.id}
