@@ -74,6 +74,19 @@ const slideshowData = [
   }
 ];
 
+// Hero images - add your image filenames here
+const heroImages = [
+  '/hero-images/hero-1.jpg',
+  '/hero-images/hero-2.jpg',
+  '/hero-images/hero-3.jpg',
+  '/hero-images/hero-4.jpg',
+  '/hero-images/hero-5.jpg',
+].filter(img => {
+  // Filter out images that don't exist (graceful fallback)
+  // In production, you can pre-validate or use a different approach
+  return true
+})
+
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -81,17 +94,121 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [currentHeroImage, setCurrentHeroImage] = useState(0)
+  const [heroImagesLoaded, setHeroImagesLoaded] = useState<string[]>([])
+  const [useVideo, setUseVideo] = useState(true) // Toggle between video and images
+  const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
+  const [allSlides, setAllSlides] = useState(slideshowData)
+
+  // Fetch upcoming events (can be disabled via env var)
+  useEffect(() => {
+    const showEventsInHero = process.env.NEXT_PUBLIC_SHOW_EVENTS_IN_HERO !== 'false'
+    
+    if (!showEventsInHero) {
+      // Feature disabled, use regular slides only
+      setAllSlides(slideshowData)
+      return
+    }
+
+    const fetchUpcomingEvents = async () => {
+      try {
+        const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+        const { data, error } = await supabase
+          .from('events')
+          .select('*')
+          .gte('date', today)
+          .order('date', { ascending: true })
+          .limit(3) // Show up to 3 upcoming events
+
+        if (error) throw error
+
+        if (data && data.length > 0) {
+          setUpcomingEvents(data)
+          // Create event slides and prepend them to slideshow
+          const eventSlides = data.map((event, idx) => ({
+            id: `event-${event.id}`,
+            type: 'upcoming-event',
+            title: event.title,
+            subtitle: `📅 ${new Date(event.date).toLocaleDateString('en-IN', { 
+              weekday: 'long', 
+              year: 'numeric', 
+              month: 'long', 
+              day: 'numeric' 
+            })} at ${event.time}`,
+            description: event.description || `Join us at ${event.location}`,
+            location: event.location,
+            eventDate: event.date,
+            eventTime: event.time,
+            eventId: event.id,
+            backgroundImage: event.image_url || '/school-building.jpg',
+            icon: Calendar,
+            cta: {
+              primary: { text: 'Register Now', href: `/events/${event.id}` },
+              secondary: { text: 'View All Events', href: '/events' }
+            }
+          }))
+          // Prepend event slides to the beginning of slideshow
+          setAllSlides([...eventSlides, ...slideshowData])
+        } else {
+          // No upcoming events, use regular slides only
+          setAllSlides(slideshowData)
+        }
+      } catch (error) {
+        console.error('Error fetching upcoming events:', error)
+        // On error, fall back to regular slides
+        setAllSlides(slideshowData)
+      }
+    }
+    fetchUpcomingEvents()
+  }, [])
+
+  // Preload hero images
+  useEffect(() => {
+    const loadImages = async () => {
+      const loaded: string[] = []
+      for (const img of heroImages) {
+        try {
+          const image = new Image()
+          await new Promise((resolve, reject) => {
+            image.onload = resolve
+            image.onerror = reject
+            image.src = img
+          })
+          loaded.push(img)
+        } catch {
+          // Image failed to load, skip it
+        }
+      }
+      setHeroImagesLoaded(loaded)
+      // If we have loaded images, prefer images over video
+      if (loaded.length > 0) {
+        setUseVideo(false)
+      }
+    }
+    loadImages()
+  }, [])
 
   // Auto-rotate slides
   useEffect(() => {
     if (!isAutoPlaying) return;
     
     const interval = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % slideshowData.length);
+      setCurrentSlide((prev) => (prev + 1) % allSlides.length);
     }, 5000); // Change slide every 5 seconds
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, allSlides.length]);
+
+  // Auto-rotate hero images (if using images)
+  useEffect(() => {
+    if (!isAutoPlaying || useVideo || heroImagesLoaded.length === 0) return;
+    
+    const interval = setInterval(() => {
+      setCurrentHeroImage((prev) => (prev + 1) % heroImagesLoaded.length);
+    }, 5000); // Change image every 5 seconds (matches animation duration better)
+
+    return () => clearInterval(interval);
+  }, [isAutoPlaying, useVideo, heroImagesLoaded.length]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
@@ -101,18 +218,18 @@ export default function Home() {
   };
 
   const goToPrevious = () => {
-    setCurrentSlide((prev) => (prev - 1 + slideshowData.length) % slideshowData.length);
+    setCurrentSlide((prev) => (prev - 1 + allSlides.length) % allSlides.length);
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 10000);
   };
 
   const goToNext = () => {
-    setCurrentSlide((prev) => (prev + 1) % slideshowData.length);
+    setCurrentSlide((prev) => (prev + 1) % allSlides.length);
     setIsAutoPlaying(false);
     setTimeout(() => setIsAutoPlaying(true), 10000);
   };
 
-  const currentSlideData = slideshowData[currentSlide];
+  const currentSlideData = allSlides[currentSlide];
   const IconComponent = currentSlideData.icon;
 
   useEffect(() => {
@@ -261,46 +378,110 @@ export default function Home() {
         </div>
       )}
 
-      {/* Hero Slideshow Section */}
-      <section className="relative h-screen overflow-hidden">
-        {/* Background Video with Overlay */}
+      {/* Hero Slideshow Section - Responsive height for mobile and desktop */}
+      <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden">
+        {/* Background - Video or Images with smooth transitions */}
         <div className="absolute inset-0 z-0">
-          <video 
-            className="w-full h-full min-w-full min-h-full object-cover opacity-95"
-            autoPlay 
-            muted 
-            loop 
-            playsInline
-            preload="auto"
-            style={{
-              objectFit: 'cover',
-              objectPosition: 'center 10%'
-            }}
-          >
-            <source src="/bghs-5mb.mp4" type="video/mp4" />
-            {/* Fallback image if video fails to load */}
-            <div 
-              className="w-full h-full bg-cover bg-center bg-no-repeat"
+          {useVideo || heroImagesLoaded.length === 0 ? (
+            // Video background (fallback)
+            <video 
+              className="w-full h-full min-w-full min-h-full object-cover opacity-95"
+              autoPlay 
+              muted 
+              loop 
+              playsInline
+              preload="auto"
               style={{
-                backgroundImage: `url('${currentSlideData.backgroundImage}')`,
-                backgroundSize: 'cover',
-                backgroundPosition: 'center'
+                objectFit: 'cover',
+                objectPosition: 'center 10%'
               }}
-            />
-          </video>
+            >
+              <source src="/bghs-5mb.mp4" type="video/mp4" />
+              {/* Fallback image if video fails to load */}
+              <div 
+                className="w-full h-full bg-cover bg-center bg-no-repeat"
+                style={{
+                  backgroundImage: `url('${currentSlideData.backgroundImage}')`,
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center'
+                }}
+              />
+            </video>
+          ) : (
+            // Image carousel with fade and zoom transitions (Ken Burns effect)
+            <div className="relative w-full h-full overflow-hidden">
+              {/* Show event image if current slide is an event with image */}
+              {currentSlideData.type === 'upcoming-event' && currentSlideData.backgroundImage && currentSlideData.backgroundImage !== '/school-building.jpg' ? (
+                <div 
+                  className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
+                  style={{
+                    backgroundImage: `url('${currentSlideData.backgroundImage}')`,
+                    backgroundSize: 'contain',
+                    backgroundPosition: 'center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundColor: '#000',
+                    transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    willChange: 'transform, opacity'
+                  }}
+                />
+              ) : (
+                // Regular hero images carousel - with zoom-in animation
+                heroImagesLoaded.map((img, index) => {
+                  const isActive = index === currentHeroImage
+                  return (
+                    <div
+                      key={`${img}-${index}-${isActive ? currentHeroImage : 'inactive'}`}
+                      className={`absolute inset-0 ${
+                        isActive 
+                          ? 'opacity-100 z-10 ken-burns-animation' 
+                          : 'opacity-0 z-0'
+                      }`}
+                      style={{
+                        backgroundImage: `url('${img}')`,
+                        backgroundSize: 'contain',
+                        backgroundPosition: 'center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundColor: '#000',
+                        transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
+                        willChange: isActive ? 'transform, opacity' : 'opacity'
+                      }}
+                    />
+                  )
+                })
+              )}
+            </div>
+          )}
           {/* Enhanced Overlay to match About page */}
-          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-transparent to-accent-900/20"></div>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50 z-20"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-transparent to-accent-900/20 z-20"></div>
         </div>
         
         {/* Content */}
         <div className="relative z-10 h-full flex items-center">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center w-full">
+            {/* Event Badge for upcoming events */}
+            {currentSlideData.type === 'upcoming-event' && (
+              <div className="mb-4">
+                <span className="inline-flex items-center gap-2 px-4 py-2 bg-accent-500/90 backdrop-blur-sm text-white rounded-full text-sm font-semibold shadow-lg">
+                  <Calendar className="h-4 w-4" />
+                  Upcoming Event
+                </span>
+              </div>
+            )}
+            
             {/* Icon for non-welcome slides */}
             {IconComponent && (
               <div className="mb-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full">
-                  <IconComponent className="h-8 w-8 text-white" />
+                <div className={`inline-flex items-center justify-center w-16 h-16 backdrop-blur-sm rounded-full ${
+                  currentSlideData.type === 'upcoming-event' 
+                    ? 'bg-accent-500/30 ring-2 ring-accent-400/50' 
+                    : 'bg-white/20'
+                }`}>
+                  <IconComponent className={`h-8 w-8 ${
+                    currentSlideData.type === 'upcoming-event' 
+                      ? 'text-accent-100' 
+                      : 'text-white'
+                  }`} />
                 </div>
               </div>
             )}
@@ -314,6 +495,13 @@ export default function Home() {
             <h2 className="text-xl md:text-2xl text-white mb-6 drop-shadow-lg font-medium">
               {currentSlideData.subtitle}
             </h2>
+            
+            {currentSlideData.type === 'upcoming-event' && currentSlideData.location && (
+              <div className="mb-4 flex items-center justify-center gap-2 text-white/90">
+                <MapPin className="h-5 w-5" />
+                <span className="text-lg drop-shadow-md">{currentSlideData.location}</span>
+              </div>
+            )}
             
             <p className="text-lg text-white mb-8 max-w-3xl mx-auto drop-shadow-md">
               {currentSlideData.description}
@@ -355,14 +543,18 @@ export default function Home() {
 
         {/* Slide Indicators */}
         <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex space-x-2">
-          {slideshowData.map((_, index) => (
+          {allSlides.map((slide, index) => (
             <button
-              key={index}
+              key={slide.id}
               onClick={() => goToSlide(index)}
               className={`w-3 h-3 rounded-full transition-all duration-200 ${
                 index === currentSlide 
-                  ? 'bg-white scale-125' 
-                  : 'bg-white/50 hover:bg-white/75'
+                  ? slide.type === 'upcoming-event'
+                    ? 'bg-accent-400 scale-125 ring-2 ring-accent-300'
+                    : 'bg-white scale-125'
+                  : slide.type === 'upcoming-event'
+                    ? 'bg-accent-400/50 hover:bg-accent-400/75'
+                    : 'bg-white/50 hover:bg-white/75'
               }`}
               aria-label={`Go to slide ${index + 1}`}
             />

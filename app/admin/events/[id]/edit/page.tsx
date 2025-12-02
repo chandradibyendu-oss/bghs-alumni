@@ -14,6 +14,9 @@ export default function EditEventPage() {
   const [saving, setSaving] = useState(false)
   const [event, setEvent] = useState<any>(null)
   const [isAuthorized, setIsAuthorized] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [imagePreview, setImagePreview] = useState<string>('')
+  const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [formData, setFormData] = useState({
     title: '',
@@ -154,6 +157,7 @@ export default function EditEventPage() {
           featured: data.metadata?.featured || false,
           sponsors: data.metadata?.sponsors || [{ name: '', logo_url: '', website_url: '', banner_url: '', description: '', tier: 'Platinum' }]
         })
+        setImagePreview(data.image_url || '')
       }
     } catch (error) {
       console.error('Error fetching event:', error)
@@ -169,6 +173,70 @@ export default function EditEventPage() {
       ...prev,
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      setErrors(prev => ({ ...prev, cover_image_url: 'Please select an image file' }))
+      return
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrors(prev => ({ ...prev, cover_image_url: 'Image size must be less than 10MB' }))
+      return
+    }
+
+    setUploadingImage(true)
+    setErrors(prev => {
+      const newErrors = { ...prev }
+      delete newErrors.cover_image_url
+      return newErrors
+    })
+
+    try {
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        setErrors(prev => ({ ...prev, cover_image_url: 'Not authenticated. Please log in again.' }))
+        return
+      }
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('eventId', params.id as string)
+
+      const response = await fetch('/api/events/upload-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: uploadFormData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to upload image')
+      }
+
+      // Set the uploaded image URL
+      setFormData(prev => ({ ...prev, cover_image_url: result.url }))
+      setImagePreview(result.url)
+    } catch (error) {
+      console.error('Image upload error:', error)
+      setErrors(prev => ({ 
+        ...prev, 
+        cover_image_url: error instanceof Error ? error.message : 'Failed to upload image' 
+      }))
+    } finally {
+      setUploadingImage(false)
+      // Reset file input
+      e.target.value = ''
+    }
   }
 
   const validateForm = () => {
@@ -409,18 +477,64 @@ export default function EditEventPage() {
                   <option value="Cultural">Cultural</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Cover Image URL
-                </label>
-                <input
-                  type="url"
-                  name="cover_image_url"
-                  value={formData.cover_image_url}
-                  onChange={handleInputChange}
-                  className="input-field"
-                  placeholder="https://example.com/image.jpg"
-                />
+              <div className="space-y-4">
+                {/* Image Upload */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Upload Cover Image
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                    disabled={uploadingImage}
+                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                  />
+                  {uploadingImage && (
+                    <p className="mt-2 text-sm text-gray-500">Uploading image...</p>
+                  )}
+                  {errors.cover_image_url && (
+                    <p className="mt-2 text-sm text-red-500">{errors.cover_image_url}</p>
+                  )}
+                </div>
+
+                {/* Image Preview */}
+                {(imagePreview || formData.cover_image_url) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Preview</label>
+                    <div className="relative w-full h-48 rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={imagePreview || formData.cover_image_url}
+                        alt="Event cover preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* URL Input (Alternative) */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Or Enter Image URL
+                  </label>
+                  <input
+                    type="url"
+                    name="cover_image_url"
+                    value={formData.cover_image_url}
+                    onChange={(e) => {
+                      handleInputChange(e)
+                      setImagePreview(e.target.value)
+                    }}
+                    className="input-field"
+                    placeholder="https://example.com/image.jpg"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Use this if you have an external image URL
+                  </p>
+                </div>
               </div>
             </div>
           </div>

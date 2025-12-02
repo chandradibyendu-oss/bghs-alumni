@@ -39,3 +39,6 @@ echo   python bengali-image-extractor.py alumni_image.jpg -o extracted_alumni.cs
 pause
 
 
+
+
+

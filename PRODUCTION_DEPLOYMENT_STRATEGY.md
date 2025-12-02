@@ -80,3 +80,6 @@ const response = await fetch('https://your-python-service.com/extract', {
 Production-ready image extraction that works on Vercel cloud deployment!
 
 
+
+
+

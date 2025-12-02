@@ -49,3 +49,6 @@ Extract Bengali text from alumni images and convert to CSV
 The image extraction functionality should now work correctly when you upload Bengali alumni list images through the admin interface.
 
 
+
+
+

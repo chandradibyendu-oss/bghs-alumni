@@ -16,7 +16,31 @@ export async function POST(request: NextRequest) {
     return new NextResponse(null, { status: 204 })
   }
 
-  // Reuse the existing processor by calling the POST handler with the jobId
+  // If an external Lambda URL is configured, offload processing to Lambda to avoid Chromium issues on Vercel
+  const lambdaUrl = process.env.PDF_LAMBDA_URL
+  const lambdaKey = process.env.PDF_LAMBDA_SECRET
+  if (lambdaUrl) {
+    try {
+      const res = await fetch(lambdaUrl, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          ...(lambdaKey ? { 'x-lambda-key': lambdaKey } : {})
+        },
+        body: JSON.stringify({ jobId: nextJob.id })
+      })
+      if (!res.ok) {
+        const text = await res.text().catch(() => '')
+        return NextResponse.json({ error: 'Lambda processing failed', status: res.status, body: text }, { status: 500 })
+      }
+      const json = await res.json().catch(() => ({}))
+      return NextResponse.json({ success: true, via: 'lambda', data: json })
+    } catch (err) {
+      return NextResponse.json({ error: 'Lambda request error', details: err instanceof Error ? err.message : String(err) }, { status: 500 })
+    }
+  }
+
+  // Fallback: reuse the existing processor locally
   const body = JSON.stringify({ jobId: nextJob.id })
   const req = new Request(request.url, { method: 'POST', body, headers: { 'content-type': 'application/json' } })
   return await processJob(req as any)
@@ -38,9 +62,10 @@ export async function GET(request: NextRequest) {
     return new NextResponse(null, { status: 204 })
   }
 
+  // Delegate to POST so the same Lambda offload logic applies
   const body = JSON.stringify({ jobId: nextJob.id })
   const req = new Request(request.url, { method: 'POST', body, headers: { 'content-type': 'application/json' } })
-  return await processJob(req as any)
+  return await POST(req as any)
 }
 
 

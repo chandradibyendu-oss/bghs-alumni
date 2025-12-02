@@ -50,3 +50,6 @@ http://localhost:3000/admin/image-extraction
 The image extraction functionality should now work properly when you upload Bengali alumni list images through the admin interface.
 
 
+
+
+

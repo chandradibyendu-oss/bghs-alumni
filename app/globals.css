@@ -39,3 +39,36 @@
     @apply bg-gradient-to-r from-primary-600 to-accent-500 bg-clip-text text-transparent;
   }
 }
+
+/* Ken Burns effect for regular hero images - smooth continuous zoom in */
+@keyframes kenBurnsZoom {
+  0% {
+    transform: scale(1.0);
+  }
+  100% {
+    transform: scale(1.08);
+  }
+}
+
+/* Ken Burns effect for event images - smooth continuous zoom out */
+/* Start larger and zoom out to show full image without cropping */
+@keyframes kenBurnsZoomOut {
+  0% {
+    transform: scale(1.15);
+  }
+  100% {
+    transform: scale(1.0);
+  }
+}
+
+.ken-burns-animation {
+  animation: kenBurnsZoom 5s ease-out forwards;
+  will-change: transform;
+  transform-origin: center center;
+}
+
+.ken-burns-zoom-out {
+  animation: kenBurnsZoomOut 5s ease-out forwards;
+  will-change: transform;
+  transform-origin: center center;
+}

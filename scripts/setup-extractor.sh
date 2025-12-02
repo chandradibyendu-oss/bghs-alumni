@@ -39,3 +39,6 @@ echo "Example:"
 echo "  python3 bengali-image-extractor.py alumni_image.jpg -o extracted_alumni.csv --debug"
 
 
+
+
+

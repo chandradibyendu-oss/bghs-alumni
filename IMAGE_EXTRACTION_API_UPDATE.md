@@ -126,3 +126,6 @@ To test the updated logic:
 The image extraction API has been updated to use the same smart logic we developed, ensuring consistent and accurate company field values for all alumni records, whether generated manually or through image extraction.
 
 
+
+
+

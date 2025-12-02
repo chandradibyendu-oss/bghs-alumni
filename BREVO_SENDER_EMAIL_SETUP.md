@@ -232,3 +232,6 @@ After adding sender in Brevo:
 
 The code will work with any verified email. The display name "BGHS Alumni" will be automatically added, so recipients see a professional sender name regardless of which email you use.
 
+
+
+

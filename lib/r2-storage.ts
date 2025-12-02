@@ -367,6 +367,95 @@ class R2Storage {
       throw new Error(`Failed to upload PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
+
+  /**
+   * Upload event image to R2
+   * Optimizes image for web use (hero/card display)
+   * @param buffer Image file buffer
+   * @param eventId Event ID for organization
+   * @param originalFileName Original filename
+   * @returns Uploaded image URL
+   */
+  async uploadEventImage(buffer: Buffer, eventId: string, originalFileName: string): Promise<string> {
+    try {
+      // Generate unique filename
+      const timestamp = Date.now()
+      const fileExtension = originalFileName.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `event-${eventId}-${timestamp}.${fileExtension}`
+      
+      // Try to optimize image if Sharp is available
+      let optimizedBuffer = buffer
+      try {
+        const sharp = await import('sharp')
+        optimizedBuffer = await sharp.default(buffer)
+          .resize(1920, 1080, { 
+            fit: 'inside', 
+            withoutEnlargement: true 
+          })
+          .jpeg({ quality: 85 })
+          .toBuffer()
+        
+        // Update filename to .jpg if optimized
+        const optimizedFileName = `event-${eventId}-${timestamp}.jpg`
+        const result = await this.uploadFile(
+          optimizedBuffer, 
+          optimizedFileName, 
+          'image/jpeg', 
+          'events'
+        )
+        return result.url
+      } catch (sharpError) {
+        // Sharp not available, upload original
+        console.warn('Sharp not available, uploading original image:', sharpError)
+        const result = await this.uploadFile(
+          buffer, 
+          fileName, 
+          `image/${fileExtension}`, 
+          'events'
+        )
+        return result.url
+      }
+    } catch (error) {
+      console.error('Failed to upload event image:', error)
+      throw new Error(`Failed to upload event image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Delete event image from R2
+   * @param imageUrl Full URL of the image to delete
+   */
+  async deleteEventImage(imageUrl: string): Promise<void> {
+    try {
+      // Extract key from URL
+      const customDomain = process.env.CLOUDFLARE_R2_CUSTOM_DOMAIN
+      let key = ''
+      
+      if (customDomain && imageUrl.includes(customDomain)) {
+        // Extract from custom domain URL
+        key = imageUrl.replace(`https://${customDomain}/`, '')
+      } else {
+        // Extract from R2 public URL
+        const r2Pattern = new RegExp(`https://pub-.*\\.r2\\.dev/${this.bucketName}/(.+)`)
+        const match = imageUrl.match(r2Pattern)
+        if (match) {
+          key = match[1]
+        } else {
+          throw new Error('Could not extract key from image URL')
+        }
+      }
+      
+      // Only delete if it's in the events folder
+      if (key.startsWith('events/')) {
+        await this.deleteFile(key)
+      } else {
+        console.warn(`Skipping deletion - image is not in events folder: ${key}`)
+      }
+    } catch (error) {
+      console.error('Failed to delete event image:', error)
+      throw new Error(`Failed to delete event image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
 }
 
 export const r2Storage = new R2Storage()
