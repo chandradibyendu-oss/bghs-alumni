@@ -4,6 +4,41 @@ import Link from 'next/link'
 import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
+
+// Blog posts data (can be moved to a shared file or fetched from API)
+const blogPosts = [
+  {
+    id: 1,
+    title: "BGHS Alumni Success Story: From Barasat to Silicon Valley",
+    excerpt: "Meet Priya Sen, a 2000 batch graduate who went from our humble school in Barasat to becoming a senior software engineer at Google in Silicon Valley. Her journey is an inspiration for all current students.",
+    author: "Alumni Association",
+    date: "2024-01-15",
+    readTime: "5 min read",
+    category: "Success Stories",
+    tags: ["Technology", "Career", "Inspiration"],
+    image: "/blog/priya-sen.jpg",
+    featured: true,
+    views: 1250,
+    likes: 89,
+    comments: 23
+  },
+  {
+    id: 2,
+    title: "The Evolution of BGHS: 165 Years of Educational Excellence",
+    excerpt: "From its establishment in 1856 to the present day, Barasat Govt. High School has been at the forefront of educational innovation and excellence in West Bengal.",
+    author: "Dr. Smita Banerjee",
+    date: "2024-01-10",
+    readTime: "8 min read",
+    category: "School History",
+    tags: ["History", "Education", "BGHS"],
+    image: "/blog/school-history.jpg",
+    featured: false,
+    views: 890,
+    likes: 67,
+    comments: 15
+  }
+]
+
 // Removed getUserPermissions import - using direct role check for performance
 
 // Type definitions for slides
@@ -29,11 +64,43 @@ type EventSlide = BaseSlide & {
   eventId?: number | string
 }
 
-type RegularSlide = BaseSlide & {
-  type: 'welcome' | 'event' | 'gallery' | 'hall-of-fame' | 'achievement'
+type BlogSlide = BaseSlide & {
+  type: 'blog'
+  blogId?: number
+  author?: string
+  date?: string
 }
 
-type Slide = EventSlide | RegularSlide
+type RegularSlide = BaseSlide & {
+  type: 'welcome' | 'event' | 'gallery' | 'hall-of-fame' | 'achievement' | 'blog'
+}
+
+type Slide = EventSlide | BlogSlide | RegularSlide
+
+// Helper function to create blog slide
+const createBlogSlide = (): BlogSlide | null => {
+  const featuredBlog = blogPosts.find(blog => blog.featured)
+  const latestBlog = featuredBlog || blogPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+  
+  if (!latestBlog) return null
+  
+  return {
+    id: 20000 + latestBlog.id,
+    type: 'blog',
+    title: latestBlog.title,
+    subtitle: `📝 ${latestBlog.category} • ${latestBlog.readTime}`,
+    description: latestBlog.excerpt,
+    backgroundImage: latestBlog.image || '/hero-images/hero-2.jpg',
+    icon: BookOpen,
+    cta: {
+      primary: { text: 'Read Article', href: '/blog' },
+      secondary: { text: 'View All Posts', href: '/blog' }
+    },
+    blogId: latestBlog.id,
+    author: latestBlog.author,
+    date: latestBlog.date
+  }
+}
 
 // Slideshow data
 const slideshowData = [
@@ -43,7 +110,7 @@ const slideshowData = [
     title: 'Welcome to BGHS Alumni',
     subtitle: 'Connect with fellow alumni from Barasat Peary Charan Sarkar Government High School',
     description: 'Stay updated with school events, network with former classmates, and contribute to your alma mater\'s legacy.',
-    backgroundImage: '/school-building.jpg',
+    backgroundImage: '/hero-images/hero-1.jpg',
     cta: {
       primary: { text: 'Join Our Community', href: '/register' },
       secondary: { text: 'Learn More', href: '/about' }
@@ -55,24 +122,11 @@ const slideshowData = [
     title: 'School Memories',
     subtitle: 'Browse Our Photo Gallery',
     description: 'Explore photos from school events, reunions, and memorable moments shared by our alumni community.',
-    backgroundImage: '/school-building.jpg',
+    backgroundImage: '/hero-images/hero-5.jpg',
     icon: Star,
     cta: {
       primary: { text: 'View Gallery', href: '/gallery' },
       secondary: { text: 'Upload Photos', href: '/gallery' }
-    }
-  },
-  {
-    id: 2,
-    type: 'event',
-    title: 'Annual Alumni Reunion 2024',
-    subtitle: 'Save the Date: December 15, 2024',
-    description: 'Join us for our biggest reunion event of the year. Reconnect with old friends, meet new alumni, and celebrate our shared memories.',
-    backgroundImage: '/school-building.jpg',
-    icon: Calendar,
-    cta: {
-      primary: { text: 'Register Now', href: '/events' },
-      secondary: { text: 'View Details', href: '/events' }
     }
   },
   {
@@ -81,7 +135,7 @@ const slideshowData = [
     title: 'Hall of Fame',
     subtitle: 'Celebrating Our Distinguished Alumni',
     description: 'Meet our alumni who have made significant contributions in their fields - from science and technology to arts and social service.',
-    backgroundImage: '/school-building.jpg',
+    backgroundImage: '/hero-images/hero-3.jpg',
     icon: Trophy,
     cta: {
       primary: { text: 'View Hall of Fame', href: '/hall-of-fame' },
@@ -94,7 +148,7 @@ const slideshowData = [
     title: 'Recent Achievements',
     subtitle: 'Alumni Making Headlines',
     description: 'Dr. Rajesh Kumar (Batch 1995) receives the prestigious Padma Shri award for his contributions to medical research.',
-    backgroundImage: '/school-building.jpg',
+    backgroundImage: '/hero-images/hero-4.jpg',
     icon: Award,
     cta: {
       primary: { text: 'Read More', href: '/blog' },
@@ -103,19 +157,6 @@ const slideshowData = [
   }
 ];
 
-// Hero images - add your image filenames here
-const heroImages = [
-  '/hero-images/hero-1.jpg',
-  '/hero-images/hero-2.jpg',
-  '/hero-images/hero-3.jpg',
-  '/hero-images/hero-4.jpg',
-  '/hero-images/hero-5.jpg',
-].filter(img => {
-  // Filter out images that don't exist (graceful fallback)
-  // In production, you can pre-validate or use a different approach
-  return true
-})
-
 export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -123,9 +164,6 @@ export default function Home() {
   const [isAdmin, setIsAdmin] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
-  const [currentHeroImage, setCurrentHeroImage] = useState(0)
-  const [heroImagesLoaded, setHeroImagesLoaded] = useState<string[]>([])
-  const [useVideo, setUseVideo] = useState(true) // Toggle between video and images
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
   const [allSlides, setAllSlides] = useState<Slide[]>(slideshowData as Slide[])
 
@@ -134,8 +172,20 @@ export default function Home() {
     const showEventsInHero = process.env.NEXT_PUBLIC_SHOW_EVENTS_IN_HERO !== 'false'
     
     if (!showEventsInHero) {
-      // Feature disabled, use regular slides only
-      setAllSlides(slideshowData as Slide[])
+      // Events disabled, but still show Welcome first, then blog, then other slides
+      const welcomeSlide = slideshowData.find(slide => slide.type === 'welcome')
+      const otherStaticSlides = slideshowData.filter(slide => slide.type !== 'welcome')
+      
+      const orderedSlides: Slide[] = []
+      if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
+      
+      const blogSlide = createBlogSlide()
+      if (blogSlide) {
+        orderedSlides.push(blogSlide)
+      }
+      
+      orderedSlides.push(...otherStaticSlides as Slide[])
+      setAllSlides(orderedSlides)
       return
     }
 
@@ -153,9 +203,10 @@ export default function Home() {
 
         if (data && data.length > 0) {
           setUpcomingEvents(data)
-          // Create event slides and prepend them to slideshow
+          
+          // Create event slides
           const eventSlides = data.map((event, idx) => ({
-            id: 10000 + (typeof event.id === 'number' ? event.id : parseInt(event.id) || idx), // Use numeric ID to match slideshow data type
+            id: 10000 + (typeof event.id === 'number' ? event.id : parseInt(event.id) || idx),
             type: 'upcoming-event',
             title: event.title,
             subtitle: `📅 ${new Date(event.date).toLocaleDateString('en-IN', { 
@@ -176,45 +227,60 @@ export default function Home() {
               secondary: { text: 'View All Events', href: '/events' }
             }
           }))
-          // Prepend event slides to the beginning of slideshow
-          setAllSlides([...eventSlides, ...slideshowData] as Slide[])
+          
+          // Add blog slide if available
+          let dynamicSlides: Slide[] = [...eventSlides] as Slide[]
+          const blogSlide = createBlogSlide()
+          if (blogSlide) {
+            dynamicSlides.push(blogSlide)
+          }
+          
+          // Separate Welcome slide from other static slides
+          const welcomeSlide = slideshowData.find(slide => slide.type === 'welcome')
+          const otherStaticSlides = slideshowData.filter(slide => slide.type !== 'welcome')
+          
+          // Combine in order: Welcome, Events, Blog, Other Static Slides
+          const orderedSlides: Slide[] = []
+          if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
+          orderedSlides.push(...dynamicSlides)
+          orderedSlides.push(...otherStaticSlides as Slide[])
+          
+          setAllSlides(orderedSlides)
         } else {
-          // No upcoming events, use regular slides only
-          setAllSlides(slideshowData as Slide[])
+          // No events, but still add blog slide
+          const welcomeSlide = slideshowData.find(slide => slide.type === 'welcome')
+          const otherStaticSlides = slideshowData.filter(slide => slide.type !== 'welcome')
+          
+          const orderedSlides: Slide[] = []
+          if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
+          
+          const blogSlide = createBlogSlide()
+          if (blogSlide) {
+            orderedSlides.push(blogSlide)
+          }
+          
+          orderedSlides.push(...otherStaticSlides as Slide[])
+          setAllSlides(orderedSlides)
         }
       } catch (error) {
         console.error('Error fetching upcoming events:', error)
-        // On error, fall back to regular slides
-        setAllSlides(slideshowData as Slide[])
+        // On error, still show Welcome first, then blog, then other slides
+        const welcomeSlide = slideshowData.find(slide => slide.type === 'welcome')
+        const otherStaticSlides = slideshowData.filter(slide => slide.type !== 'welcome')
+        
+        const orderedSlides: Slide[] = []
+        if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
+        
+        const blogSlide = createBlogSlide()
+        if (blogSlide) {
+          orderedSlides.push(blogSlide)
+        }
+        
+        orderedSlides.push(...otherStaticSlides as Slide[])
+        setAllSlides(orderedSlides)
       }
     }
     fetchUpcomingEvents()
-  }, [])
-
-  // Preload hero images
-  useEffect(() => {
-    const loadImages = async () => {
-      const loaded: string[] = []
-      for (const img of heroImages) {
-        try {
-          const image = new Image()
-          await new Promise((resolve, reject) => {
-            image.onload = resolve
-            image.onerror = reject
-            image.src = img
-          })
-          loaded.push(img)
-        } catch {
-          // Image failed to load, skip it
-        }
-      }
-      setHeroImagesLoaded(loaded)
-      // If we have loaded images, prefer images over video
-      if (loaded.length > 0) {
-        setUseVideo(false)
-      }
-    }
-    loadImages()
   }, [])
 
   // Auto-rotate slides
@@ -228,16 +294,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [isAutoPlaying, allSlides.length]);
 
-  // Auto-rotate hero images (if using images)
-  useEffect(() => {
-    if (!isAutoPlaying || useVideo || heroImagesLoaded.length === 0) return;
-    
-    const interval = setInterval(() => {
-      setCurrentHeroImage((prev) => (prev + 1) % heroImagesLoaded.length);
-    }, 5000); // Change image every 5 seconds (matches animation duration better)
-
-    return () => clearInterval(interval);
-  }, [isAutoPlaying, useVideo, heroImagesLoaded.length]);
 
   const goToSlide = (index: number) => {
     setCurrentSlide(index);
@@ -409,77 +465,26 @@ export default function Home() {
 
       {/* Hero Slideshow Section - Responsive height for mobile and desktop */}
       <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden mt-0">
-        {/* Background - Video or Images with smooth transitions */}
+        {/* Background - Slide-specific images with smooth transitions */}
         <div className="absolute inset-0 z-0 -mt-0">
-          {useVideo || heroImagesLoaded.length === 0 ? (
-            // Video background (fallback)
-            <video 
-              className="w-full h-full min-w-full min-h-full object-cover opacity-95"
-              autoPlay 
-              muted 
-              loop 
-              playsInline
-              preload="auto"
-              style={{
-                objectFit: 'cover',
-                objectPosition: 'center 10%'
-              }}
-            >
-              <source src="/bghs-5mb.mp4" type="video/mp4" />
-              {/* Fallback image if video fails to load */}
+          {/* Show slide-specific background image with fade and zoom transitions (Ken Burns effect) */}
+          <div className="relative w-full h-full overflow-hidden">
+            {currentSlideData.backgroundImage && (
               <div 
-                className="w-full h-full bg-cover bg-center bg-no-repeat"
+                key={currentSlideData.id}
+                className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
                 style={{
                   backgroundImage: `url('${currentSlideData.backgroundImage}')`,
                   backgroundSize: 'cover',
-                  backgroundPosition: 'center'
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundColor: '#000',
+                  transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  willChange: 'transform, opacity'
                 }}
               />
-            </video>
-          ) : (
-            // Image carousel with fade and zoom transitions (Ken Burns effect)
-            <div className="relative w-full h-full overflow-hidden">
-              {/* Show event image if current slide is an event with image */}
-              {currentSlideData.type === 'upcoming-event' && currentSlideData.backgroundImage && currentSlideData.backgroundImage !== '/school-building.jpg' ? (
-                <div 
-                  className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
-                  style={{
-                    backgroundImage: `url('${currentSlideData.backgroundImage}')`,
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundColor: '#000',
-                    transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    willChange: 'transform, opacity'
-                  }}
-                />
-              ) : (
-                // Regular hero images carousel - with zoom-in animation
-                heroImagesLoaded.map((img, index) => {
-                  const isActive = index === currentHeroImage
-                  return (
-                    <div
-                      key={`${img}-${index}-${isActive ? currentHeroImage : 'inactive'}`}
-                      className={`absolute inset-0 ${
-                        isActive 
-                          ? 'opacity-100 z-10 ken-burns-animation' 
-                          : 'opacity-0 z-0'
-                      }`}
-                      style={{
-                        backgroundImage: `url('${img}')`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundColor: '#000',
-                        transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
-                        willChange: isActive ? 'transform, opacity' : 'opacity'
-                      }}
-                    />
-                  )
-                })
-              )}
-            </div>
-          )}
+            )}
+          </div>
           {/* Enhanced Overlay to match About page */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50 z-20"></div>
           <div className="absolute inset-0 bg-gradient-to-br from-primary-900/20 via-transparent to-accent-900/20 z-20"></div>
