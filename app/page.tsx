@@ -1,10 +1,39 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon } from 'lucide-react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 // Removed getUserPermissions import - using direct role check for performance
+
+// Type definitions for slides
+type BaseSlide = {
+  id: number
+  type: string
+  title: string
+  subtitle: string
+  description: string
+  backgroundImage: string
+  cta: {
+    primary: { text: string; href: string }
+    secondary: { text: string; href: string }
+  }
+  icon?: LucideIcon
+}
+
+type EventSlide = BaseSlide & {
+  type: 'upcoming-event'
+  location?: string
+  eventDate?: string
+  eventTime?: string
+  eventId?: number | string
+}
+
+type RegularSlide = BaseSlide & {
+  type: 'welcome' | 'event' | 'gallery' | 'hall-of-fame' | 'achievement'
+}
+
+type Slide = EventSlide | RegularSlide
 
 // Slideshow data
 const slideshowData = [
@@ -98,7 +127,7 @@ export default function Home() {
   const [heroImagesLoaded, setHeroImagesLoaded] = useState<string[]>([])
   const [useVideo, setUseVideo] = useState(true) // Toggle between video and images
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
-  const [allSlides, setAllSlides] = useState(slideshowData)
+  const [allSlides, setAllSlides] = useState<Slide[]>(slideshowData as Slide[])
 
   // Fetch upcoming events (can be disabled via env var)
   useEffect(() => {
@@ -106,7 +135,7 @@ export default function Home() {
     
     if (!showEventsInHero) {
       // Feature disabled, use regular slides only
-      setAllSlides(slideshowData)
+      setAllSlides(slideshowData as Slide[])
       return
     }
 
@@ -148,15 +177,15 @@ export default function Home() {
             }
           }))
           // Prepend event slides to the beginning of slideshow
-          setAllSlides([...eventSlides, ...slideshowData])
+          setAllSlides([...eventSlides, ...slideshowData] as Slide[])
         } else {
           // No upcoming events, use regular slides only
-          setAllSlides(slideshowData)
+          setAllSlides(slideshowData as Slide[])
         }
       } catch (error) {
         console.error('Error fetching upcoming events:', error)
         // On error, fall back to regular slides
-        setAllSlides(slideshowData)
+        setAllSlides(slideshowData as Slide[])
       }
     }
     fetchUpcomingEvents()
@@ -496,10 +525,10 @@ export default function Home() {
               {currentSlideData.subtitle}
             </h2>
             
-            {currentSlideData.type === 'upcoming-event' && currentSlideData.location && (
+            {currentSlideData.type === 'upcoming-event' && (currentSlideData as EventSlide).location && (
               <div className="mb-4 flex items-center justify-center gap-2 text-white/90">
                 <MapPin className="h-5 w-5" />
-                <span className="text-lg drop-shadow-md">{currentSlideData.location}</span>
+                <span className="text-lg drop-shadow-md">{(currentSlideData as EventSlide).location}</span>
               </div>
             )}
             
