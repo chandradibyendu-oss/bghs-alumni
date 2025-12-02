@@ -126,7 +126,7 @@ export default function Home() {
           setUpcomingEvents(data)
           // Create event slides and prepend them to slideshow
           const eventSlides = data.map((event, idx) => ({
-            id: `event-${event.id}`,
+            id: 10000 + (typeof event.id === 'number' ? event.id : parseInt(event.id) || idx), // Use numeric ID to match slideshow data type
             type: 'upcoming-event',
             title: event.title,
             subtitle: `📅 ${new Date(event.date).toLocaleDateString('en-IN', { 
