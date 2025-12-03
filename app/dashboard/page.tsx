@@ -12,6 +12,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<any>(null)
   const [canManageUsers, setCanManageUsers] = useState(false)
   const [canManageRoles, setCanManageRoles] = useState(false)
+  const [canManageBlog, setCanManageBlog] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -34,12 +35,16 @@ export default function DashboardPage() {
         
         setUserProfile(profile)
         
+        // Check permissions using the permission system
+        const perms = await getUserPermissions(user.id)
+        
         // Quick permission check based on role (no additional database queries)
         const isSuperAdmin = profile?.role === 'super_admin'
         const isAdmin = isSuperAdmin || profile?.role === 'alumni_premium' || profile?.role === 'content_moderator'
         
         setCanManageUsers(isAdmin)
         setCanManageRoles(isSuperAdmin)
+        setCanManageBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_moderate_blog') || hasPermission(perms, 'can_access_admin'))
       } else {
         router.push('/login')
       }
@@ -203,6 +208,14 @@ export default function DashboardPage() {
               <p className="text-gray-600">Quick attendance capture for events</p>
             </Link>
           )}
+
+          {canManageBlog && (
+            <Link href="/admin/blog" className="card text-center hover:shadow-lg transition-shadow group">
+              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog Management</h3>
+              <p className="text-gray-600">Create, edit, and moderate blog posts</p>
+            </Link>
+          )}
           
           <Link href="/directory" className="card text-center hover:shadow-lg transition-shadow group">
             <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
@@ -215,6 +228,14 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog</h3>
             <p className="text-gray-600">Read latest news and stories</p>
           </Link>
+
+          {canManageBlog && (
+            <Link href="/admin/blog" className="card text-center hover:shadow-lg transition-shadow group">
+              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog Management</h3>
+              <p className="text-gray-600">Create, edit, and moderate blog posts</p>
+            </Link>
+          )}
           
           <Link href="/profile/payments" className="card text-center hover:shadow-lg transition-shadow group">
             <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />

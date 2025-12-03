@@ -5,39 +5,7 @@ import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, C
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
-// Blog posts data (can be moved to a shared file or fetched from API)
-const blogPosts = [
-  {
-    id: 1,
-    title: "BGHS Alumni Success Story: From Barasat to Silicon Valley",
-    excerpt: "Meet Priya Sen, a 2000 batch graduate who went from our humble school in Barasat to becoming a senior software engineer at Google in Silicon Valley. Her journey is an inspiration for all current students.",
-    author: "Alumni Association",
-    date: "2024-01-15",
-    readTime: "5 min read",
-    category: "Success Stories",
-    tags: ["Technology", "Career", "Inspiration"],
-    image: "/blog/priya-sen.jpg",
-    featured: true,
-    views: 1250,
-    likes: 89,
-    comments: 23
-  },
-  {
-    id: 2,
-    title: "The Evolution of BGHS: 165 Years of Educational Excellence",
-    excerpt: "From its establishment in 1856 to the present day, Barasat Govt. High School has been at the forefront of educational innovation and excellence in West Bengal.",
-    author: "Dr. Smita Banerjee",
-    date: "2024-01-10",
-    readTime: "8 min read",
-    category: "School History",
-    tags: ["History", "Education", "BGHS"],
-    image: "/blog/school-history.jpg",
-    featured: false,
-    views: 890,
-    likes: 67,
-    comments: 15
-  }
-]
+// Blog posts will be fetched from database
 
 // Removed getUserPermissions import - using direct role check for performance
 
@@ -77,28 +45,27 @@ type RegularSlide = BaseSlide & {
 
 type Slide = EventSlide | BlogSlide | RegularSlide
 
-// Helper function to create blog slide
-const createBlogSlide = (): BlogSlide | null => {
-  const featuredBlog = blogPosts.find(blog => blog.featured)
-  const latestBlog = featuredBlog || blogPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
+// Helper function to create blog slide from fetched blog data
+const createBlogSlide = (blog: any): BlogSlide | null => {
+  if (!blog) return null
   
-  if (!latestBlog) return null
+  const readTime = blog.read_time ? `${blog.read_time} min read` : '5 min read'
   
   return {
-    id: 20000 + latestBlog.id,
+    id: 20000 + (typeof blog.id === 'string' ? parseInt(blog.id.slice(0, 8), 16) : blog.id || 0),
     type: 'blog',
-    title: latestBlog.title,
-    subtitle: `📝 ${latestBlog.category} • ${latestBlog.readTime}`,
-    description: latestBlog.excerpt,
-    backgroundImage: latestBlog.image || '/hero-images/hero-2.jpg',
+    title: blog.title,
+    subtitle: `📝 ${blog.category} • ${readTime}`,
+    description: blog.excerpt,
+    backgroundImage: blog.image_url || '/hero-images/hero-2.jpg',
     icon: BookOpen,
     cta: {
-      primary: { text: 'Read Article', href: '/blog' },
+      primary: { text: 'Read Article', href: `/blog/${blog.id}` },
       secondary: { text: 'View All Posts', href: '/blog' }
     },
-    blogId: latestBlog.id,
-    author: latestBlog.author,
-    date: latestBlog.date
+    blogId: blog.id,
+    author: blog.author?.full_name || 'Unknown Author',
+    date: blog.created_at
   }
 }
 
@@ -166,8 +133,65 @@ export default function Home() {
   const [accountOpen, setAccountOpen] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
   const [allSlides, setAllSlides] = useState<Slide[]>(slideshowData as Slide[])
+  const [latestBlog, setLatestBlog] = useState<any>(null)
 
-  // Fetch upcoming events (can be disabled via env var)
+  // Fetch latest blog post
+  useEffect(() => {
+    const fetchLatestBlog = async () => {
+      try {
+        // First try to get featured blog, if none, get the latest published blog
+        let { data: featuredBlogs, error: featuredError } = await supabase
+          .from('blog_posts')
+          .select(`
+            *,
+            author:profiles!blog_posts_author_id_fkey(full_name)
+          `)
+          .eq('published', true)
+          .eq('status', 'published')
+          .eq('featured', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+
+        let featuredBlog = null
+        if (!featuredError && featuredBlogs && featuredBlogs.length > 0) {
+          featuredBlog = featuredBlogs[0]
+        }
+
+        // If no featured blog, get the latest published blog
+        if (!featuredBlog) {
+          const { data: latestBlogs, error: latestError } = await supabase
+            .from('blog_posts')
+            .select(`
+              *,
+              author:profiles!blog_posts_author_id_fkey(full_name)
+            `)
+            .eq('published', true)
+            .eq('status', 'published')
+            .order('created_at', { ascending: false })
+            .limit(1)
+          
+          if (!latestError && latestBlogs && latestBlogs.length > 0) {
+            featuredBlog = latestBlogs[0]
+          }
+        }
+
+        if (featuredBlog) {
+          // Process author data if it's an array
+          if (Array.isArray(featuredBlog.author) && featuredBlog.author.length > 0) {
+            featuredBlog.author = featuredBlog.author[0]
+          }
+          setLatestBlog(featuredBlog)
+        }
+      } catch (error) {
+        console.error('Error fetching latest blog:', error)
+        // If error, latestBlog remains null and no blog slide will be shown
+      }
+    }
+
+    fetchLatestBlog()
+  }, [])
+
+  // Fetch upcoming events and build slides (can be disabled via env var)
   useEffect(() => {
     const showEventsInHero = process.env.NEXT_PUBLIC_SHOW_EVENTS_IN_HERO !== 'false'
     
@@ -179,7 +203,7 @@ export default function Home() {
       const orderedSlides: Slide[] = []
       if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
       
-      const blogSlide = createBlogSlide()
+      const blogSlide = createBlogSlide(latestBlog)
       if (blogSlide) {
         orderedSlides.push(blogSlide)
       }
@@ -230,7 +254,7 @@ export default function Home() {
           
           // Add blog slide if available
           let dynamicSlides: Slide[] = [...eventSlides] as Slide[]
-          const blogSlide = createBlogSlide()
+          const blogSlide = createBlogSlide(latestBlog)
           if (blogSlide) {
             dynamicSlides.push(blogSlide)
           }
@@ -254,7 +278,7 @@ export default function Home() {
           const orderedSlides: Slide[] = []
           if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
           
-          const blogSlide = createBlogSlide()
+          const blogSlide = createBlogSlide(latestBlog)
           if (blogSlide) {
             orderedSlides.push(blogSlide)
           }
@@ -271,7 +295,7 @@ export default function Home() {
         const orderedSlides: Slide[] = []
         if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
         
-        const blogSlide = createBlogSlide()
+        const blogSlide = createBlogSlide(latestBlog)
         if (blogSlide) {
           orderedSlides.push(blogSlide)
         }
@@ -281,7 +305,7 @@ export default function Home() {
       }
     }
     fetchUpcomingEvents()
-  }, [])
+  }, [latestBlog]) // Re-run when latestBlog changes
 
   // Auto-rotate slides
   useEffect(() => {
@@ -329,7 +353,7 @@ export default function Home() {
           .eq('id', user.id)
           .single()
         
-        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator' || profile?.role === 'blog_moderator' || profile?.role === 'content_creator'
         setIsAdmin(isAdmin)
       } else {
         setIsAdmin(false)
@@ -410,6 +434,7 @@ export default function Home() {
                             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                             <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
                             <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                            <Link href="/admin/blog" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Blog Management</Link>
                           </>
                         )}
                         <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
@@ -450,6 +475,7 @@ export default function Home() {
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                         <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
                         <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+                        <Link href="/admin/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog Management</Link>
                       </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>

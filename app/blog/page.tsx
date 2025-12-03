@@ -1,127 +1,169 @@
+'use client'
+
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Calendar, User, Tag, BookOpen, TrendingUp, Heart, MessageCircle, Share2 } from 'lucide-react'
+import Image from 'next/image'
+import { ArrowLeft, Calendar, User, Tag, BookOpen, TrendingUp, Heart, MessageCircle, Share2, Plus } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
-const blogPosts = [
-  {
-    id: 1,
-    title: "BGHS Alumni Success Story: From Barasat to Silicon Valley",
-    excerpt: "Meet Priya Sen, a 2000 batch graduate who went from our humble school in Barasat to becoming a senior software engineer at Google in Silicon Valley. Her journey is an inspiration for all current students.",
-    author: "Alumni Association",
-    date: "2024-01-15",
-    readTime: "5 min read",
-    category: "Success Stories",
-    tags: ["Technology", "Career", "Inspiration"],
-    image: "/blog/priya-sen.jpg",
-    featured: true,
-    views: 1250,
-    likes: 89,
-    comments: 23
-  },
-  {
-    id: 2,
-    title: "The Evolution of BGHS: 165 Years of Educational Excellence",
-    excerpt: "From its establishment in 1856 to the present day, Barasat Govt. High School has been at the forefront of educational innovation and excellence in West Bengal.",
-    author: "Dr. Smita Banerjee",
-    date: "2024-01-10",
-    readTime: "8 min read",
-    category: "School History",
-    tags: ["History", "Education", "BGHS"],
-    image: "/blog/school-history.jpg",
-    featured: false,
-    views: 890,
-    likes: 67,
-    comments: 15
-  },
-  {
-    id: 3,
-    title: "Annual Alumni Reunion 2023: A Grand Success",
-    excerpt: "The 2023 annual reunion brought together over 200 alumni from different batches, creating unforgettable memories and strengthening our community bonds.",
-    author: "Reunion Committee",
-    date: "2024-01-05",
-    readTime: "4 min read",
-    category: "Events",
-    tags: ["Reunion", "Community", "Memories"],
-    image: "/blog/reunion-2023.jpg",
-    featured: false,
-    views: 756,
-    likes: 45,
-    comments: 12
-  },
-  {
-    id: 4,
-    title: "Career Opportunities in Emerging Technologies",
-    excerpt: "A comprehensive guide for current students and recent graduates on the most promising career paths in AI, machine learning, and renewable energy sectors.",
-    author: "Career Guidance Team",
-    date: "2024-01-01",
-    readTime: "6 min read",
-    category: "Career Guidance",
-    tags: ["Technology", "Career", "Future"],
-    image: "/blog/career-tech.jpg",
-    featured: false,
-    views: 634,
-    likes: 38,
-    comments: 8
-  },
-  {
-    id: 5,
-    title: "BGHS Sports Legacy: Champions Then and Now",
-    excerpt: "Exploring the rich sports tradition of our school and how it continues to produce state and national level athletes across various sports disciplines.",
-    author: "Sports Department",
-    date: "2023-12-28",
-    readTime: "7 min read",
-    category: "Sports",
-    tags: ["Sports", "Athletics", "Legacy"],
-    image: "/blog/sports-legacy.jpg",
-    featured: false,
-    views: 567,
-    likes: 42,
-    comments: 11
-  },
-  {
-    id: 6,
-    title: "Alumni Spotlight: Dr. Amit Kumar's Medical Journey",
-    excerpt: "Dr. Amit Kumar shares his inspiring journey from BGHS to becoming a renowned cardiologist, and how his school days shaped his approach to medicine.",
-    author: "Alumni Association",
-    date: "2023-12-20",
-    readTime: "5 min read",
-    category: "Success Stories",
-    tags: ["Medicine", "Healthcare", "Inspiration"],
-    image: "/blog/dr-amit.jpg",
-    featured: false,
-    views: 445,
-    likes: 31,
-    comments: 7
+type BlogPost = {
+  id: string
+  title: string
+  excerpt: string
+  content: string
+  author_id: string
+  category: string
+  tags: string[]
+  image_url?: string | null
+  views: number
+  likes: number
+  comments: number
+  featured: boolean
+  published: boolean
+  status: 'draft' | 'pending_review' | 'published' | 'rejected'
+  read_time?: number | null
+  created_at: string
+  updated_at: string
+  author?: {
+    full_name: string
   }
-]
-
-const categories = ["All", "Success Stories", "School History", "Events", "Career Guidance", "Sports", "Technology", "Community"]
+}
 
 export default function BlogPage() {
+  const [blogs, setBlogs] = useState<BlogPost[]>([])
+  const [loading, setLoading] = useState(true)
+  const [canCreateBlog, setCanCreateBlog] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState<string>('All')
+
+  useEffect(() => {
+    checkPermissions()
+    fetchBlogs()
+  }, [])
+
+  const checkPermissions = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const perms = await getUserPermissions(user.id)
+      setCanCreateBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_access_admin'))
+    }
+  }
+
+  const fetchBlogs = async () => {
+    try {
+      setLoading(true)
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select(`
+          *,
+          author:profiles!blog_posts_author_id_fkey(full_name)
+        `)
+        .eq('published', true)
+        .eq('status', 'published')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      setBlogs((data || []) as BlogPost[])
+    } catch (e) {
+      console.error('Failed to load blogs', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Separate featured and regular posts
+  const featuredPosts = useMemo(() => {
+    return blogs.filter(blog => blog.featured)
+  }, [blogs])
+
+  const regularPosts = useMemo(() => {
+    return blogs.filter(blog => !blog.featured)
+  }, [blogs])
+
+  // Filter by category
+  const filteredPosts = useMemo(() => {
+    if (selectedCategory === 'All') {
+      return regularPosts
+    }
+    return regularPosts.filter(blog => blog.category === selectedCategory)
+  }, [regularPosts, selectedCategory])
+
+  // Get unique categories from published blogs
+  const categories = useMemo(() => {
+    const cats = Array.from(new Set(blogs.map(b => b.category))).sort()
+    return ['All', ...cats]
+  }, [blogs])
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })
+  }
+
+  const formatShortDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric' 
+    })
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-600">Loading blog posts...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center space-x-4">
-            <Link href="/" className="text-gray-500 hover:text-gray-700">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Blog & News</h1>
-              <p className="text-gray-600">Stay updated with stories, achievements, and insights from our alumni community</p>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <Link href="/" className="text-gray-500 hover:text-gray-700">
+                <ArrowLeft className="h-5 w-5" />
+              </Link>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Blog & News</h1>
+                <p className="text-gray-600">Stay updated with stories, achievements, and insights from our alumni community</p>
+              </div>
             </div>
+            {canCreateBlog && (
+              <Link 
+                href="/admin/blog/new" 
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Plus className="h-5 w-5" />
+                Create Blog Post
+              </Link>
+            )}
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Featured Post */}
-        {blogPosts.filter(post => post.featured).map(post => (
+        {featuredPosts.length > 0 && featuredPosts.slice(0, 1).map(post => (
           <div key={post.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden mb-8">
             <div className="md:flex">
               <div className="md:w-1/2">
-                <div className="h-64 md:h-full bg-gray-200 flex items-center justify-center">
-                  <BookOpen className="h-16 w-16 text-gray-400" />
+                <div className="h-64 md:h-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                  {post.image_url ? (
+                    <Image
+                      src={post.image_url}
+                      alt={post.title}
+                      width={600}
+                      height={400}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <BookOpen className="h-16 w-16 text-gray-400" />
+                  )}
                 </div>
               </div>
               <div className="md:w-1/2 p-6 md:p-8">
@@ -139,31 +181,31 @@ export default function BlogPage() {
                   <div className="flex items-center space-x-4 text-sm text-gray-500">
                     <div className="flex items-center">
                       <User className="h-4 w-4 mr-1" />
-                      {post.author}
+                      {post.author?.full_name || 'Anonymous'}
                     </div>
                     <div className="flex items-center">
                       <Calendar className="h-4 w-4 mr-1" />
-                      {new Date(post.date).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
+                      {formatDate(post.created_at)}
                     </div>
-                    <div className="flex items-center">
-                      <BookOpen className="h-4 w-4 mr-1" />
-                      {post.readTime}
-                    </div>
+                    {post.read_time && (
+                      <div className="flex items-center">
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        {post.read_time} min read
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex space-x-2">
-                    {post.tags.map(tag => (
+                    {post.tags?.slice(0, 3).map(tag => (
                       <span key={tag} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
                         {tag}
                       </span>
                     ))}
                   </div>
-                  <button className="btn-primary">Read More</button>
+                  <Link href={`/blog/${post.id}`} className="btn-primary">
+                    Read More
+                  </Link>
                 </div>
               </div>
             </div>
@@ -171,88 +213,110 @@ export default function BlogPage() {
         ))}
 
         {/* Categories Filter */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex flex-wrap gap-2">
-            {categories.map(category => (
-              <button
-                key={category}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                  category === "All" 
-                    ? "bg-primary-600 text-white" 
-                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                }`}
-              >
-                {category}
-              </button>
-            ))}
+        {categories.length > 1 && (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+            <div className="flex flex-wrap gap-2">
+              {categories.map(category => (
+                <button
+                  key={category}
+                  onClick={() => setSelectedCategory(category)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    selectedCategory === category
+                      ? "bg-primary-600 text-white"
+                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                  }`}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Blog Posts Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-          {blogPosts.filter(post => !post.featured).map((post) => (
-            <div key={post.id} className="card hover:shadow-lg transition-shadow">
-              <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center">
-                <BookOpen className="h-12 w-12 text-gray-400" />
-              </div>
-              
-              <div className="mb-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <span className="bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
-                    {post.category}
+        {filteredPosts.length > 0 ? (
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            {filteredPosts.map((post) => (
+              <Link key={post.id} href={`/blog/${post.id}`} className="card hover:shadow-lg transition-shadow">
+                <div className="aspect-video bg-gray-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
+                  {post.image_url ? (
+                    <Image
+                      src={post.image_url}
+                      alt={post.title}
+                      width={400}
+                      height={225}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <BookOpen className="h-12 w-12 text-gray-400" />
+                  )}
+                </div>
+                
+                <div className="mb-4">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <span className="bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                      {post.category}
+                    </span>
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">{post.excerpt}</p>
+                </div>
+
+                <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
+                  <div className="flex items-center">
+                    <User className="h-4 w-4 mr-1" />
+                    {post.author?.full_name || 'Anonymous'}
+                  </div>
+                  <div className="flex items-center">
+                    <Calendar className="h-4 w-4 mr-1" />
+                    {formatShortDate(post.created_at)}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-4 text-sm text-gray-500">
+                    <div className="flex items-center">
+                      <TrendingUp className="h-4 w-4 mr-1" />
+                      {post.views || 0}
+                    </div>
+                    <div className="flex items-center">
+                      <Heart className="h-4 w-4 mr-1" />
+                      {post.likes || 0}
+                    </div>
+                    <div className="flex items-center">
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      {post.comments || 0}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex space-x-2">
+                    {post.tags?.slice(0, 2).map(tag => (
+                      <span key={tag} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-primary-600 hover:text-primary-700 font-medium text-sm">
+                    Read More →
                   </span>
                 </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">{post.title}</h3>
-                <p className="text-gray-600 text-sm mb-4 line-clamp-3">{post.excerpt}</p>
-              </div>
-
-              <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                <div className="flex items-center">
-                  <User className="h-4 w-4 mr-1" />
-                  {post.author}
-                </div>
-                <div className="flex items-center">
-                  <Calendar className="h-4 w-4 mr-1" />
-                  {new Date(post.date).toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric' 
-                  })}
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
-                  <div className="flex items-center">
-                    <TrendingUp className="h-4 w-4 mr-1" />
-                    {post.views}
-                  </div>
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 mr-1" />
-                    {post.likes}
-                  </div>
-                  <div className="flex items-center">
-                    <MessageCircle className="h-4 w-4 mr-1" />
-                    {post.comments}
-                  </div>
-                </div>
-                <button className="text-primary-600 hover:text-primary-700">
-                  <Share2 className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="flex space-x-2">
-                  {post.tags.slice(0, 2).map(tag => (
-                    <span key={tag} className="bg-gray-100 text-gray-700 text-xs px-2 py-1 rounded">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <button className="btn-primary">Read More</button>
-              </div>
-            </div>
-          ))}
-        </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
+            <BookOpen className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">No blog posts found</h3>
+            <p className="text-gray-600">
+              {selectedCategory === 'All' 
+                ? 'No published blog posts are available at the moment. Check back soon!'
+                : `No blog posts found in the "${selectedCategory}" category.`
+              }
+            </p>
+          </div>
+        )}
 
         {/* Newsletter Signup */}
         <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-8 text-center text-white">
@@ -279,7 +343,13 @@ export default function BlogPage() {
             Are you a BGHS alumnus with an interesting story to share? We'd love to feature your journey, 
             achievements, or insights on our blog.
           </p>
-          <button className="btn-primary">Submit Your Article</button>
+          {canCreateBlog ? (
+            <Link href="/admin/blog/new" className="btn-primary">
+              Submit Your Article
+            </Link>
+          ) : (
+            <button className="btn-primary">Contact Us</button>
+          )}
         </div>
       </div>
     </div>

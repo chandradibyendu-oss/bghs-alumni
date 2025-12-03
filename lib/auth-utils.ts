@@ -17,6 +17,9 @@ export interface UserPermissions {
   can_send_notifications: boolean
   can_create_blog: boolean
   can_edit_blog: boolean
+  can_delete_blog: boolean
+  can_moderate_blog: boolean
+  can_publish_blog: boolean
   can_upload_media: boolean
   can_view_donations: boolean
   can_manage_campaigns: boolean

@@ -422,6 +422,59 @@ class R2Storage {
   }
 
   /**
+   * Upload blog inline image to R2
+   * @param buffer Image buffer
+   * @param blogId Blog post ID (optional, can be temp for drafts)
+   * @param originalFileName Original filename
+   * @returns Public URL of uploaded image
+   */
+  async uploadBlogImage(buffer: Buffer, blogId: string, originalFileName: string): Promise<string> {
+    try {
+      // Generate unique filename
+      const timestamp = Date.now()
+      const fileExtension = originalFileName.split('.').pop()?.toLowerCase() || 'jpg'
+      const fileName = `blog-${blogId}-${timestamp}.${fileExtension}`
+      
+      // Try to optimize image if Sharp is available
+      let optimizedBuffer = buffer
+      try {
+        const sharp = await import('sharp')
+        // For inline blog images, resize to max 1200px width (good for content)
+        optimizedBuffer = await sharp.default(buffer)
+          .resize(1200, null, { 
+            fit: 'inside', 
+            withoutEnlargement: true 
+          })
+          .jpeg({ quality: 85 })
+          .toBuffer()
+        
+        // Update filename to .jpg if optimized
+        const optimizedFileName = `blog-${blogId}-${timestamp}.jpg`
+        const result = await this.uploadFile(
+          optimizedBuffer, 
+          optimizedFileName, 
+          'image/jpeg', 
+          'blog'
+        )
+        return result.url
+      } catch (sharpError) {
+        // Sharp not available, upload original
+        console.warn('Sharp not available, uploading original image:', sharpError)
+        const result = await this.uploadFile(
+          buffer, 
+          fileName, 
+          `image/${fileExtension}`, 
+          'blog'
+        )
+        return result.url
+      }
+    } catch (error) {
+      console.error('Failed to upload blog image:', error)
+      throw new Error(`Failed to upload blog image: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
    * Delete event image from R2
    * @param imageUrl Full URL of the image to delete
    */
