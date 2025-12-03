@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 
@@ -94,32 +94,6 @@ const slideshowData = [
     cta: {
       primary: { text: 'View Gallery', href: '/gallery' },
       secondary: { text: 'Upload Photos', href: '/gallery' }
-    }
-  },
-  {
-    id: 3,
-    type: 'hall-of-fame',
-    title: 'Hall of Fame',
-    subtitle: 'Celebrating Our Distinguished Alumni',
-    description: 'Meet our alumni who have made significant contributions in their fields - from science and technology to arts and social service.',
-    backgroundImage: '/hero-images/hero-3.jpg',
-    icon: Trophy,
-    cta: {
-      primary: { text: 'View Hall of Fame', href: '/hall-of-fame' },
-      secondary: { text: 'Nominate Alumni', href: '/nominate' }
-    }
-  },
-  {
-    id: 4,
-    type: 'achievement',
-    title: 'Recent Achievements',
-    subtitle: 'Alumni Making Headlines',
-    description: 'Dr. Rajesh Kumar (Batch 1995) receives the prestigious Padma Shri award for his contributions to medical research.',
-    backgroundImage: '/hero-images/hero-4.jpg',
-    icon: Award,
-    cta: {
-      primary: { text: 'Read More', href: '/blog' },
-      secondary: { text: 'Share Achievement', href: '/share' }
     }
   }
 ];
@@ -416,7 +390,6 @@ export default function Home() {
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
-              <Link href="/donate" className="text-gray-700 hover:text-primary-600 transition-colors">Donate</Link>
               {userEmail ? (
                 <div className="relative">
                   <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
@@ -464,7 +437,6 @@ export default function Home() {
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
-              <Link href="/donate" className="block px-2 py-2 rounded hover:bg-gray-50">Donate</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>
@@ -732,7 +704,6 @@ export default function Home() {
                  <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                  <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
                  <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-                 <li><Link href="/donate" className="text-gray-400 hover:text-white transition-colors">Donate</Link></li>
                </ul>
              </div>
             <div>

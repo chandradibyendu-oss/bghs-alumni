@@ -389,7 +389,6 @@ export default function About() {
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
-              <Link href="/donate" className="text-gray-700 hover:text-primary-600 transition-colors">Donate</Link>
               {userEmail ? (
                 <div className="relative">
                   <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
@@ -436,7 +435,6 @@ export default function About() {
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
-              <Link href="/donate" className="block px-2 py-2 rounded hover:bg-gray-50">Donate</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>
@@ -744,7 +742,6 @@ export default function About() {
                 <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                 <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
                 <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-                <li><Link href="/donate" className="text-gray-400 hover:text-white transition-colors">Donate</Link></li>
               </ul>
             </div>
             <div>
