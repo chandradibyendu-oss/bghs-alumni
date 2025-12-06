@@ -82,3 +82,4 @@ The event image (2x2 collage) has a **square/portrait aspect ratio**, but the he
 2. Focus on the most important parts of the collage
 3. Or create a new hero-specific version that highlights key elements in a 16:9 format
 
+

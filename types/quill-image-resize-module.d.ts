@@ -8,3 +8,4 @@ declare module 'quill-image-resize-module' {
   export default ImageResize
 }
 
+

@@ -84,6 +84,8 @@ ENABLE_ACCESS_CONTROL=false
 - **Static assets are excluded**: Images, CSS, and JavaScript files load normally
 - **Session-based**: Once authenticated, users stay logged in for that browser session
 - **Case-insensitive emails**: Email matching is case-insensitive
+- **Multiple simultaneous access**: Multiple users can use the same email/password simultaneously - there's no limit on concurrent sessions
+- **Best practice**: Assign unique emails to each test member for better tracking, but sharing credentials works too
 
 ## Disabling Access Control (After Launch)
 

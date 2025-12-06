@@ -82,3 +82,4 @@ Event images are **NOT** shown in the gallery because:
 - [ ] Automatic thumbnail generation
 - [ ] Image alt text support
 
+

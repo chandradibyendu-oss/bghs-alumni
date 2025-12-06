@@ -16,3 +16,4 @@ Place your hero section images in this folder.
 
 The images will automatically be displayed in the hero section with smooth fade transitions.
 
+

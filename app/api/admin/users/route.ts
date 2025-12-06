@@ -128,18 +128,121 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // Fetch all users
-    const { data: users, error } = await supabaseAdmin
+    // First, get the total count from database
+    const { count: totalCount, error: countError } = await supabaseAdmin
       .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      console.error('Error fetching users:', error)
-      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
+      .select('*', { count: 'exact', head: true })
+    
+    if (countError) {
+      console.error('[API] Error getting total count:', countError)
+    } else {
+      console.log('[API] Total records in database (from count):', totalCount)
     }
 
-    return NextResponse.json({ users })
+    // Fetch all users - use service role to bypass RLS
+    // Supabase has a default limit of 1000, so we need to fetch in batches if needed
+    let allUsers: any[] = []
+    let page = 0
+    const pageSize = 1000
+    let hasMore = true
+
+    while (hasMore) {
+      const { data: users, error } = await supabaseAdmin
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .range(page * pageSize, (page + 1) * pageSize - 1)
+
+      if (error) {
+        console.error(`[API] Error fetching users (page ${page}):`, error)
+        break
+      }
+
+      if (users && users.length > 0) {
+        allUsers = allUsers.concat(users)
+        console.log(`[API] Fetched page ${page}: ${users.length} records (total so far: ${allUsers.length})`)
+        
+        // If we got fewer records than pageSize, we've reached the end
+        if (users.length < pageSize) {
+          hasMore = false
+        } else {
+          page++
+        }
+      } else {
+        hasMore = false
+      }
+    }
+
+    let finalUsers = allUsers
+    
+    // Verify count matches
+    console.log('[API] Total users fetched from database:', finalUsers.length)
+    if (totalCount !== null && totalCount !== undefined) {
+      if (finalUsers.length !== totalCount) {
+        console.error(`[API] COUNT MISMATCH! Database has ${totalCount} records, but API returned ${finalUsers.length} records`)
+      } else {
+        console.log('[API] ✓ Count matches database:', finalUsers.length, 'records')
+      }
+    }
+    
+    // Direct check for the specific emails
+    const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
+    const foundTargets = finalUsers.filter((u: any) => 
+      targetEmails.some(e => u.email?.toLowerCase() === e.toLowerCase())
+    )
+    
+    console.log('[API] Target emails found in main query:', foundTargets.length, 'out of', targetEmails.length)
+    foundTargets.forEach((u: any) => {
+      console.log('[API] ✓ Found target:', { id: u.id, email: u.email, full_name: u.full_name })
+    })
+    
+    // Check for missing emails and fetch them separately if needed
+    const missingEmails = targetEmails.filter(targetEmail => 
+      !finalUsers.some((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase())
+    )
+    
+    if (missingEmails.length > 0) {
+      console.warn('[API] Missing emails in main query:', missingEmails)
+      
+      // Fetch missing records individually
+      for (const missingEmail of missingEmails) {
+        const { data: missingUser, error: missingError } = await supabaseAdmin
+          .from('profiles')
+          .select('*')
+          .eq('email', missingEmail)
+          .maybeSingle()
+        
+        if (missingError) {
+          console.error(`[API] Error fetching ${missingEmail}:`, missingError)
+        } else if (missingUser) {
+          // Check if it's already in the array (case-insensitive check)
+          const exists = finalUsers.some((u: any) => 
+            u.id === missingUser.id || 
+            u.email?.toLowerCase() === missingUser.email?.toLowerCase()
+          )
+          
+          if (!exists) {
+            finalUsers.push(missingUser)
+            console.log(`[API] ✓ Added missing user: ${missingUser.email}`)
+          } else {
+            console.log(`[API] User ${missingEmail} already exists in array (duplicate check)`)
+          }
+        } else {
+          console.warn(`[API] User ${missingEmail} not found in database`)
+        }
+      }
+    }
+    
+    // Final verification
+    const finalCheck = finalUsers.filter((u: any) => 
+      targetEmails.some(e => u.email?.toLowerCase() === e.toLowerCase())
+    )
+    console.log('[API] Final count of target emails:', finalCheck.length, 'out of', targetEmails.length)
+    finalCheck.forEach((u: any) => {
+      console.log('[API] Final check - Found:', { id: u.id, email: u.email, full_name: u.full_name })
+    })
+
+    return NextResponse.json({ users: finalUsers })
 
   } catch (error) {
     console.error('Error in users fetch API:', error)

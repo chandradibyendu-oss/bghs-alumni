@@ -142,7 +142,59 @@ export default function AdminUsersPage() {
       }
 
       const { users } = await response.json()
-      setUsers((users || []).map((u: any) => ({ ...u, is_approved: u.is_approved ?? false })))
+      const apiCount = users?.length || 0
+      console.log('[FETCH] Raw API response - users count:', apiCount)
+      
+      // Log count comparison (expected: 1303 based on user's query)
+      if (apiCount !== 1303) {
+        console.warn(`[FETCH] ⚠️ Count mismatch! API returned ${apiCount} records, expected 1303`)
+      } else {
+        console.log('[FETCH] ✓ Count matches expected: 1303 records')
+      }
+      
+      const mappedUsers = (users || []).map((u: any) => ({ ...u, is_approved: u.is_approved ?? false }))
+      
+      // Debug: Check for specific target emails
+      const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
+      const foundTargets = mappedUsers.filter((u: any) => 
+        targetEmails.some(email => u.email?.toLowerCase() === email.toLowerCase())
+      )
+      
+      console.log('[FETCH] Target emails found in response:', foundTargets.length, 'out of', targetEmails.length)
+      foundTargets.forEach((u: any) => {
+        console.log('[FETCH] ✓ Found:', { id: u.id, email: u.email, full_name: u.full_name })
+      })
+      
+      // Check for missing email
+      const chandraEmailUser = mappedUsers.find((u: any) => 
+        u.email?.toLowerCase() === 'chandra.dibyendu@gmail.com'
+      )
+      if (!chandraEmailUser) {
+        console.error('[FETCH] ✗ MISSING: chandra.dibyendu@gmail.com NOT in API response!')
+        console.log('[FETCH] Total users in response:', mappedUsers.length)
+        // Log first few emails to see what we got
+        console.log('[FETCH] Sample emails:', mappedUsers.slice(0, 10).map((u: any) => u.email))
+      } else {
+        console.log('[FETCH] ✓ Found chandra.dibyendu@gmail.com:', {
+          id: chandraEmailUser.id,
+          email: chandraEmailUser.email,
+          full_name: chandraEmailUser.full_name
+        })
+      }
+      
+      // Log all Dibyendu users
+      const dibyenduUsers = mappedUsers.filter((u: any) => 
+        u.email?.toLowerCase().includes('dibyendu') || 
+        u.full_name?.toLowerCase().includes('dibyendu') ||
+        (u.first_name && u.first_name.toLowerCase().includes('dibyendu'))
+      )
+      console.log('[FETCH] All Dibyendu users in state:', dibyenduUsers.length)
+      dibyenduUsers.forEach((u: any) => {
+        console.log('[FETCH] Dibyendu user:', { id: u.id, email: u.email, full_name: u.full_name })
+      })
+      
+      setUsers(mappedUsers)
+      console.log('[FETCH] State updated with', mappedUsers.length, 'users')
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -460,17 +512,61 @@ export default function AdminUsersPage() {
 
   const filteredUsers = users.filter(user => {
     const term = searchTerm.trim().toLowerCase()
-    const matchesNameEmailProfession = user.full_name.toLowerCase().includes(term) ||
-                         user.email.toLowerCase().includes(term) ||
-                         user.profession?.toLowerCase().includes(term)
+    if (!term) {
+      // If no search term, only filter by year
+      const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
+      return matchesYear
+    }
+    
+    // Search across multiple fields: full_name, first_name, last_name, middle_name, email, profession
+    const fullName = (user.full_name || '').toLowerCase()
+    const firstName = ((user as any).first_name || '').toLowerCase()
+    const lastName = ((user as any).last_name || '').toLowerCase()
+    const middleName = ((user as any).middle_name || '').toLowerCase()
+    const email = (user.email || '').toLowerCase()
+    const profession = (user.profession || '').toLowerCase()
+    
+    const matchesName = fullName.includes(term) ||
+                       firstName.includes(term) ||
+                       lastName.includes(term) ||
+                       middleName.includes(term) ||
+                       email.includes(term) ||
+                       profession.includes(term)
+    
     // Allow search by full or last 5 digits of registration_id
     const regId = (user.registration_id || '').toLowerCase()
-    const matchesRegId = term
-      ? (regId.includes(term) || (term.length <= 5 && regId.endsWith(term)))
-      : true
-    const matchesSearch = matchesNameEmailProfession || matchesRegId
+    const matchesRegId = regId.includes(term) || (term.length <= 5 && regId.endsWith(term))
+    
+    const matchesSearch = matchesName || matchesRegId
     const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
-    return matchesSearch && matchesYear
+    const result = matchesSearch && matchesYear
+    
+    // Debug logging for specific emails or Dibyendu users
+    const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
+    const isTargetUser = targetEmails.some(e => email === e.toLowerCase()) ||
+                        email.includes('dibyendu') || 
+                        email.includes('bghsa202501123') || 
+                        fullName.includes('dibyendu') || 
+                        firstName.includes('dibyendu')
+    
+    if (isTargetUser) {
+      console.log('[FILTER] Filter check for:', {
+        email: user.email,
+        full_name: user.full_name,
+        first_name: (user as any).first_name,
+        last_name: (user as any).last_name,
+        year_of_leaving: user.year_of_leaving,
+        filterYear,
+        term,
+        matchesName,
+        matchesRegId,
+        matchesSearch,
+        matchesYear,
+        result
+      })
+    }
+    
+    return result
   })
 
   const leavingYears = Array.from(new Set(users.map(u => u.year_of_leaving).filter(Boolean) as number[])).sort((a, b) => (b - a))
