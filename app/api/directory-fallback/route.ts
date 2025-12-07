@@ -28,11 +28,15 @@ export async function GET(request: NextRequest) {
   try {
     const supabaseAdmin = createSupabaseAdmin()
     
-    // Parse pagination parameters
+    // Parse pagination and filter parameters
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '12')
     const offset = (page - 1) * limit
+    const searchTerm = searchParams.get('search') || ''
+    const filterYear = searchParams.get('year') || ''
+    const filterClass = searchParams.get('class') || ''
+    const filterProfession = searchParams.get('profession') || ''
 
     // Helper to anonymize names for public responses
     const anonymizeName = (fullName: string | null): string => {
@@ -67,19 +71,54 @@ export async function GET(request: NextRequest) {
       console.log('DEBUG: No auth header found')
     }
 
-    // Get total count for pagination
-    const { count: totalCount, error: countError } = await supabaseAdmin
+    // Build count query with filters (for total count)
+    let countQuery = supabaseAdmin
       .from('profiles')
       .select('*', { count: 'exact', head: true })
       .eq('is_approved', true)
+
+    // Apply search filter to count query (search across name, profession, and company)
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim()
+      countQuery = countQuery.or(`full_name.ilike.%${searchLower}%,profession.ilike.%${searchLower}%,company.ilike.%${searchLower}%`)
+    }
+
+    // Apply year filter to count query (decade-based)
+    if (filterYear && filterYear !== 'All') {
+      const decade = parseInt(filterYear.replace('s', ''))
+      if (!isNaN(decade)) {
+        countQuery = countQuery.gte('year_of_leaving', decade).lt('year_of_leaving', decade + 10)
+      }
+    }
+
+    // Apply class filter to count query
+    if (filterClass && filterClass !== 'All') {
+      if (filterClass === 'Class 12') {
+        countQuery = countQuery.eq('last_class', 12)
+      } else if (filterClass === 'Class 10') {
+        countQuery = countQuery.eq('last_class', 10)
+      } else if (filterClass === 'Class 6-9') {
+        countQuery = countQuery.gte('last_class', 6).lte('last_class', 9)
+      } else if (filterClass === 'Class 1-5') {
+        countQuery = countQuery.gte('last_class', 1).lte('last_class', 5)
+      }
+    }
+
+    // Apply profession filter to count query
+    if (filterProfession && filterProfession !== 'All') {
+      countQuery = countQuery.eq('profession', filterProfession)
+    }
+
+    // Get total count with filters applied
+    const { count: totalCount, error: countError } = await countQuery
 
     if (countError) {
       console.error('Error fetching total count:', countError)
       return NextResponse.json({ error: 'Failed to fetch alumni count' }, { status: 500 })
     }
 
-    // Get paginated approved users
-    const { data: users, error } = await supabaseAdmin
+    // Get paginated results with same filters
+    let paginatedQuery = supabaseAdmin
       .from('profiles')
       .select(`
         id, email, full_name, batch_year, profession, company, location, bio, avatar_url, 
@@ -90,6 +129,37 @@ export async function GET(request: NextRequest) {
         professional_title_id, is_deceased, deceased_year
       `)
       .eq('is_approved', true)
+
+    // Apply same filters to paginated query
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim()
+      paginatedQuery = paginatedQuery.or(`full_name.ilike.%${searchLower}%,profession.ilike.%${searchLower}%,company.ilike.%${searchLower}%`)
+    }
+
+    if (filterYear && filterYear !== 'All') {
+      const decade = parseInt(filterYear.replace('s', ''))
+      if (!isNaN(decade)) {
+        paginatedQuery = paginatedQuery.gte('year_of_leaving', decade).lt('year_of_leaving', decade + 10)
+      }
+    }
+
+    if (filterClass && filterClass !== 'All') {
+      if (filterClass === 'Class 12') {
+        paginatedQuery = paginatedQuery.eq('last_class', 12)
+      } else if (filterClass === 'Class 10') {
+        paginatedQuery = paginatedQuery.eq('last_class', 10)
+      } else if (filterClass === 'Class 6-9') {
+        paginatedQuery = paginatedQuery.gte('last_class', 6).lte('last_class', 9)
+      } else if (filterClass === 'Class 1-5') {
+        paginatedQuery = paginatedQuery.gte('last_class', 1).lte('last_class', 5)
+      }
+    }
+
+    if (filterProfession && filterProfession !== 'All') {
+      paginatedQuery = paginatedQuery.eq('profession', filterProfession)
+    }
+
+    const { data: users, error } = await paginatedQuery
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

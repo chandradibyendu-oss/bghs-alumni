@@ -34,6 +34,9 @@ interface ProfileData {
   registration_id?: string
   created_at?: string
   is_approved?: boolean
+  professional_title_id?: number
+  professional_title?: string
+  professional_title_category?: string
 }
 
 interface PrivacySettings {
@@ -43,6 +46,16 @@ interface PrivacySettings {
     description: string
     category: string
   }
+}
+
+// Helper function to format name with professional title (from database)
+const formatNameWithTitle = (fullName: string, professionalTitle?: string): string => {
+  // Display professional title from database before the name
+  if (professionalTitle) {
+    return `${professionalTitle} ${fullName}`
+  }
+  
+  return fullName
 }
 
 export default function ProfileViewPage() {
@@ -93,8 +106,29 @@ export default function ProfileViewPage() {
         return
       }
 
-      // Set profile data and privacy settings
-      setProfile(profileData.profile)
+      // Fetch professional title if professional_title_id exists
+      let professionalTitle = null
+      let professionalTitleCategory = null
+      
+      if (profileData.profile?.professional_title_id) {
+        const { data: titleData, error: titleError } = await supabase
+          .from('professional_titles')
+          .select('title, category')
+          .eq('id', profileData.profile.professional_title_id)
+          .single()
+        
+        if (!titleError && titleData) {
+          professionalTitle = titleData.title
+          professionalTitleCategory = titleData.category
+        }
+      }
+
+      // Set profile data with professional title information
+      setProfile({
+        ...profileData.profile,
+        professional_title: professionalTitle,
+        professional_title_category: professionalTitleCategory
+      })
       setPrivacySettings(profileData.privacy_settings || {})
       setCanViewProfile(true)
 
@@ -224,7 +258,9 @@ export default function ProfileViewPage() {
             {/* Basic Info */}
             <div className="flex-1">
               <div className="flex items-center space-x-3 mb-2">
-                <h2 className="text-2xl font-bold text-gray-900">{profile.full_name}</h2>
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {formatNameWithTitle(profile.full_name, profile.professional_title)}
+                </h2>
                 {accessLevel === 'admin' && (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Admin View

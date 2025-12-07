@@ -7,6 +7,16 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { User, Mail, Phone, MapPin, Briefcase, Building, Globe, Linkedin, Camera, Save, Edit3, Award, Upload, X } from 'lucide-react'
 
+// Helper function to format name with professional title (from database)
+const formatNameWithTitle = (fullName: string, professionalTitle?: string | null): string => {
+  // Display professional title from database before the name
+  if (professionalTitle) {
+    return `${professionalTitle} ${fullName}`
+  }
+  
+  return fullName
+}
+
 interface Profile {
   id: string
   email: string
@@ -310,7 +320,7 @@ export default function ProfilePage() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">
-              {profile.professional_title ? `${profile.professional_title} ${profile.full_name}` : profile.full_name}
+              {formatNameWithTitle(profile.full_name, profile.professional_title)}
             </h1>
             {profile.professional_title_category && (
               <p className="text-sm text-gray-600 mt-1">

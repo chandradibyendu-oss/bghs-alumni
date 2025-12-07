@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { ArrowLeft, Search, Filter, MapPin, Briefcase, GraduationCap, Mail, Linkedin, Globe, User } from 'lucide-react'
@@ -43,6 +43,16 @@ interface PaginationInfo {
   hasPrevPage: boolean
 }
 
+interface DirectoryStats {
+  totalAlumni: number
+  totalProfessions: number
+  totalYearDecades: number
+  totalClasses: number
+  professions: string[]
+  yearDecades: string[]
+  classes: number[]
+}
+
 const anonymizeName = (fullName: string): string => {
   if (!fullName) return 'Alumni Member'
   const parts = fullName.trim().split(/\s+/)
@@ -52,12 +62,13 @@ const anonymizeName = (fullName: string): string => {
   return `${first} ${lastInitial}.`
 }
 
-// Helper function to format name with professional title
+// Helper function to format name with professional title (from database)
 const formatNameWithTitle = (person: UserProfile, isAuthenticated: boolean) => {
   if (!isAuthenticated) {
     return anonymizeName(person.full_name)
   }
   
+  // Display professional title from database before the name
   if (person.professional_title) {
     return `${person.professional_title} ${person.full_name}`
   }
@@ -68,7 +79,9 @@ const formatNameWithTitle = (person: UserProfile, isAuthenticated: boolean) => {
 export default function DirectoryPage() {
   const [alumni, setAlumni] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchLoading, setSearchLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('')
   const [filterYear, setFilterYear] = useState('All')
   const [filterClass, setFilterClass] = useState('All')
   const [filterProfession, setFilterProfession] = useState('All')
@@ -86,32 +99,90 @@ export default function DirectoryPage() {
     can_view_full_directory: false,
     is_authenticated: false
   })
+  const [stats, setStats] = useState<DirectoryStats>({
+    totalAlumni: 0,
+    totalProfessions: 0,
+    totalYearDecades: 0,
+    totalClasses: 0,
+    professions: [],
+    yearDecades: [],
+    classes: []
+  })
+  const [statsLoading, setStatsLoading] = useState(true)
 
+  // Debounce search term
   useEffect(() => {
-    checkAuthAndLoad()
-  }, [])
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm)
+    }, 300) // 300ms debounce
 
+    return () => clearTimeout(timer)
+  }, [searchTerm])
+
+  // Load stats and initial data on mount
   useEffect(() => {
-    if (currentPage > 1) {
-      loadPage(currentPage)
-    }
-  }, [currentPage])
-
-  const checkAuthAndLoad = async () => {
-    try {
+    const initialize = async () => {
       setLoading(true)
       const { data: { user } } = await supabase.auth.getUser()
       setIsAuthed(!!user)
-      await loadPage(1)
-    } catch (error) {
-      console.error('Error fetching alumni:', error)
-    } finally {
+      await loadStats()
+      await loadPage(1, '', 'All', 'All', 'All')
       setLoading(false)
+    }
+    initialize()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Load data when filters or search change (skip initial mount)
+  useEffect(() => {
+    // Skip if still loading initial data
+    if (loading) return
+    
+    setCurrentPage(1) // Reset to first page when filters change
+    loadPage(1, debouncedSearchTerm, filterYear, filterClass, filterProfession)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearchTerm, filterYear, filterClass, filterProfession])
+
+  useEffect(() => {
+    if (currentPage > 1 && !loading) {
+      loadPage(currentPage, debouncedSearchTerm, filterYear, filterClass, filterProfession)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage])
+
+  const loadStats = async () => {
+    try {
+      setStatsLoading(true)
+      const response = await fetch('/api/directory/stats', {
+        method: 'GET',
+        cache: 'no-store'
+      })
+      
+      if (response.ok) {
+        const statsData = await response.json()
+        setStats(statsData)
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    } finally {
+      setStatsLoading(false)
     }
   }
 
-  const loadPage = async (page: number) => {
+  const loadPage = async (
+    page: number, 
+    search: string = '', 
+    year: string = 'All', 
+    classFilter: string = 'All', 
+    profession: string = 'All'
+  ) => {
     try {
+      if (page === 1) {
+        setLoading(true)
+      } else {
+        setSearchLoading(true)
+      }
+      
       const { data: { user } } = await supabase.auth.getUser()
       setIsAuthed(!!user)
       
@@ -119,7 +190,26 @@ export default function DirectoryPage() {
       const { data: sessionData } = await supabase.auth.getSession()
       const accessToken = sessionData?.session?.access_token
       
-      const response = await fetch(`/api/directory-fallback?page=${page}&limit=12`, {
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '12'
+      })
+      
+      if (search.trim()) {
+        params.append('search', search.trim())
+      }
+      if (year && year !== 'All') {
+        params.append('year', year)
+      }
+      if (classFilter && classFilter !== 'All') {
+        params.append('class', classFilter)
+      }
+      if (profession && profession !== 'All') {
+        params.append('profession', profession)
+      }
+      
+      const response = await fetch(`/api/directory-fallback?${params.toString()}`, {
         method: 'GET',
         headers: accessToken ? { 'Authorization': `Bearer ${accessToken}` } : undefined,
         cache: 'no-store'
@@ -152,16 +242,18 @@ export default function DirectoryPage() {
       }
     } catch (error) {
       console.error('Error fetching alumni:', error)
+    } finally {
+      setLoading(false)
+      setSearchLoading(false)
     }
   }
 
-  // Generate year decades dynamically from year_of_leaving
-  const yearDecades = ['All', ...Array.from(new Set(alumni.map(u => Math.floor(u.year_of_leaving / 10) * 10 + 's'))).sort()]
+  // Generate filter options from stats
+  const yearDecades = ['All', ...stats.yearDecades]
   
-  // Generate class options dynamically from last_class
   const generateClassOptions = () => {
     const allClasses = ['All']
-    const existingClasses = Array.from(new Set(alumni.map(u => u.last_class).filter(Boolean))).sort()
+    const existingClasses = stats.classes
     
     // Add specific class options based on existing data
     if (existingClasses.includes(12)) allClasses.push('Class 12')
@@ -178,40 +270,10 @@ export default function DirectoryPage() {
   }
   
   const classOptions = generateClassOptions()
-  
-  // Generate professions dynamically (only for authenticated users with full access)
-  const allProfessions = ['All', ...Array.from(new Set(
-    alumni
-      .map(u => u.profession)
-      .filter(Boolean)
-      .filter(prof => prof !== 'BGHS Alumni') // Filter out anonymized profession
-  )).sort()]
+  const allProfessions = ['All', ...stats.professions]
 
-  // Filter alumni based on search and filters
-  const filteredAlumni = alumni.filter(person => {
-    const matchesSearch = person.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         person.profession?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         person.company?.toLowerCase().includes(searchTerm.toLowerCase())
-    
-    // Enhanced year of leaving filter (decade-based)
-    const matchesYear = filterYear === 'All' || 
-                       (filterYear === '1980s' && person.year_of_leaving >= 1980 && person.year_of_leaving < 1990) ||
-                       (filterYear === '1990s' && person.year_of_leaving >= 1990 && person.year_of_leaving < 2000) ||
-                       (filterYear === '2000s' && person.year_of_leaving >= 2000 && person.year_of_leaving < 2010) ||
-                       (filterYear === '2010s' && person.year_of_leaving >= 2010 && person.year_of_leaving < 2020) ||
-                       (filterYear === '2020s' && person.year_of_leaving >= 2020)
-    
-    // Enhanced last class filter (class-based)
-    const matchesClass = filterClass === 'All' ||
-                        (filterClass === 'Class 12' && person.last_class === 12) ||
-                        (filterClass === 'Class 10' && person.last_class === 10) ||
-                        (filterClass === 'Class 6-9' && person.last_class >= 6 && person.last_class <= 9) ||
-                        (filterClass === 'Class 1-5' && person.last_class >= 1 && person.last_class <= 5)
-    
-    const matchesProfession = filterProfession === 'All' || person.profession === filterProfession
-    
-    return matchesSearch && matchesYear && matchesClass && matchesProfession
-  })
+  // No client-side filtering - all filtering is done server-side
+  const filteredAlumni = alumni
 
   if (loading) {
     return (
@@ -255,6 +317,11 @@ export default function DirectoryPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="input-field pl-10"
                 />
+                {searchLoading && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-600"></div>
+                  </div>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -329,19 +396,27 @@ export default function DirectoryPage() {
         {/* Directory Stats */}
         <div className="grid md:grid-cols-4 gap-4 mb-8">
           <div className="bg-white rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary-600">{filteredAlumni.length}</div>
+            <div className="text-2xl font-bold text-primary-600">
+              {statsLoading ? '...' : (searchTerm || filterYear !== 'All' || filterClass !== 'All' || filterProfession !== 'All' ? pagination.totalCount : stats.totalAlumni)}
+            </div>
             <div className="text-sm text-gray-600">Total Alumni</div>
           </div>
           <div className="bg-white rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary-600">{alumni.length > 0 ? 'Active' : '0'}</div>
-            <div className="text-sm text-gray-600">Profiles</div>
+            <div className="text-2xl font-bold text-primary-600">
+              {statsLoading ? '...' : stats.totalAlumni}
+            </div>
+            <div className="text-sm text-gray-600">Active Profiles</div>
           </div>
           <div className="bg-white rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary-600">{allProfessions.length - 1}</div>
+            <div className="text-2xl font-bold text-primary-600">
+              {statsLoading ? '...' : stats.totalProfessions}
+            </div>
             <div className="text-sm text-gray-600">Professions</div>
           </div>
           <div className="bg-white rounded-lg p-4 text-center">
-            <div className="text-2xl font-bold text-primary-600">{yearDecades.length - 1}</div>
+            <div className="text-2xl font-bold text-primary-600">
+              {statsLoading ? '...' : stats.totalYearDecades}
+            </div>
             <div className="text-sm text-gray-600">Year Decades</div>
           </div>
         </div>
@@ -481,10 +556,10 @@ export default function DirectoryPage() {
             <div className="text-center mt-8">
               <button
                 onClick={() => setCurrentPage(prev => prev + 1)}
-                disabled={loading}
+                disabled={searchLoading}
                 className="btn-secondary px-8 py-3 text-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? (
+                {searchLoading ? (
                   <span className="flex items-center">
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-current mr-2"></div>
                     Loading...
@@ -500,6 +575,11 @@ export default function DirectoryPage() {
           {pagination.totalCount > 0 && (
             <div className="text-center mt-4 text-gray-600">
               Showing {alumni.length} of {pagination.totalCount} alumni
+              {(searchTerm || filterYear !== 'All' || filterClass !== 'All' || filterProfession !== 'All') && (
+                <span className="ml-2 text-sm text-gray-500">
+                  (filtered results)
+                </span>
+              )}
             </div>
           )}
           </div>
