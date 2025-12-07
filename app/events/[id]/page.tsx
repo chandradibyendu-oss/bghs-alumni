@@ -17,135 +17,264 @@ import {
   Mail,
   Camera,
   Eye,
+  X,
+  ExternalLink,
+  Maximize2,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 
+// Lightbox component for viewing sponsor images
+function ImageLightbox({ 
+  imageUrl, 
+  alt, 
+  isOpen, 
+  onClose 
+}: { 
+  imageUrl: string | null
+  alt: string
+  isOpen: boolean
+  onClose: () => void 
+}) {
+  if (!isOpen || !imageUrl) return null
+
+  return (
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-90 p-4"
+      onClick={onClose}
+    >
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors z-10"
+        aria-label="Close lightbox"
+      >
+        <X size={32} />
+      </button>
+      <div 
+        className="relative max-w-7xl max-h-[90vh] w-full h-full"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <img
+          src={imageUrl}
+          alt={alt}
+          className="w-full h-full object-contain"
+        />
+      </div>
+    </div>
+  )
+}
+
+// Horizontal Marquee Component
+function SponsorMarquee({
+  sponsors,
+  title,
+  onImageClick,
+  tierType,
+}: {
+  sponsors: { name: string; logo_url: string; website_url: string; banner_url?: string; description?: string; tier: string }[]
+  title: string
+  onImageClick: (imageUrl: string, sponsorName: string) => void
+  tierType: 'platinum' | 'gold' | 'silver' | 'bronze'
+}) {
+  // Duplicate sponsors multiple times for seamless infinite loop
+  // More duplicates = smoother animation
+  const duplicatedSponsors = [...sponsors, ...sponsors, ...sponsors]
+  
+  const handleBannerClick = (
+    e: React.MouseEvent,
+    sponsor: { name: string; website_url: string; banner_url?: string; logo_url: string }
+  ) => {
+    e.preventDefault()
+    e.stopPropagation()
+    const imageUrl = sponsor.banner_url || sponsor.logo_url
+    if (imageUrl) {
+      onImageClick(imageUrl, sponsor.name)
+    }
+  }
+
+  const hasValidWebsite = (url: string | undefined) => {
+    return url && url !== '#' && url.trim() !== '' && (url.startsWith('http://') || url.startsWith('https://'))
+  }
+
+  // Tier-specific styling with dark backgrounds
+  const tierStyles = {
+    platinum: {
+      container: 'bg-gradient-to-r from-gray-900 via-gray-800 to-gray-900 border-2 border-gray-700 shadow-2xl',
+      card: 'bg-white border-2 border-gray-400 rounded-xl p-6 hover:border-primary-400 hover:shadow-2xl hover:scale-105',
+      imageContainer: 'aspect-[16/9]',
+      title: 'text-xl font-bold bg-gradient-to-r from-yellow-300 to-yellow-500',
+      icon: 'from-yellow-400 to-yellow-600',
+    },
+    gold: {
+      container: 'bg-gradient-to-r from-amber-900 via-amber-800 to-amber-900 border border-amber-700 shadow-xl',
+      card: 'bg-white border border-amber-300 rounded-lg p-5 hover:border-amber-400 hover:shadow-2xl hover:scale-105',
+      imageContainer: 'aspect-[4/3]',
+      title: 'text-lg font-semibold bg-gradient-to-r from-amber-300 to-amber-500',
+      icon: 'from-amber-400 to-amber-600',
+    },
+    silver: {
+      container: 'bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800 border border-gray-600 shadow-lg',
+      card: 'bg-white border border-gray-300 rounded-lg p-4 hover:border-gray-400 hover:shadow-xl hover:scale-105',
+      imageContainer: 'aspect-square',
+      title: 'text-base font-semibold bg-gradient-to-r from-gray-300 to-gray-400',
+      icon: 'from-gray-400 to-gray-600',
+    },
+    bronze: {
+      container: 'bg-gradient-to-r from-orange-900 via-orange-800 to-orange-900 border border-orange-700 shadow-lg',
+      card: 'bg-white border border-orange-300 rounded-lg p-3 hover:border-orange-400 hover:shadow-xl hover:scale-105',
+      imageContainer: 'aspect-square',
+      title: 'text-base font-semibold bg-gradient-to-r from-orange-300 to-orange-500',
+      icon: 'from-orange-400 to-orange-600',
+    },
+  }
+
+  const style = tierStyles[tierType]
+  const isLargeTier = tierType === 'platinum' || tierType === 'gold'
+
+  return (
+    <div className={`relative overflow-hidden ${style.container} rounded-lg py-4`}>
+      {/* Gradient fade edges - dark background compatible */}
+      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r z-10 pointer-events-none" 
+           style={{
+             background: tierType === 'platinum' 
+               ? 'linear-gradient(to right, rgb(17 24 39), transparent)'
+               : tierType === 'gold'
+               ? 'linear-gradient(to right, rgb(120 53 15), transparent)'
+               : tierType === 'silver'
+               ? 'linear-gradient(to right, rgb(31 41 55), transparent)'
+               : 'linear-gradient(to right, rgb(154 52 18), transparent)'
+           }} />
+      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l z-10 pointer-events-none"
+           style={{
+             background: tierType === 'platinum' 
+               ? 'linear-gradient(to left, rgb(17 24 39), transparent)'
+               : tierType === 'gold'
+               ? 'linear-gradient(to left, rgb(120 53 15), transparent)'
+               : tierType === 'silver'
+               ? 'linear-gradient(to left, rgb(31 41 55), transparent)'
+               : 'linear-gradient(to left, rgb(154 52 18), transparent)'
+           }} />
+      
+      {/* Scrolling content */}
+      <div className="flex animate-scroll group">
+        {duplicatedSponsors.map((sponsor, index) => {
+          const imageUrl = sponsor.banner_url || sponsor.logo_url
+          const hasWebsite = hasValidWebsite(sponsor.website_url)
+          
+          return (
+            <div
+              key={`${sponsor.name}-${index}`}
+              className={`flex-shrink-0 mx-4 ${style.card} transition-all duration-300 min-w-[280px] ${isLargeTier ? 'min-w-[320px]' : 'min-w-[200px]'} shadow-lg`}
+            >
+              <div className={`relative ${style.imageContainer} bg-gray-50 rounded-lg overflow-hidden mb-3`}>
+                {imageUrl ? (
+                  <>
+                    <Image
+                      src={imageUrl}
+                      alt={`${sponsor.name} — ${title} Sponsor`}
+                      width={isLargeTier ? 320 : 200}
+                      height={isLargeTier ? 180 : 200}
+                      className="w-full h-full object-cover hover:scale-105 transition-transform duration-300 cursor-pointer"
+                      onClick={(e) => handleBannerClick(e, sponsor)}
+                    />
+                    <button
+                      onClick={(e) => handleBannerClick(e, sponsor)}
+                      className="absolute top-2 right-2 bg-black bg-opacity-50 hover:bg-opacity-70 text-white p-1.5 rounded-full transition-all opacity-0 hover:opacity-100"
+                      aria-label="View image in full size"
+                      title="View image in full size"
+                    >
+                      <Maximize2 size={14} />
+                    </button>
+                  </>
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    <div className="text-center">
+                      <div className={`${isLargeTier ? 'text-4xl mb-2' : 'text-2xl mb-1'}`}>🏢</div>
+                      <div className={`${isLargeTier ? 'text-sm' : 'text-xs'} font-medium`}>{sponsor.name}</div>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <h4 className={`font-semibold text-gray-900 ${isLargeTier ? 'text-base' : 'text-sm'}`}>
+                    {sponsor.name}
+                  </h4>
+                  {hasWebsite && (
+                    <Link
+                      href={sponsor.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow sponsored"
+                      className="text-primary-600 hover:text-primary-700 transition-colors"
+                      onClick={(e) => e.stopPropagation()}
+                      aria-label={`Visit ${sponsor.name} website`}
+                    >
+                      <ExternalLink size={isLargeTier ? 16 : 14} />
+                    </Link>
+                  )}
+                </div>
+                {sponsor.description && isLargeTier && (
+                  <p className="text-xs text-gray-600 line-clamp-2">{sponsor.description}</p>
+                )}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function TierSection({
   title,
   sponsors,
+  onImageClick,
 }: {
   title: string
   sponsors: { name: string; logo_url: string; website_url: string; banner_url?: string; description?: string; tier: string }[]
+  onImageClick: (imageUrl: string, sponsorName: string) => void
 }) {
   if (!sponsors || sponsors.length === 0) return null
   
-  // Different layouts based on tier
-  const isPlatinum = title === 'Platinum'
-  const isGold = title === 'Gold'
+  // Map tier names to tier types
+  const tierTypeMap: Record<string, 'platinum' | 'gold' | 'silver' | 'bronze'> = {
+    'Platinum': 'platinum',
+    'Gold': 'gold',
+    'Silver': 'silver',
+    'Bronze': 'bronze',
+  }
+  
+  const tierType = tierTypeMap[title] || 'silver'
+  
+  // Tier-specific gradient colors for title - bright colors for dark backgrounds
+  const titleGradients = {
+    platinum: 'from-yellow-300 to-yellow-500',
+    gold: 'from-amber-300 to-amber-500',
+    silver: 'from-gray-300 to-gray-400',
+    bronze: 'from-orange-300 to-orange-500',
+  }
+  
+  const iconGradients = {
+    platinum: 'from-yellow-400 to-yellow-600',
+    gold: 'from-amber-400 to-amber-600',
+    silver: 'from-gray-400 to-gray-500',
+    bronze: 'from-orange-400 to-orange-600',
+  }
   
   return (
-    <div className="mb-8">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-        <span className="w-2 h-2 rounded-full bg-gradient-to-r from-yellow-400 to-yellow-600"></span>
+    <div className="mb-10">
+      <h3 className={`text-lg font-bold mb-4 flex items-center gap-2 text-transparent bg-clip-text bg-gradient-to-r ${titleGradients[tierType]} drop-shadow-lg`}>
+        <span className={`w-3 h-3 rounded-full bg-gradient-to-r ${iconGradients[tierType]} shadow-lg`}></span>
         {title} Sponsors
       </h3>
       
-      {isPlatinum ? (
-        // Platinum: Large banner display
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {sponsors.map((sponsor) => (
-            <div key={sponsor.name} className="group">
-              <Link
-                href={sponsor.website_url || '#'}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                className="block bg-white border-2 border-gray-200 rounded-xl p-6 hover:border-primary-300 hover:shadow-lg transition-all duration-300"
-              >
-                <div className="aspect-[16/9] bg-gray-50 rounded-lg overflow-hidden mb-4">
-                  {(sponsor.banner_url || sponsor.logo_url) ? (
-                    <Image
-                      src={sponsor.banner_url || sponsor.logo_url}
-                      alt={`${sponsor.name} — ${title} Sponsor`}
-                      width={400}
-                      height={225}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <div className="text-center">
-                        <div className="text-4xl mb-2">🏢</div>
-                        <div className="text-sm font-medium">{sponsor.name}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <div className="text-center">
-                  <h4 className="font-semibold text-gray-900 mb-1">{sponsor.name}</h4>
-                  {sponsor.description && (
-                    <p className="text-sm text-gray-600 line-clamp-2">{sponsor.description}</p>
-                  )}
-                </div>
-              </Link>
-            </div>
-          ))}
-        </div>
-      ) : isGold ? (
-        // Gold: Medium banner display
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sponsors.map((sponsor) => (
-            <div key={sponsor.name} className="group">
-              <Link
-                href={sponsor.website_url || '#'}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                className="block bg-white border border-gray-200 rounded-lg p-4 hover:border-primary-300 hover:shadow-md transition-all duration-300"
-              >
-                <div className="aspect-[4/3] bg-gray-50 rounded-lg overflow-hidden mb-3">
-                  {(sponsor.banner_url || sponsor.logo_url) ? (
-                    <Image
-                      src={sponsor.banner_url || sponsor.logo_url}
-                      alt={`${sponsor.name} — ${title} Sponsor`}
-                      width={300}
-                      height={225}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                      <div className="text-center">
-                        <div className="text-3xl mb-1">🏢</div>
-                        <div className="text-xs font-medium">{sponsor.name}</div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <h4 className="font-medium text-gray-900 text-sm text-center">{sponsor.name}</h4>
-              </Link>
-            </div>
-          ))}
-        </div>
-      ) : (
-        // Silver/Bronze: Compact logo display
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          {sponsors.map((sponsor) => (
-            <div key={sponsor.name} className="group">
-              <Link
-                href={sponsor.website_url || '#'}
-                target="_blank"
-                rel="noopener noreferrer nofollow sponsored"
-                className="block bg-white border border-gray-200 rounded-lg p-3 hover:border-primary-300 hover:shadow-sm transition-all duration-300"
-              >
-                <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden flex items-center justify-center">
-                  {(sponsor.banner_url || sponsor.logo_url) ? (
-                    <Image
-                      src={sponsor.banner_url || sponsor.logo_url}
-                      alt={`${sponsor.name} — ${title} Sponsor`}
-                      width={120}
-                      height={120}
-                      className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-300"
-                    />
-                  ) : (
-                    <div className="text-center text-gray-400">
-                      <div className="text-2xl mb-1">🏢</div>
-                      <div className="text-xs font-medium">{sponsor.name}</div>
-                    </div>
-                  )}
-                </div>
-              </Link>
-            </div>
-          ))}
-        </div>
-      )}
+      <SponsorMarquee
+        sponsors={sponsors}
+        title={title}
+        onImageClick={onImageClick}
+        tierType={tierType}
+      />
     </div>
   )
 }
@@ -162,6 +291,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   const [registering, setRegistering] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
   const [isEventCreator, setIsEventCreator] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState<{ url: string; alt: string } | null>(null)
 
   // Get sponsors from event metadata, fallback to mock data if none
   const eventSponsors = event?.metadata?.sponsors || []
@@ -811,6 +941,15 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   })
 
   return (
+    <>
+      {/* Image Lightbox */}
+      <ImageLightbox
+        imageUrl={lightboxImage?.url || null}
+        alt={lightboxImage?.alt || ''}
+        isOpen={!!lightboxImage}
+        onClose={() => setLightboxImage(null)}
+      />
+      
     <div className="min-h-screen bg-gray-50">
       {/* Top bar & breadcrumbs */}
       <div className="bg-white shadow-sm border-b border-gray-200">
@@ -932,10 +1071,26 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               Sponsors
             </h2>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <TierSection title="Platinum" sponsors={displaySponsors.filter((s: any) => s.tier === 'Platinum')} />
-                        <TierSection title="Gold" sponsors={displaySponsors.filter((s: any) => s.tier === 'Gold')} />
-                        <TierSection title="Silver" sponsors={displaySponsors.filter((s: any) => s.tier === 'Silver')} />
-                        <TierSection title="Bronze" sponsors={displaySponsors.filter((s: any) => s.tier === 'Bronze')} />
+                        <TierSection 
+                          title="Platinum" 
+                          sponsors={displaySponsors.filter((s: any) => s.tier === 'Platinum')} 
+                          onImageClick={(url, name) => setLightboxImage({ url, alt: `${name} — Platinum Sponsor` })}
+                        />
+                        <TierSection 
+                          title="Gold" 
+                          sponsors={displaySponsors.filter((s: any) => s.tier === 'Gold')} 
+                          onImageClick={(url, name) => setLightboxImage({ url, alt: `${name} — Gold Sponsor` })}
+                        />
+                        <TierSection 
+                          title="Silver" 
+                          sponsors={displaySponsors.filter((s: any) => s.tier === 'Silver')} 
+                          onImageClick={(url, name) => setLightboxImage({ url, alt: `${name} — Silver Sponsor` })}
+                        />
+                        <TierSection 
+                          title="Bronze" 
+                          sponsors={displaySponsors.filter((s: any) => s.tier === 'Bronze')} 
+                          onImageClick={(url, name) => setLightboxImage({ url, alt: `${name} — Bronze Sponsor` })}
+                        />
 
                         {(!displaySponsors.length) && (
                           <p className="text-gray-500">Sponsor roster will be announced soon.</p>
@@ -1306,6 +1461,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         </aside>
       </div>
     </div>
+    </>
   )
 }
 

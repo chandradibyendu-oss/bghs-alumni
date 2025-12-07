@@ -72,3 +72,30 @@
   will-change: transform;
   transform-origin: center center;
 }
+
+/* Horizontal scrolling marquee animation */
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-33.333%);
+  }
+}
+
+.animate-scroll {
+  animation: scroll 40s linear infinite;
+  display: flex;
+  width: fit-content;
+  will-change: transform;
+}
+
+/* Pause animation on hover */
+.group:hover .animate-scroll {
+  animation-play-state: paused;
+}
+
+/* Faster animation for fewer items */
+.animate-scroll-fast {
+  animation: scroll 25s linear infinite;
+}

@@ -27,6 +27,7 @@ export default function EditEventPage() {
   const [uploadingImage, setUploadingImage] = useState(false)
   const [imagePreview, setImagePreview] = useState<string>('')
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [uploadingSponsorImages, setUploadingSponsorImages] = useState<Record<number, { logo: boolean; banner: boolean }>>({})
 
   const [formData, setFormData] = useState({
     title: '',
@@ -304,6 +305,76 @@ export default function EditEventPage() {
         i === index ? { ...sponsor, [field]: value } : sponsor
       )
     }))
+  }
+
+  const handleSponsorImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    sponsorIndex: number,
+    imageType: 'logo' | 'banner'
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file')
+      return
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert('Image size must be less than 5MB')
+      return
+    }
+
+    // Set uploading state
+    setUploadingSponsorImages(prev => ({
+      ...prev,
+      [sponsorIndex]: { ...prev[sponsorIndex], [imageType]: true }
+    }))
+
+    try {
+      // Get session token for authentication
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        alert('Not authenticated. Please log in again.')
+        return
+      }
+
+      const uploadFormData = new FormData()
+      uploadFormData.append('file', file)
+      uploadFormData.append('eventId', params.id as string)
+      uploadFormData.append('sponsorIndex', sponsorIndex.toString())
+      uploadFormData.append('imageType', imageType)
+      uploadFormData.append('sponsorTier', formData.sponsors[sponsorIndex].tier)
+
+      const response = await fetch('/api/events/upload-sponsor-image', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: uploadFormData
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to upload image')
+      }
+
+      // Update sponsor with uploaded image URL
+      updateSponsor(sponsorIndex, imageType === 'logo' ? 'logo_url' : 'banner_url', result.url)
+    } catch (error) {
+      console.error('Sponsor image upload error:', error)
+      alert(error instanceof Error ? error.message : 'Failed to upload image')
+    } finally {
+      // Clear uploading state
+      setUploadingSponsorImages(prev => ({
+        ...prev,
+        [sponsorIndex]: { ...prev[sponsorIndex], [imageType]: false }
+      }))
+      // Reset file input
+      e.target.value = ''
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -902,26 +973,108 @@ export default function EditEventPage() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Logo URL</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Logo {sponsor.tier === 'Silver' || sponsor.tier === 'Bronze' ? '*' : ''}
+                      </label>
+                      
+                      {/* Logo Upload */}
+                      <div className="mb-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleSponsorImageUpload(e, index, 'logo')}
+                          disabled={uploadingSponsorImages[index]?.logo}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        {uploadingSponsorImages[index]?.logo && (
+                          <p className="mt-1 text-xs text-gray-500">Uploading...</p>
+                        )}
+                      </div>
+
+                      {/* Logo Preview */}
+                      {sponsor.logo_url && (
+                        <div className="mb-2">
+                          <div className="relative w-24 h-24 rounded-lg overflow-hidden border border-gray-200">
+                            <img
+                              src={sponsor.logo_url}
+                              alt={`${sponsor.name} logo`}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Logo URL Input (Alternative) */}
                       <input
                         type="url"
                         value={sponsor.logo_url}
                         onChange={(e) => updateSponsor(index, 'logo_url', e.target.value)}
                         className="input-field"
-                        placeholder="https://example.com/logo.png"
+                        placeholder="Or enter logo URL"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Square logo for Silver/Bronze tiers</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {sponsor.tier === 'Silver' || sponsor.tier === 'Bronze' 
+                          ? 'Square logo (recommended: 800x800px, max 5MB)'
+                          : 'Square logo (recommended: 800x800px, max 5MB)'}
+                      </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Banner/Poster URL</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Banner/Poster {sponsor.tier === 'Platinum' || sponsor.tier === 'Gold' ? '*' : ''}
+                      </label>
+                      
+                      {/* Banner Upload */}
+                      <div className="mb-2">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleSponsorImageUpload(e, index, 'banner')}
+                          disabled={uploadingSponsorImages[index]?.banner}
+                          className="block w-full text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                        />
+                        {uploadingSponsorImages[index]?.banner && (
+                          <p className="mt-1 text-xs text-gray-500">Uploading...</p>
+                        )}
+                      </div>
+
+                      {/* Banner Preview */}
+                      {sponsor.banner_url && (
+                        <div className="mb-2">
+                          <div className={`relative rounded-lg overflow-hidden border border-gray-200 ${
+                            sponsor.tier === 'Platinum' ? 'aspect-[16/9]' : 
+                            sponsor.tier === 'Gold' ? 'aspect-[4/3]' : 
+                            'aspect-video'
+                          }`}>
+                            <img
+                              src={sponsor.banner_url}
+                              alt={`${sponsor.name} banner`}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Banner URL Input (Alternative) */}
                       <input
                         type="url"
                         value={sponsor.banner_url}
                         onChange={(e) => updateSponsor(index, 'banner_url', e.target.value)}
                         className="input-field"
-                        placeholder="https://example.com/banner.jpg"
+                        placeholder="Or enter banner URL"
                       />
-                      <p className="text-xs text-gray-500 mt-1">Banner/poster for Platinum/Gold tiers (16:9 or 4:3 ratio)</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {sponsor.tier === 'Platinum' 
+                          ? 'Banner (recommended: 1920x1080px, 16:9 ratio, max 5MB)'
+                          : sponsor.tier === 'Gold'
+                          ? 'Banner (recommended: 1200x900px, 4:3 ratio, max 5MB)'
+                          : 'Banner/poster (recommended: 1200x800px, max 5MB)'}
+                      </p>
                     </div>
                   </div>
 
