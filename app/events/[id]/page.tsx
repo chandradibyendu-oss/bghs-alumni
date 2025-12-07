@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -76,6 +76,16 @@ function SponsorMarquee({
   onImageClick: (imageUrl: string, sponsorName: string) => void
   tierType: 'platinum' | 'gold' | 'silver' | 'bronze'
 }) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const scrollContentRef = useRef<HTMLDivElement>(null)
+  const [isPaused, setIsPaused] = useState(false)
+  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const isDraggingRef = useRef(false)
+  const isUserInteractingRef = useRef(false)
+  const startXRef = useRef(0)
+  const scrollLeftRef = useRef(0)
+  const lastScrollLeftRef = useRef(0)
+  
   // Duplicate sponsors multiple times for seamless infinite loop
   // More duplicates = smoother animation
   const duplicatedSponsors = [...sponsors, ...sponsors, ...sponsors]
@@ -131,10 +141,150 @@ function SponsorMarquee({
   const style = tierStyles[tierType]
   const isLargeTier = tierType === 'platinum' || tierType === 'gold'
 
+  // Handle manual scrolling and pause/resume auto-scroll
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    const content = scrollContentRef.current
+    if (!container || !content) return
+
+    const handleMouseDown = (e: MouseEvent) => {
+      isDraggingRef.current = true
+      isUserInteractingRef.current = true
+      startXRef.current = e.pageX - container.offsetLeft
+      scrollLeftRef.current = container.scrollLeft
+      lastScrollLeftRef.current = container.scrollLeft
+      setIsPaused(true)
+      container.style.cursor = 'grabbing'
+      container.style.userSelect = 'none'
+    }
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isDraggingRef.current) return
+      e.preventDefault()
+      const x = e.pageX - container.offsetLeft
+      const walk = (x - startXRef.current) * 2
+      container.scrollLeft = scrollLeftRef.current - walk
+      lastScrollLeftRef.current = container.scrollLeft
+    }
+
+    const handleMouseUp = () => {
+      isDraggingRef.current = false
+      container.style.cursor = 'grab'
+      container.style.userSelect = ''
+      // Resume auto-scroll after delay
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isUserInteractingRef.current = false
+        setIsPaused(false)
+      }, 2000)
+    }
+
+    const handleTouchStart = (e: TouchEvent) => {
+      isDraggingRef.current = true
+      isUserInteractingRef.current = true
+      startXRef.current = e.touches[0].pageX - container.offsetLeft
+      scrollLeftRef.current = container.scrollLeft
+      lastScrollLeftRef.current = container.scrollLeft
+      setIsPaused(true)
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!isDraggingRef.current) return
+      const x = e.touches[0].pageX - container.offsetLeft
+      const walk = (x - startXRef.current) * 2
+      container.scrollLeft = scrollLeftRef.current - walk
+      lastScrollLeftRef.current = container.scrollLeft
+    }
+
+    const handleTouchEnd = () => {
+      isDraggingRef.current = false
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+      scrollTimeoutRef.current = setTimeout(() => {
+        isUserInteractingRef.current = false
+        setIsPaused(false)
+      }, 2000)
+    }
+
+    // Detect manual scroll (wheel or trackpad)
+    const handleWheel = (e: WheelEvent) => {
+      // Only pause if user is actually scrolling (not just hovering)
+      if (Math.abs(e.deltaX) > 0 || Math.abs(e.deltaY) > 0) {
+        isUserInteractingRef.current = true
+        setIsPaused(true)
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current)
+        }
+        scrollTimeoutRef.current = setTimeout(() => {
+          isUserInteractingRef.current = false
+          setIsPaused(false)
+        }, 2000)
+      }
+    }
+
+    // Note: We don't use scroll event for detection since CSS animation doesn't trigger scroll events
+    // Manual interaction is detected via mouse/touch events only
+
+    container.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+    container.addEventListener('touchstart', handleTouchStart, { passive: false })
+    container.addEventListener('touchmove', handleTouchMove, { passive: false })
+    container.addEventListener('touchend', handleTouchEnd)
+    container.addEventListener('wheel', handleWheel, { passive: true })
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchmove', handleTouchMove)
+      container.removeEventListener('touchend', handleTouchEnd)
+      container.removeEventListener('wheel', handleWheel)
+      if (scrollTimeoutRef.current) {
+        clearTimeout(scrollTimeoutRef.current)
+      }
+    }
+  }, [])
+
+  // Auto-scroll using JavaScript (works with manual scroll)
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    const content = scrollContentRef.current
+    if (!container || !content || isPaused) return
+
+    let animationId: number
+    const scrollSpeed = 0.5 // pixels per frame (~30px per second at 60fps)
+    const contentWidth = content.scrollWidth / 3 // One-third since we have 3 duplicates
+
+    const animate = () => {
+      if (!isPaused && container && !isUserInteractingRef.current) {
+        container.scrollLeft += scrollSpeed
+        
+        // Reset when reaching end of first set
+        if (container.scrollLeft >= contentWidth) {
+          container.scrollLeft = 0
+        }
+      }
+      animationId = requestAnimationFrame(animate)
+    }
+
+    animationId = requestAnimationFrame(animate)
+
+    return () => {
+      if (animationId) {
+        cancelAnimationFrame(animationId)
+      }
+    }
+  }, [isPaused])
+
   return (
-    <div className={`relative overflow-hidden ${style.container} rounded-lg py-4`}>
-      {/* Gradient fade edges - dark background compatible */}
-      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r z-10 pointer-events-none" 
+    <div className={`relative ${style.container} rounded-lg py-4`}>
+      {/* Gradient fade edges - fixed position, outside scrollable area */}
+      <div className="absolute left-0 top-0 bottom-0 w-24 bg-gradient-to-r z-20 pointer-events-none" 
            style={{
              background: tierType === 'platinum' 
                ? 'linear-gradient(to right, rgb(17 24 39), transparent)'
@@ -144,7 +294,7 @@ function SponsorMarquee({
                ? 'linear-gradient(to right, rgb(31 41 55), transparent)'
                : 'linear-gradient(to right, rgb(154 52 18), transparent)'
            }} />
-      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l z-10 pointer-events-none"
+      <div className="absolute right-0 top-0 bottom-0 w-24 bg-gradient-to-l z-20 pointer-events-none"
            style={{
              background: tierType === 'platinum' 
                ? 'linear-gradient(to left, rgb(17 24 39), transparent)'
@@ -155,8 +305,21 @@ function SponsorMarquee({
                : 'linear-gradient(to left, rgb(154 52 18), transparent)'
            }} />
       
-      {/* Scrolling content */}
-      <div className="flex animate-scroll group">
+      {/* Scrollable container */}
+      <div 
+        ref={scrollContainerRef}
+        className="overflow-x-auto overflow-y-hidden scrollbar-hide relative z-10"
+        style={{
+          cursor: 'grab',
+          WebkitOverflowScrolling: 'touch',
+        }}
+      >
+        {/* Scrolling content */}
+        <div 
+          ref={scrollContentRef}
+          className="flex group"
+          style={{ width: 'fit-content' }}
+        >
         {duplicatedSponsors.map((sponsor, index) => {
           const imageUrl = sponsor.banner_url || sponsor.logo_url
           const hasWebsite = hasValidWebsite(sponsor.website_url)
@@ -221,6 +384,7 @@ function SponsorMarquee({
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )
