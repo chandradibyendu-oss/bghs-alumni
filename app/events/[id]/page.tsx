@@ -405,6 +405,41 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     }
   }
 
+  const handleShare = async () => {
+    if (!event) return
+
+    const shareUrl = window.location.href
+    const shareTitle = event.title
+    const shareText = `${event.title} - ${event.description?.substring(0, 100)}...`
+
+    // Try native Web Share API first (mobile devices)
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: shareTitle,
+          text: shareText,
+          url: shareUrl,
+        })
+        return
+      } catch (error) {
+        // User cancelled or error - fall through to clipboard
+        if ((error as Error).name !== 'AbortError') {
+          console.error('Share error:', error)
+        }
+      }
+    }
+
+    // Fallback: Copy to clipboard
+    try {
+      await navigator.clipboard.writeText(shareUrl)
+      alert('Event link copied to clipboard!')
+    } catch (error) {
+      console.error('Clipboard error:', error)
+      // Last resort: show URL in prompt
+      prompt('Copy this link to share:', shareUrl)
+    }
+  }
+
   // Registration Button Component
   const RegistrationButton = ({ className = "", size = "normal" }: { className?: string, size?: "normal" | "large" }) => {
     // Event Creator/Admin Interface
@@ -849,7 +884,10 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                 <div className="flex-1">
                   <RegistrationButton className="w-full" />
                 </div>
-                <button className="bg-white/20 backdrop-blur-md border-2 border-white/30 text-white hover:bg-white/30 font-semibold px-6 py-4 rounded-xl flex items-center justify-center gap-2 text-base transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 min-w-[140px]">
+                <button 
+                  onClick={handleShare}
+                  className="bg-white/20 backdrop-blur-md border-2 border-white/30 text-white hover:bg-white/30 font-semibold px-6 py-4 rounded-xl flex items-center justify-center gap-2 text-base transition-all duration-200 shadow-xl hover:shadow-2xl transform hover:-translate-y-1 min-w-[140px]"
+                >
                   <Share2 className="h-4 w-4" /> 
                   Share
                 </button>
@@ -982,39 +1020,238 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             </div>
           </section>
 
-          {/* Schedule (sample) */}
+          {/* Program Schedule - Day-wise Display */}
           <section>
-            <h2 className="text-xl font-semibold text-gray-900 mb-3">Schedule</h2>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
-              {[
-                { t: '5:30 PM', d: 'Registration & Welcome Tea' },
-                { t: '6:00 PM', d: 'Opening Ceremony & School Song' },
-                { t: '6:30 PM', d: 'Alumni Awards & Speeches' },
-                { t: '7:30 PM', d: 'Cultural Program' },
-                { t: '9:00 PM', d: 'Dinner & Networking' },
-              ].map((row) => (
-                <div key={row.t} className="flex items-center justify-between p-4">
-                  <div className="flex items-center gap-3 text-gray-700">
-                    <Clock className="h-4 w-4 text-gray-400" />
-                    <span className="font-medium">{row.t}</span>
+            <h2 className="text-xl font-semibold text-gray-900 mb-3">Program Schedule</h2>
+            
+            {event.metadata?.program_schedule?.days && Array.isArray(event.metadata.program_schedule.days) && event.metadata.program_schedule.days.length > 0 ? (
+              // Multi-day schedule format
+              <div className="space-y-6">
+                {event.metadata.program_schedule.days.map((day: any, dayIndex: number) => (
+                  <div key={day.date || dayIndex} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    {/* Day Header */}
+                    <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Calendar className="h-5 w-5 text-white" />
+                          <h3 className="text-lg font-semibold text-white">
+                            {day.dayLabel || `Day ${dayIndex + 1}`}
+                          </h3>
+                        </div>
+                        {day.date && (
+                          <span className="text-white/90 text-sm">
+                            {new Date(day.date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric',
+                              year: 'numeric'
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {/* Activities for this day */}
+                    <div className="divide-y divide-gray-100">
+                      {day.activities && Array.isArray(day.activities) && day.activities.length > 0 ? (
+                        day.activities.map((activity: any, activityIndex: number) => (
+                          <div key={activityIndex} className="flex items-start sm:items-center gap-4 p-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-center gap-3 text-gray-700 flex-shrink-0 min-w-[100px]">
+                              <Clock className="h-4 w-4 text-primary-600 flex-shrink-0" />
+                              <span className="font-semibold text-sm sm:text-base whitespace-nowrap">
+                                {activity.time || activity.t}
+                              </span>
+                            </div>
+                            <div className="text-gray-700 flex-1 text-sm sm:text-base">
+                              {activity.description || activity.d || activity.title}
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="p-6 text-center text-gray-500 text-sm">
+                          No activities scheduled for this day
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-gray-600">{row.d}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : event.metadata?.program_schedule && Array.isArray(event.metadata.program_schedule) && event.metadata.program_schedule.length > 0 ? (
+              // Legacy flat array format (backward compatibility)
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
+                {event.metadata.program_schedule.map((item: any, index: number) => (
+                  <div key={index} className="flex items-start sm:items-center justify-between p-4 gap-4">
+                    <div className="flex items-center gap-3 text-gray-700 flex-shrink-0">
+                      <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="font-medium whitespace-nowrap">{item.time || item.t}</span>
+                    </div>
+                    <div className="text-gray-600 text-right sm:text-left flex-1">{item.description || item.d || item.title}</div>
+                  </div>
+                ))}
+              </div>
+            ) : event.metadata?.schedule && Array.isArray(event.metadata.schedule) && event.metadata.schedule.length > 0 ? (
+              // Alternative schedule format
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
+                {event.metadata.schedule.map((item: any, index: number) => (
+                  <div key={index} className="flex items-start sm:items-center justify-between p-4 gap-4">
+                    <div className="flex items-center gap-3 text-gray-700 flex-shrink-0">
+                      <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                      <span className="font-medium whitespace-nowrap">{item.time || item.t}</span>
+                    </div>
+                    <div className="text-gray-600 text-right sm:text-left flex-1">{item.description || item.d || item.title}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 text-center text-gray-500">
+                <Clock className="h-8 w-8 mx-auto mb-2 text-gray-300" />
+                <p>Program schedule will be announced soon</p>
+              </div>
+            )}
           </section>
 
-          {/* Venue & map placeholder */}
+          {/* Venue & map */}
           <section>
             <h2 className="text-xl font-semibold text-gray-900 mb-3">Venue</h2>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
               <div className="flex items-center gap-2 text-gray-700 mb-4">
                 <MapPin className="h-5 w-5 text-primary-600" />
-                <span>{event.location}</span>
+                <div className="flex-1">
+                  <div className="font-medium">{event.metadata?.venue_name || event.location}</div>
+                  {event.metadata?.address && (
+                    <div className="text-sm text-gray-600 mt-1">
+                      {[
+                        event.metadata.address.line1,
+                        event.metadata.address.line2,
+                        event.metadata.address.city,
+                        event.metadata.address.state,
+                        event.metadata.address.postal_code,
+                        event.metadata.address.country
+                      ].filter(Boolean).join(', ')}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="aspect-video bg-gray-100 rounded-lg border border-dashed border-gray-300 flex items-center justify-center text-gray-400">
-                Map preview coming soon
-              </div>
+              
+              {/* Map - Interactive with Google Maps */}
+              {(() => {
+                // Build full address string
+                let fullAddress = event.location
+                let mapAddress = event.location
+                
+                if (event.metadata?.address) {
+                  const addr = event.metadata.address
+                  const addressParts = [
+                    event.metadata.venue_name || addr.line1,
+                    addr.line1,
+                    addr.line2,
+                    addr.city,
+                    addr.state,
+                    addr.postal_code,
+                    addr.country
+                  ].filter(Boolean)
+                  
+                  fullAddress = addressParts.join(', ')
+                  mapAddress = [
+                    event.metadata.venue_name || addr.line1,
+                    addr.city,
+                    addr.state,
+                    addr.country
+                  ].filter(Boolean).join(', ')
+                }
+                
+                // Encode for URLs
+                const encodedAddress = encodeURIComponent(mapAddress)
+                const encodedFullAddress = encodeURIComponent(fullAddress)
+                
+                // Google Maps URLs
+                const googleMapsSearchUrl = `https://www.google.com/maps/search/?api=1&query=${encodedFullAddress}`
+                const googleMapsEmbedUrl = `https://www.google.com/maps/embed/v1/place?key=YOUR_API_KEY&q=${encodedFullAddress}`
+                
+                return (
+                  <div className="space-y-3">
+                    {/* Map Preview - Clickable to open in Google Maps */}
+                    <div 
+                      className="aspect-video rounded-lg overflow-hidden border border-gray-300 relative cursor-pointer group"
+                      onClick={() => window.open(googleMapsSearchUrl, '_blank')}
+                    >
+                      {/* Map placeholder with address */}
+                      <div className="w-full h-full bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col items-center justify-center p-6">
+                        <MapPin className="h-12 w-12 text-primary-600 mb-3 group-hover:scale-110 transition-transform" />
+                        <p className="text-gray-700 font-medium text-center mb-2">{event.metadata?.venue_name || 'Event Venue'}</p>
+                        <p className="text-gray-600 text-sm text-center">{fullAddress}</p>
+                        <div className="mt-4 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium group-hover:bg-primary-700 transition-colors">
+                          Click to view on Google Maps
+                        </div>
+                      </div>
+                      
+                      {/* Optional: If you have Google Maps API key, uncomment this */}
+                      {/* <iframe
+                        width="100%"
+                        height="100%"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        allowFullScreen
+                        referrerPolicy="no-referrer-when-downgrade"
+                        src={googleMapsEmbedUrl}
+                        title="Event location map"
+                      /> */}
+                    </div>
+                    
+                    {/* Action Links */}
+                    <div className="flex flex-wrap gap-3">
+                      <a
+                        href={googleMapsSearchUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+                      >
+                        <MapPin className="h-4 w-4" />
+                        Open in Google Maps
+                      </a>
+                      {event.metadata?.address?.city && (
+                        <a
+                          href={`https://www.google.com/maps/dir/?api=1&destination=${encodedFullAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-700 text-sm"
+                        >
+                          Get Directions
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )
+              })()}
+              
+              {/* Fallback link to open in Google Maps */}
+              {(() => {
+                let mapAddress = event.location
+                if (event.metadata?.address) {
+                  const addr = event.metadata.address
+                  mapAddress = [
+                    event.metadata.venue_name || addr.line1,
+                    addr.line1,
+                    addr.city,
+                    addr.state,
+                    addr.country
+                  ].filter(Boolean).join(', ')
+                }
+                const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapAddress)}`
+                
+                return (
+                  <div className="mt-4">
+                    <a
+                      href={googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 text-sm font-medium"
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Open in Google Maps
+                    </a>
+                  </div>
+                )
+              })()}
             </div>
           </section>
 

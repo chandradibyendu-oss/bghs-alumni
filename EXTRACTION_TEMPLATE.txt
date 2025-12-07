@@ -1,0 +1,21 @@
+Extract alumni data from the attached Bengali text image following the standard Bengali Alumni Data Extraction Instructions.
+
+Create [START-END].csv (e.g., 180-210.csv) with all entries extracted and formatted correctly.
+
+Requirements:
+- Use the EXACT format matching: 57-86.csv, 87-117.csv, 118-148.csv, or 149-179.csv
+- Extract ALL entries (no placeholders like "Name180")
+- Correctly transliterate Bengali names to English
+- Parse names into First/Middle/Last name fields
+- Convert Bengali year numerals (০-৯) to English (0-9)
+- Mark deceased status from "(প্রয়াত)" markers
+- Extract professional titles (ডাঃ→Dr., অধ্যাঃ→Prof.)
+- Continue registration number sequence from last uploaded file
+- Generate email addresses in format: BGHSA[8-digit]@alumnibghs.org
+- Set Last Class = 12 for all entries
+- Set Batch Year = Year of Leaving
+- Include entry number in Notes field
+
+Do NOT use placeholder names - extract actual transliterated names from the Bengali text.
+
+

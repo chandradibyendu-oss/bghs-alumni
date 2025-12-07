@@ -6,6 +6,16 @@ import Link from 'next/link'
 import { ArrowLeft, Save, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+import ProgramScheduleEditor from '@/components/ProgramScheduleEditor'
+
+interface DaySchedule {
+  date: string
+  dayLabel: string
+  activities: Array<{
+    time: string
+    description: string
+  }>
+}
 
 export default function EditEventPage() {
   const params = useParams()
@@ -59,7 +69,9 @@ export default function EditEventPage() {
     // Sponsor fields
     sponsors: [
       { name: '', logo_url: '', website_url: '', banner_url: '', description: '', tier: 'Platinum' }
-    ]
+    ],
+    // Program schedule
+    program_schedule: [] as DaySchedule[]
   })
 
   useEffect(() => {
@@ -103,6 +115,17 @@ export default function EditEventPage() {
     }
   }
 
+  // Format time to HH:MM (remove seconds if present)
+  const formatTimeForInput = (timeStr: string): string => {
+    if (!timeStr) return ''
+    // If time is in HH:MM:SS format, convert to HH:MM
+    if (timeStr.includes(':') && timeStr.split(':').length === 3) {
+      const parts = timeStr.split(':')
+      return `${parts[0]}:${parts[1]}`
+    }
+    return timeStr
+  }
+
   const fetchEvent = async () => {
     try {
       setLoading(true)
@@ -122,9 +145,9 @@ export default function EditEventPage() {
           description: data.description || '',
           category: data.category || 'Reunion',
           start_date: data.date || '',
-          start_time: data.time || '',
+          start_time: formatTimeForInput(data.time || ''),
           end_date: data.metadata?.end_date || '',
-          end_time: data.metadata?.end_time || '',
+          end_time: formatTimeForInput(data.metadata?.end_time || ''),
           venue_name: data.metadata?.venue_name || '',
           address_line1: data.metadata?.address?.line1 || '',
           address_line2: data.metadata?.address?.line2 || '',
@@ -155,7 +178,8 @@ export default function EditEventPage() {
           wheelchair_accessible: data.metadata?.policies?.wheelchair_accessible || false,
           cover_image_url: data.image_url || '',
           featured: data.metadata?.featured || false,
-          sponsors: data.metadata?.sponsors || [{ name: '', logo_url: '', website_url: '', banner_url: '', description: '', tier: 'Platinum' }]
+          sponsors: data.metadata?.sponsors || [{ name: '', logo_url: '', website_url: '', banner_url: '', description: '', tier: 'Platinum' }],
+          program_schedule: data.metadata?.program_schedule?.days || []
         })
         setImagePreview(data.image_url || '')
       }
@@ -341,7 +365,10 @@ export default function EditEventPage() {
             wheelchair_accessible: formData.wheelchair_accessible
           },
           featured: formData.featured,
-          sponsors: formData.sponsors.filter(sponsor => sponsor.name.trim() !== '')
+          sponsors: formData.sponsors.filter(sponsor => sponsor.name.trim() !== ''),
+          program_schedule: {
+            days: formData.program_schedule || []
+          }
         }
       }
 
@@ -562,6 +589,7 @@ export default function EditEventPage() {
                 </label>
                 <input
                   type="time"
+                  step="60"
                   name="start_time"
                   value={formData.start_time}
                   onChange={handleInputChange}
@@ -587,6 +615,7 @@ export default function EditEventPage() {
                 </label>
                 <input
                   type="time"
+                  step="60"
                   name="end_time"
                   value={formData.end_time}
                   onChange={handleInputChange}
@@ -594,6 +623,18 @@ export default function EditEventPage() {
                 />
               </div>
             </div>
+          </div>
+
+          {/* Program Schedule */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <ProgramScheduleEditor
+              startDate={formData.start_date}
+              endDate={formData.end_date || formData.start_date}
+              value={formData.program_schedule}
+              onChange={(schedule) => {
+                setFormData(prev => ({ ...prev, program_schedule: schedule }))
+              }}
+            />
           </div>
 
           {/* Location */}

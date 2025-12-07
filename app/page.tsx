@@ -30,6 +30,7 @@ type EventSlide = BaseSlide & {
   eventDate?: string
   eventTime?: string
   eventId?: number | string
+  shortDescription?: string
 }
 
 type BlogSlide = BaseSlide & {
@@ -214,6 +215,9 @@ export default function Home() {
               day: 'numeric' 
             })} at ${event.time}`,
             description: event.description || `Join us at ${event.location}`,
+            shortDescription: event.short_description || (event.description && event.description.length > 150 
+              ? `${event.description.substring(0, 150)}...` 
+              : event.description) || `Join us at ${event.location}`,
             location: event.location,
             eventDate: event.date,
             eventTime: event.time,
@@ -499,7 +503,7 @@ export default function Home() {
         )}
         
         {/* Content */}
-        <div className={`relative z-10 h-full flex items-center justify-center pb-28 sm:pb-0 ${currentSlideData.type === 'upcoming-event' ? 'pt-12 sm:pt-16' : 'pt-12 sm:pt-0'}`}>
+        <div className={`relative z-10 h-full flex items-center justify-center pb-28 sm:pb-0 ${currentSlideData.type === 'upcoming-event' ? 'pt-16 sm:pt-20 md:pt-16' : 'pt-12 sm:pt-0'}`}>
           <div className="max-w-7xl mx-auto px-12 sm:px-6 lg:px-8 text-center w-full py-4 sm:py-0">
             {/* Icon for non-welcome slides (hide for event slides since we have the badge at top) */}
             {IconComponent && currentSlideData.type !== 'upcoming-event' && (
@@ -527,8 +531,11 @@ export default function Home() {
               </div>
             )}
             
-            <p className="text-base sm:text-lg text-white mb-6 sm:mb-8 max-w-3xl mx-auto drop-shadow-md px-2">
-              {currentSlideData.description}
+            {/* Short description for hero section - truncated on mobile */}
+            <p className="text-sm sm:text-base md:text-lg text-white mb-4 sm:mb-6 md:mb-8 max-w-3xl mx-auto drop-shadow-md px-2 line-clamp-3 sm:line-clamp-none">
+              {currentSlideData.type === 'upcoming-event' 
+                ? ((currentSlideData as EventSlide).shortDescription || currentSlideData.description)
+                : currentSlideData.description}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

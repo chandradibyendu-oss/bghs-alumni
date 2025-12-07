@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { ArrowLeft, Save, Calendar, MapPin, Clock, Users, Image, DollarSign } from 'lucide-react'
+import ProgramScheduleEditor from '@/components/ProgramScheduleEditor'
 
 const EVENT_CATEGORIES = [
   'Reunion',
@@ -75,7 +76,9 @@ export default function CreateEventPage() {
     // Sponsor fields
     sponsors: [
       { name: '', logo_url: '', website_url: '', banner_url: '', description: '', tier: 'Platinum' }
-    ]
+    ],
+    // Program schedule
+    program_schedule: []
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -211,7 +214,10 @@ export default function CreateEventPage() {
             wheelchair_accessible: formData.wheelchair_accessible
           },
           featured: formData.featured,
-          sponsors: formData.sponsors.filter(sponsor => sponsor.name.trim() !== '')
+          sponsors: formData.sponsors.filter(sponsor => sponsor.name.trim() !== ''),
+          program_schedule: {
+            days: formData.program_schedule || []
+          }
         }
       }
 
@@ -427,6 +433,7 @@ export default function CreateEventPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">Start Time *</label>
                 <input
                   type="time"
+                  step="60"
                   value={formData.start_time}
                   onChange={(e) => handleInputChange('start_time', e.target.value)}
                   className={`input-field ${errors.start_time ? 'border-red-500' : ''}`}
@@ -448,6 +455,7 @@ export default function CreateEventPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-2">End Time</label>
                 <input
                   type="time"
+                  step="60"
                   value={formData.end_time}
                   onChange={(e) => handleInputChange('end_time', e.target.value)}
                   className="input-field"
@@ -628,6 +636,16 @@ export default function CreateEventPage() {
                 {errors.capacity_max && <p className="text-red-500 text-sm mt-1">{errors.capacity_max}</p>}
               </div>
             </div>
+          </div>
+
+          {/* Program Schedule */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <ProgramScheduleEditor
+              startDate={formData.start_date}
+              endDate={formData.end_date || formData.start_date}
+              value={formData.program_schedule}
+              onChange={(schedule) => handleInputChange('program_schedule', schedule)}
+            />
           </div>
 
           {/* Pricing */}

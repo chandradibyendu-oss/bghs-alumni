@@ -1,0 +1,29 @@
+═══════════════════════════════════════════════════════════════════════════════
+  QUICK EXTRACTION TEMPLATE - Copy & Paste This Each Time
+═══════════════════════════════════════════════════════════════════════════════
+
+Extract alumni data from the attached Bengali text image.
+
+Create [START-END].csv (e.g., 180-210.csv) with all entries extracted correctly.
+
+Requirements:
+✓ Use EXACT format from: 57-86.csv, 87-117.csv, 118-148.csv, or 149-179.csv
+✓ Extract ALL entries - NO placeholder names (like "Name180")
+✓ Transliterate Bengali names accurately to English
+✓ Parse names: First Name, Middle Name, Last Name
+✓ Convert Bengali numerals (০-৯) to English (0-9) for years
+✓ Mark deceased if "(প্রয়াত)" or "(প্রয়াত)" present
+✓ Extract titles: "ডাঃ"→Dr., "অধ্যাঃ"→Prof.
+✓ Registration Number: BGHSA-2025-00XXX (XXX = Old Number + 2)
+✓ Email: BGHSA[8-digit]@alumnibghs.org
+✓ Last Class = 12, Batch Year = Year of Leaving
+✓ Include entry number in Notes
+
+Current Status:
+- Last file: 149-179.csv
+- Last entry: 179
+- Last registration: BGHSA-2025-00181
+- Next file (180+) should start with: BGHSA-2025-00182
+
+═══════════════════════════════════════════════════════════════════════════════
+
