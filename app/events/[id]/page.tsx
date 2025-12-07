@@ -193,6 +193,17 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
     checkUserPermissions()
   }, [])
 
+  // Format time to HH:MM (remove seconds if present)
+  const formatTime = (timeStr: string): string => {
+    if (!timeStr) return ''
+    // If time is in HH:MM:SS format, convert to HH:MM
+    if (timeStr.includes(':') && timeStr.split(':').length === 3) {
+      const parts = timeStr.split(':')
+      return `${parts[0]}:${parts[1]}`
+    }
+    return timeStr
+  }
+
   const fetchEvent = async () => {
     try {
       setLoading(true)
@@ -865,7 +876,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="text-white/80 text-sm font-medium">Time</div>
-                    <div className="text-white font-semibold text-sm">{event.time}</div>
+                    <div className="text-white font-semibold text-sm">{formatTime(event.time)}</div>
                   </div>
                 </div>
                 <div className="bg-white/25 backdrop-blur-md rounded-xl p-4 flex items-center gap-3 border border-white/20">
@@ -1279,7 +1290,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
             <h3 className="text-base font-semibold text-gray-900 mb-3">Event details</h3>
             <ul className="space-y-2 text-sm text-gray-700">
               <li className="flex items-center gap-2"><Calendar className="h-4 w-4 text-gray-400" /> {dateText}</li>
-              <li className="flex items-center gap-2"><Clock className="h-4 w-4 text-gray-400" /> 6:00 PM</li>
+              <li className="flex items-center gap-2"><Clock className="h-4 w-4 text-gray-400" /> {formatTime(event.time)}</li>
               <li className="flex items-center gap-2"><MapPin className="h-4 w-4 text-gray-400" /> {event.location}</li>
             </ul>
             <RegistrationButton className="w-full mt-4" />
