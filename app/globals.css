@@ -9,10 +9,14 @@
     font-family: 'Inter', system-ui, sans-serif;
     font-size: 16px; /* improve readability */
     line-height: 1.6;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
   }
   
   body {
     @apply bg-gray-50 text-gray-900 antialiased;
+    overflow-x: hidden; /* Prevent horizontal scroll on mobile */
+    width: 100%;
+    max-width: 100vw;
   }
 }
 
@@ -88,6 +92,8 @@
   display: flex;
   width: fit-content;
   will-change: transform;
+  /* Prevent horizontal scroll on mobile */
+  max-width: none;
 }
 
 /* Pause animation on hover */

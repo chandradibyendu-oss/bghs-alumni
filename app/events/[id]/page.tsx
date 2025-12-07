@@ -164,7 +164,7 @@ function SponsorMarquee({
           return (
             <div
               key={`${sponsor.name}-${index}`}
-              className={`flex-shrink-0 mx-4 ${style.card} transition-all duration-300 min-w-[280px] ${isLargeTier ? 'min-w-[320px]' : 'min-w-[200px]'} shadow-lg`}
+              className={`flex-shrink-0 mx-2 sm:mx-4 ${style.card} transition-all duration-300 min-w-[240px] sm:min-w-[280px] ${isLargeTier ? 'sm:min-w-[320px]' : 'sm:min-w-[200px]'} shadow-lg`}
             >
               <div className={`relative ${style.imageContainer} bg-gray-50 rounded-lg overflow-hidden mb-3`}>
                 {imageUrl ? (
@@ -950,7 +950,7 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
         onClose={() => setLightboxImage(null)}
       />
       
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Top bar & breadcrumbs */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
@@ -1063,14 +1063,14 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
       </section>
 
       {/* Content sections */}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-10">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 grid lg:grid-cols-3 gap-8 overflow-x-hidden">
+        <div className="lg:col-span-2 space-y-10 overflow-x-hidden">
           {/* Sponsors section — inline on detail page */}
-          <section aria-labelledby="sponsors-heading" className="scroll-mt-20" id="sponsors">
+          <section aria-labelledby="sponsors-heading" className="scroll-mt-20 overflow-x-hidden" id="sponsors">
             <h2 id="sponsors-heading" className="text-xl font-semibold text-gray-900 mb-4">
               Sponsors
             </h2>
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 sm:p-6 overflow-x-hidden">
                         <TierSection 
                           title="Platinum" 
                           sponsors={displaySponsors.filter((s: any) => s.tier === 'Platinum')} 
