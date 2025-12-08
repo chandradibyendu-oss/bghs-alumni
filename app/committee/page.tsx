@@ -13,6 +13,21 @@ interface CommitteePosition {
   display_order: number
 }
 
+interface CommitteeMemberProfile {
+  id: string
+  full_name: string
+  email?: string
+  phone?: string
+  avatar_url?: string
+  bio?: string
+  profession?: string
+  company?: string
+  location?: string
+  professional_title_id?: number | null
+  professional_title?: string | null
+  professional_title_category?: string | null
+}
+
 interface CommitteeMember {
   id: string
   profile_id: string // REQUIRED: All members must have a profile
@@ -22,26 +37,18 @@ interface CommitteeMember {
   position_type_id?: string | null
   display_order: number // Member's display order within their position/group
   start_date: string
-  profile: {
-    id: string
-    full_name: string
-    email?: string
-    phone?: string
-    avatar_url?: string
-    bio?: string
-    profession?: string
-    company?: string
-    location?: string
-    professional_title_id?: number | null
-    professional_title?: string | null
-    professional_title_category?: string | null
-  }
+  profile: CommitteeMemberProfile | null
+}
+
+// Type for members with guaranteed profiles (after filtering)
+interface CommitteeMemberWithProfile extends Omit<CommitteeMember, 'profile'> {
+  profile: CommitteeMemberProfile
 }
 
 export default function CommitteePage() {
   const [loading, setLoading] = useState(true)
-  const [advisoryMembers, setAdvisoryMembers] = useState<CommitteeMember[]>([])
-  const [executiveMembers, setExecutiveMembers] = useState<CommitteeMember[]>([])
+  const [advisoryMembers, setAdvisoryMembers] = useState<CommitteeMemberWithProfile[]>([])
+  const [executiveMembers, setExecutiveMembers] = useState<CommitteeMemberWithProfile[]>([])
   const [positions, setPositions] = useState<CommitteePosition[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
@@ -146,7 +153,7 @@ export default function CommitteePage() {
 
       if (error) throw error
 
-      const formatted = data?.map(m => {
+      const formatted = (data?.map(m => {
         const positionType = Array.isArray(m.position_type) 
           ? m.position_type[0] 
           : m.position_type
@@ -159,18 +166,26 @@ export default function CommitteePage() {
               : profile.professional_titles)
           : null
         
+        if (!profile) {
+          return null
+        }
+        
         return {
-          ...m,
+          id: m.id,
+          profile_id: m.profile_id,
+          committee_type: m.committee_type,
           position_name: positionType?.name || null,
           position_display_order: positionType?.display_order || null,
-          display_order: m.display_order || 0, // Ensure display_order is included
-          profile: profile ? {
+          position_type_id: m.position_type_id || null,
+          display_order: m.display_order || 0,
+          start_date: m.start_date,
+          profile: {
             ...profile,
             professional_title: professionalTitle?.title || null,
             professional_title_category: professionalTitle?.category || null
-          } : null
-        }
-      }).filter(m => m.profile !== null) || [] // Filter out any members without profiles
+          }
+        } as CommitteeMemberWithProfile
+      }).filter(m => m !== null) || []) as CommitteeMemberWithProfile[]
 
       // Separate by committee type
       const advisory = formatted.filter(m => m.committee_type === 'advisory')
@@ -182,14 +197,16 @@ export default function CommitteePage() {
       // Sort executive by position order first, then by display_order within each position
       executive.sort((a, b) => {
         // First sort by position display order
-        if (a.position_display_order !== null && b.position_display_order !== null) {
-          const positionDiff = a.position_display_order - b.position_display_order
+        const aPosOrder = a.position_display_order ?? null
+        const bPosOrder = b.position_display_order ?? null
+        if (aPosOrder !== null && bPosOrder !== null) {
+          const positionDiff = aPosOrder - bPosOrder
           if (positionDiff !== 0) return positionDiff
           // If same position, sort by member display_order
           return a.display_order - b.display_order
         }
-        if (a.position_display_order !== null) return -1
-        if (b.position_display_order !== null) return 1
+        if (aPosOrder !== null) return -1
+        if (bPosOrder !== null) return 1
         // Both have no position - sort by display_order
         return a.display_order - b.display_order
       })
@@ -433,8 +450,7 @@ const formatNameWithTitle = (fullName: string, professionalTitle?: string | null
   return fullName
 }
 
-function MemberCard({ member }: { member: CommitteeMember }) {
-  if (!member.profile) return null
+function MemberCard({ member }: { member: CommitteeMemberWithProfile }) {
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
