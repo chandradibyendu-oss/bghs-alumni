@@ -490,12 +490,32 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
   // Format time to HH:MM (remove seconds if present)
   const formatTime = (timeStr: string): string => {
     if (!timeStr) return ''
-    // If time is in HH:MM:SS format, convert to HH:MM
-    if (timeStr.includes(':') && timeStr.split(':').length === 3) {
-      const parts = timeStr.split(':')
-      return `${parts[0]}:${parts[1]}`
+    
+    // Check if time already has AM/PM
+    const hasAmPm = /[ap]m/i.test(timeStr)
+    if (hasAmPm) {
+      // Already in 12-hour format, just remove seconds if present
+      if (timeStr.includes(':') && timeStr.split(':').length === 3) {
+        const parts = timeStr.split(':')
+        const ampm = parts[2].replace(/[^apm]/gi, '').toUpperCase()
+        return `${parts[0]}:${parts[1]} ${ampm}`
+      }
+      return timeStr
     }
-    return timeStr
+    
+    // Parse 24-hour format (HH:MM:SS or HH:MM)
+    const timeMatch = timeStr.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/)
+    if (!timeMatch) return timeStr
+    
+    let hour = parseInt(timeMatch[1], 10)
+    const minute = parseInt(timeMatch[2], 10)
+    
+    // Convert to 12-hour format
+    const ampm = hour >= 12 ? 'PM' : 'AM'
+    hour = hour % 12
+    hour = hour === 0 ? 12 : hour // 0 should be 12
+    
+    return `${hour}:${minute.toString().padStart(2, '0')} ${ampm}`
   }
 
   const fetchEvent = async () => {

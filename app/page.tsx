@@ -1,8 +1,9 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 
 // Blog posts will be fetched from database
@@ -109,6 +110,8 @@ export default function Home() {
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
   const [allSlides, setAllSlides] = useState<Slide[]>(slideshowData as Slide[])
   const [latestBlog, setLatestBlog] = useState<any>(null)
+  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
+  const imageRefs = useRef<Map<string, HTMLImageElement>>(new Map())
 
   // Fetch latest blog post
   useEffect(() => {
@@ -284,6 +287,41 @@ export default function Home() {
     }
     fetchUpcomingEvents()
   }, [latestBlog]) // Re-run when latestBlog changes
+
+  // Preload images for smooth transitions
+  useEffect(() => {
+    const preloadImages = async () => {
+      const imagePromises: Promise<void>[] = []
+      
+      allSlides.forEach((slide) => {
+        if (slide.backgroundImage && !loadedImages.has(slide.backgroundImage)) {
+          const img = new window.Image()
+          img.src = slide.backgroundImage
+          
+          const promise = new Promise<void>((resolve) => {
+            img.onload = () => {
+              setLoadedImages((prev) => {
+                const newSet = new Set(prev)
+                newSet.add(slide.backgroundImage)
+                return newSet
+              })
+              resolve()
+            }
+            img.onerror = () => resolve() // Continue even if image fails
+          })
+          
+          imagePromises.push(promise)
+          imageRefs.current.set(slide.backgroundImage, img)
+        }
+      })
+      
+      await Promise.all(imagePromises)
+    }
+    
+    if (allSlides.length > 0) {
+      preloadImages()
+    }
+  }, [allSlides])
 
   // Auto-rotate slides
   useEffect(() => {
@@ -469,23 +507,65 @@ export default function Home() {
       <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden mt-0">
         {/* Background - Slide-specific images with smooth transitions */}
         <div className="absolute inset-0 z-0 -mt-0">
-          {/* Show slide-specific background image with fade and zoom transitions (Ken Burns effect) */}
+          {/* Render all slides for preloading, but only show current one */}
           <div className="relative w-full h-full overflow-hidden">
-            {currentSlideData.backgroundImage && (
-              <div 
-                key={currentSlideData.id}
-                className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
-                style={{
-                  backgroundImage: `url('${currentSlideData.backgroundImage}')`,
-                  backgroundSize: 'cover',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundColor: '#000',
-                  transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  willChange: 'transform, opacity'
-                }}
-              />
-            )}
+            {allSlides.map((slide, index) => {
+              const isActive = index === currentSlide
+              const isLoaded = loadedImages.has(slide.backgroundImage) || slide.backgroundImage.startsWith('data:')
+              
+              return (
+                <div
+                  key={slide.id}
+                  className={`absolute inset-0 hero-slide-fade ${
+                    isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+                  }`}
+                  style={{
+                    willChange: 'opacity, transform'
+                  }}
+                >
+                  {slide.backgroundImage && (
+                    <>
+                      {/* Preload image */}
+                      <img
+                        src={slide.backgroundImage}
+                        alt=""
+                        className="hidden"
+                        onLoad={() => {
+                          if (!loadedImages.has(slide.backgroundImage)) {
+                            setLoadedImages((prev) => {
+                              const newSet = new Set(prev)
+                              newSet.add(slide.backgroundImage)
+                              return newSet
+                            })
+                          }
+                        }}
+                        loading={index <= 2 ? 'eager' : 'lazy'}
+                        fetchPriority={index === 0 ? 'high' : index <= 2 ? 'high' : 'low'}
+                      />
+                      {/* Loading placeholder - shown while image is loading */}
+                      {!isLoaded && isActive && (
+                        <div className="absolute inset-0 hero-image-placeholder" />
+                      )}
+                      {/* Background image with Ken Burns effect */}
+                      <div
+                        className={`absolute inset-0 ken-burns-zoom-out ${
+                          isActive && isLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        style={{
+                          backgroundImage: `url('${slide.backgroundImage}')`,
+                          backgroundSize: 'cover',
+                          backgroundPosition: 'center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundColor: '#000',
+                          transition: isActive && isLoaded ? 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                          willChange: 'transform, opacity'
+                        }}
+                      />
+                    </>
+                  )}
+                </div>
+              )
+            })}
           </div>
           {/* Enhanced Overlay to match About page */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50 z-20"></div>

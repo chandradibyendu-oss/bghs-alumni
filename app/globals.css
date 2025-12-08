@@ -72,9 +72,30 @@
 }
 
 .ken-burns-zoom-out {
-  animation: kenBurnsZoomOut 5s ease-out forwards;
+  animation: kenBurnsZoomOut 20s ease-in-out infinite;
   will-change: transform;
   transform-origin: center center;
+}
+
+/* Smooth crossfade transition for hero slides */
+.hero-slide-fade {
+  transition: opacity 1s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Image loading placeholder */
+.hero-image-placeholder {
+  background: linear-gradient(90deg, #1a1a1a 0%, #2a2a2a 50%, #1a1a1a 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 /* Horizontal scrolling marquee animation */
