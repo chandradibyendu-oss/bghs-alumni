@@ -387,6 +387,7 @@ export default function About() {
               <Link href="/about" className="text-primary-600 font-semibold">About</Link>
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
+              <Link href="/committee" className="text-gray-700 hover:text-primary-600 transition-colors">Committee</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
               {userEmail ? (
@@ -406,6 +407,7 @@ export default function About() {
                             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                             <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
                             <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                            <Link href="/admin/committee" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Committee Management</Link>
                           </>
                         )}
                         <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
@@ -445,6 +447,7 @@ export default function About() {
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                         <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
                         <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+                        <Link href="/admin/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee Management</Link>
                       </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>

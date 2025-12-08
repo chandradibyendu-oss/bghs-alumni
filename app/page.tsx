@@ -430,6 +430,7 @@ export default function Home() {
               <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
+              <Link href="/committee" className="text-gray-700 hover:text-primary-600 transition-colors">Committee</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
               {userEmail ? (
@@ -449,6 +450,7 @@ export default function Home() {
                             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                             <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
                             <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                            <Link href="/admin/committee" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Committee Management</Link>
                             <Link href="/admin/blog" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Blog Management</Link>
                           </>
                         )}
@@ -477,6 +479,7 @@ export default function Home() {
               <Link href="/about" className="block px-2 py-2 rounded hover:bg-gray-50">About</Link>
               <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
+              <Link href="/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
               <div className="pt-2 border-t mt-2">
@@ -489,6 +492,7 @@ export default function Home() {
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
                         <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
                         <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+                        <Link href="/admin/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee Management</Link>
                         <Link href="/admin/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog Management</Link>
                       </>
                     )}
@@ -790,6 +794,7 @@ export default function Home() {
                  <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About</Link></li>
                  <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                  <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
+                 <li><Link href="/committee" className="text-gray-400 hover:text-white transition-colors">Committee</Link></li>
                  <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
                </ul>
              </div>
