@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail, Upload } from 'lucide-react'
+import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail, Upload, Award } from 'lucide-react'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const [canManageUsers, setCanManageUsers] = useState(false)
   const [canManageRoles, setCanManageRoles] = useState(false)
   const [canManageBlog, setCanManageBlog] = useState(false)
+  const [canManageCommittee, setCanManageCommittee] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -45,6 +46,8 @@ export default function DashboardPage() {
         setCanManageUsers(isAdmin)
         setCanManageRoles(isSuperAdmin)
         setCanManageBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_moderate_blog') || hasPermission(perms, 'can_access_admin'))
+        // Committee management: super_admin, event_manager, or content_moderator
+        setCanManageCommittee(isSuperAdmin || profile?.role === 'event_manager' || profile?.role === 'content_moderator')
       } else {
         router.push('/login')
       }
@@ -214,6 +217,14 @@ export default function DashboardPage() {
               <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog Management</h3>
               <p className="text-gray-600">Create, edit, and moderate blog posts</p>
+            </Link>
+          )}
+
+          {canManageCommittee && (
+            <Link href="/admin/committee" className="card text-center hover:shadow-lg transition-shadow group">
+              <Award className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Committee Management</h3>
+              <p className="text-gray-600">Manage advisory and executive committee members</p>
             </Link>
           )}
           
