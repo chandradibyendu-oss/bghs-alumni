@@ -91,3 +91,4 @@ If you want to use the 2x2 collage:
 | 4:3 | 1920×1440 | Large | ❌ Not recommended |
 
 
+

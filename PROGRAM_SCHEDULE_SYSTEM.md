@@ -240,3 +240,4 @@ Potential improvements:
 - Export schedule as PDF
 - Add to calendar integration
 
+

@@ -250,3 +250,4 @@ For issues or questions:
 3. Check browser console for errors
 4. Review Supabase logs
 
+

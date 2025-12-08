@@ -109,3 +109,4 @@ Run the updated schema:
 
 The schema now enforces that `profile_id` is NOT NULL, ensuring all members come from profiles table.
 
+

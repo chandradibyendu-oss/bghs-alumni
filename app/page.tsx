@@ -555,18 +555,18 @@ export default function Home() {
                         className={`absolute inset-0 ken-burns-zoom-out ${
                           isActive && isLoaded ? 'opacity-100' : 'opacity-0'
                         }`}
-                        style={{
+                style={{
                           backgroundImage: `url('${slide.backgroundImage}')`,
-                          backgroundSize: 'cover',
-                          backgroundPosition: 'center',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundColor: '#000',
+                  backgroundSize: 'cover',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundColor: '#000',
                           transition: isActive && isLoaded ? 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
-                          willChange: 'transform, opacity'
-                        }}
-                      />
+                  willChange: 'transform, opacity'
+                }}
+              />
                     </>
-                  )}
+            )}
                 </div>
               )
             })}

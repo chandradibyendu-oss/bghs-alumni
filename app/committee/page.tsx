@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Users, Award, Calendar, Mail, Phone, MapPin, Building, History } from 'lucide-react'
+import { Users, Award, Calendar, Mail, Phone, MapPin, Building, History, Menu as MenuIcon, X, User as UserIcon } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 import Link from 'next/link'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
 interface CommitteePosition {
   id: string
@@ -18,6 +19,8 @@ interface CommitteeMember {
   committee_type: 'advisory' | 'executive'
   position_name?: string | null
   position_display_order?: number | null
+  position_type_id?: string | null
+  display_order: number // Member's display order within their position/group
   start_date: string
   profile: {
     id: string
@@ -29,6 +32,9 @@ interface CommitteeMember {
     profession?: string
     company?: string
     location?: string
+    professional_title_id?: number | null
+    professional_title?: string | null
+    professional_title_category?: string | null
   }
 }
 
@@ -36,12 +42,74 @@ export default function CommitteePage() {
   const [loading, setLoading] = useState(true)
   const [advisoryMembers, setAdvisoryMembers] = useState<CommitteeMember[]>([])
   const [executiveMembers, setExecutiveMembers] = useState<CommitteeMember[]>([])
+  const [positions, setPositions] = useState<CommitteePosition[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
 
   useEffect(() => {
     loadCommitteeMembers()
+    loadPositions()
+    initAuth()
   }, [])
+
+  // Close account dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (accountOpen) {
+        const target = event.target as HTMLElement
+        if (!target.closest('.account-dropdown-container')) {
+          setAccountOpen(false)
+        }
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [accountOpen])
+
+  const initAuth = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUserEmail(user?.email ?? null)
+    if (user) {
+      try {
+        const perms = await getUserPermissions(user.id)
+        setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+      } catch {
+        // ignore if RPC not available
+      }
+    } else {
+      setIsAdmin(false)
+    }
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+      setUserEmail(session?.user?.email ?? null)
+      setIsAdmin(false)
+    })
+    return () => subscription.unsubscribe()
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    setUserEmail(null)
+    window.location.href = '/'
+  }
+
+  const loadPositions = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('committee_position_types')
+        .select('*')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+
+      if (error) throw error
+      setPositions(data || [])
+    } catch (error) {
+      console.error('Error loading positions:', error)
+    }
+  }
 
   const loadCommitteeMembers = async () => {
     try {
@@ -55,8 +123,22 @@ export default function CommitteePage() {
           profile_id,
           committee_type,
           start_date,
+          display_order,
+          position_type_id,
           position_type:committee_position_types(name, display_order),
-          profile:profiles!profile_id(id, full_name, email, phone, avatar_url, bio, profession, company, location)
+          profile:profiles!profile_id(
+            id, 
+            full_name, 
+            email, 
+            phone, 
+            avatar_url, 
+            bio, 
+            profession, 
+            company, 
+            location,
+            professional_title_id,
+            professional_titles(title, category)
+          )
         `)
         .eq('is_current', true)
         .order('committee_type', { ascending: true })
@@ -69,11 +151,24 @@ export default function CommitteePage() {
           ? m.position_type[0] 
           : m.position_type
         const profile = Array.isArray(m.profile) ? m.profile[0] : m.profile
+        
+        // Extract professional title from joined data
+        const professionalTitle = profile?.professional_titles
+          ? (Array.isArray(profile.professional_titles) 
+              ? profile.professional_titles[0] 
+              : profile.professional_titles)
+          : null
+        
         return {
           ...m,
           position_name: positionType?.name || null,
           position_display_order: positionType?.display_order || null,
-          profile: profile || null
+          display_order: m.display_order || 0, // Ensure display_order is included
+          profile: profile ? {
+            ...profile,
+            professional_title: professionalTitle?.title || null,
+            professional_title_category: professionalTitle?.category || null
+          } : null
         }
       }).filter(m => m.profile !== null) || [] // Filter out any members without profiles
 
@@ -81,16 +176,22 @@ export default function CommitteePage() {
       const advisory = formatted.filter(m => m.committee_type === 'advisory')
       const executive = formatted.filter(m => m.committee_type === 'executive')
 
-      // Sort executive by position order, then name
+      // Sort advisory members by display_order (as set in admin)
+      advisory.sort((a, b) => a.display_order - b.display_order)
+
+      // Sort executive by position order first, then by display_order within each position
       executive.sort((a, b) => {
+        // First sort by position display order
         if (a.position_display_order !== null && b.position_display_order !== null) {
-          return a.position_display_order - b.position_display_order
+          const positionDiff = a.position_display_order - b.position_display_order
+          if (positionDiff !== 0) return positionDiff
+          // If same position, sort by member display_order
+          return a.display_order - b.display_order
         }
         if (a.position_display_order !== null) return -1
         if (b.position_display_order !== null) return 1
-        const nameA = a.profile?.full_name || ''
-        const nameB = b.profile?.full_name || ''
-        return nameA.localeCompare(nameB)
+        // Both have no position - sort by display_order
+        return a.display_order - b.display_order
       })
 
       setAdvisoryMembers(advisory)
@@ -114,6 +215,106 @@ export default function CommitteePage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Navigation */}
+      <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center gap-3">
+              <button className="md:hidden p-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
+                <MenuIcon className="h-6 w-6 text-gray-700" />
+              </button>
+              <Link href="/" className="flex items-center gap-3">
+                <img 
+                  src="/bghs-logo.png" 
+                  alt="BGHS Alumni Association" 
+                  className="h-14 w-auto object-contain shrink-0 flex-none"
+                />
+                <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
+                  <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
+                  <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
+                </div>
+              </Link>
+            </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
+              <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
+              <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
+              <Link href="/committee" className="text-primary-600 font-semibold">Committee</Link>
+              <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
+              <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
+              {userEmail ? (
+                <div className="relative account-dropdown-container">
+                  <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
+                    <UserIcon className="h-4 w-4" />
+                    <span className="text-sm">Account</span>
+                  </button>
+                  {accountOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                      <div className="px-4 py-3 text-sm text-gray-600 border-b">{userEmail}</div>
+                      <div className="py-1">
+                        <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
+                        <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
+                        {isAdmin && (
+                          <>
+                            <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+                            <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
+                            <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                            <Link href="/admin/committee" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Committee Management</Link>
+                          </>
+                        )}
+                        <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/login" className="btn-primary">Login</Link>
+              )}
+            </div>
+          </div>
+        </div>
+      </nav>
+
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
+          <div className="absolute top-0 left-0 h-full w-72 bg-white shadow-lg p-4">
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-lg font-semibold">Menu</span>
+              <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
+            </div>
+            <nav className="space-y-2">
+              <Link href="/about" className="block px-2 py-2 rounded hover:bg-gray-50">About</Link>
+              <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+              <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
+              <Link href="/committee" className="block px-2 py-2 rounded bg-primary-50 text-primary-600 font-semibold">Committee</Link>
+              <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
+              <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
+              <div className="pt-2 border-t mt-2">
+                {userEmail ? (
+                  <>
+                    <div className="px-2 py-2 text-sm text-gray-600">{userEmail}</div>
+                    <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
+                    <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
+                    {isAdmin && (
+                      <>
+                        <div className="px-2 py-2 text-xs font-semibold text-gray-500 uppercase">Admin</div>
+                        <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
+                        <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
+                        <Link href="/admin/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee Management</Link>
+                      </>
+                    )}
+                    <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
+                  </>
+                ) : (
+                  <Link href="/login" className="block px-2 py-2 rounded bg-primary-600 text-white text-center font-semibold">Login</Link>
+                )}
+              </div>
+            </nav>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-gradient-to-r from-primary-600 to-primary-800 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -140,10 +341,45 @@ export default function CommitteePage() {
               <p>No executive committee members to display</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {executiveMembers.map((member) => (
-                <MemberCard key={member.id} member={member} />
-              ))}
+            <div className="space-y-12">
+              {/* Group executive members by position */}
+              {positions.map((position) => {
+                const membersInPosition = executiveMembers
+                  .filter(m => m.position_type_id === position.id)
+                  .sort((a, b) => a.display_order - b.display_order)
+
+                if (membersInPosition.length === 0) return null
+
+                return (
+                  <div key={position.id}>
+                    <h3 className="text-xl font-semibold text-primary-700 mb-6 flex items-center gap-2">
+                      <Award className="h-5 w-5" /> {position.name}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {membersInPosition.map((member) => (
+                        <MemberCard key={member.id} member={member} />
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+              
+              {/* Members without position (General Members) */}
+              {executiveMembers.filter(m => !m.position_type_id).length > 0 && (
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                    <Users className="h-5 w-5 text-gray-600" /> Other Executive Members
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {executiveMembers
+                      .filter(m => !m.position_type_id)
+                      .sort((a, b) => a.display_order - b.display_order)
+                      .map((member) => (
+                        <MemberCard key={member.id} member={member} />
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -189,6 +425,14 @@ export default function CommitteePage() {
   )
 }
 
+// Helper function to format name with professional title
+const formatNameWithTitle = (fullName: string, professionalTitle?: string | null): string => {
+  if (professionalTitle) {
+    return `${professionalTitle} ${fullName}`
+  }
+  return fullName
+}
+
 function MemberCard({ member }: { member: CommitteeMember }) {
   if (!member.profile) return null
 
@@ -200,7 +444,7 @@ function MemberCard({ member }: { member: CommitteeMember }) {
           {member.profile.avatar_url ? (
             <Image
               src={member.profile.avatar_url}
-              alt={member.profile.full_name}
+              alt={formatNameWithTitle(member.profile.full_name, member.profile.professional_title)}
               width={120}
               height={120}
               className="rounded-full object-cover border-4 border-primary-100"
@@ -213,7 +457,9 @@ function MemberCard({ member }: { member: CommitteeMember }) {
         </div>
 
         {/* Name and Position */}
-        <h3 className="text-xl font-semibold text-gray-900 mb-1">{member.profile.full_name}</h3>
+        <h3 className="text-xl font-semibold text-gray-900 mb-1">
+          {formatNameWithTitle(member.profile.full_name, member.profile.professional_title)}
+        </h3>
         {member.position_name && (
           <p className="text-primary-600 font-medium mb-3">{member.position_name}</p>
         )}

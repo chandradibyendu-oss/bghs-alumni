@@ -56,6 +56,9 @@ interface CommitteeMember {
     profession?: string
     company?: string
     location?: string
+    professional_title_id?: number | null
+    professional_title?: string | null
+    professional_title_category?: string | null
   }
 }
 
@@ -74,6 +77,7 @@ export default function AdminCommitteePage() {
   const [profileSearchTerm, setProfileSearchTerm] = useState('')
   const [draggedMember, setDraggedMember] = useState<CommitteeMember | null>(null)
   const [dragOverPosition, setDragOverPosition] = useState<string | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null) // Track which index we're hovering over
   const [showAddMemberModal, setShowAddMemberModal] = useState(false)
 
   const [memberForm, setMemberForm] = useState({
@@ -95,7 +99,20 @@ export default function AdminCommitteePage() {
   useEffect(() => {
     checkAuth()
     loadData()
+    // Load initial profiles (without search term to show all)
+    loadProfiles()
   }, [])
+
+  // Reload profiles when search term changes (debounced)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (showAddMemberModal) {
+        loadProfiles(profileSearchTerm)
+      }
+    }, 300) // Debounce search by 300ms
+
+    return () => clearTimeout(timer)
+  }, [profileSearchTerm, showAddMemberModal])
 
   const checkAuth = async () => {
     try {
@@ -120,11 +137,14 @@ export default function AdminCommitteePage() {
   const loadData = async () => {
     try {
       setLoading(true)
+      // Load members and positions in parallel
       await Promise.all([
         loadMembers(),
-        loadPositions(),
-        loadProfiles()
+        loadPositions()
+        // loadProfiles is called separately in useEffect to support search
       ])
+      // Small delay to ensure state updates
+      await new Promise(resolve => setTimeout(resolve, 50))
     } catch (error) {
       console.error('Error loading data:', error)
       alert('Error loading committee data')
@@ -139,7 +159,19 @@ export default function AdminCommitteePage() {
       .select(`
         *,
         position_type:committee_position_types(name),
-        profile:profiles!profile_id(id, full_name, email, phone, avatar_url, bio, profession, company, location)
+        profile:profiles!profile_id(
+          id, 
+          full_name, 
+          email, 
+          phone, 
+          avatar_url, 
+          bio, 
+          profession, 
+          company, 
+          location,
+          professional_title_id,
+          professional_titles(title, category)
+        )
       `)
       .order('is_current', { ascending: false })
       .order('display_order', { ascending: true })
@@ -149,22 +181,40 @@ export default function AdminCommitteePage() {
     const formatted = data?.map(m => {
       const positionType = Array.isArray(m.position_type) ? m.position_type[0] : m.position_type
       const profile = Array.isArray(m.profile) ? m.profile[0] : m.profile
+      
+      // Extract professional title from joined data
+      const professionalTitle = profile?.professional_titles
+        ? (Array.isArray(profile.professional_titles) 
+            ? profile.professional_titles[0] 
+            : profile.professional_titles)
+        : null
+      
       return {
         ...m,
         position_name: positionType?.name || null,
         position_type: positionType,
-        profile: profile || null
+        profile: profile ? {
+          ...profile,
+          professional_title: professionalTitle?.title || null,
+          professional_title_category: professionalTitle?.category || null
+        } : null
       }
     }).filter(m => m.profile !== null) || [] // Filter out any members without profiles
 
-    // Sort by profile name
+    // Sort by display_order first (to maintain drag-and-drop order), then by name for same order
     formatted.sort((a, b) => {
+      // First sort by display_order
+      if (a.display_order !== b.display_order) {
+        return a.display_order - b.display_order
+      }
+      // If display_order is the same, sort by name
       const nameA = a.profile?.full_name || ''
       const nameB = b.profile?.full_name || ''
       return nameA.localeCompare(nameB)
     })
 
-    setMembers(formatted)
+    // Force state update with new array reference
+    setMembers([...formatted])
   }
 
   const loadPositions = async () => {
@@ -178,16 +228,66 @@ export default function AdminCommitteePage() {
     setPositions(data || [])
   }
 
-  const loadProfiles = async () => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('id, full_name, email, avatar_url')
-      .eq('is_approved', true)
-      .order('full_name', { ascending: true })
-      .limit(1000)
+  const loadProfiles = async (searchTerm?: string) => {
+    try {
+      let query = supabase
+        .from('profiles')
+        .select(`
+          id, 
+          full_name, 
+          email, 
+          avatar_url,
+          professional_title_id,
+          professional_titles(title, category)
+        `)
+        .eq('is_approved', true)
 
-    if (error) throw error
-    setProfiles(data || [])
+      // If search term provided, use server-side search with ilike (case-insensitive pattern matching)
+      // Search in name, email, and professional title
+      if (searchTerm && searchTerm.trim()) {
+        const searchLower = searchTerm.trim().toLowerCase()
+        // Note: We can't directly search in joined table, so we search in name/email
+        // and then filter by title client-side if needed
+        query = query.or(`full_name.ilike.%${searchLower}%,email.ilike.%${searchLower}%`)
+        // When searching, limit to 500 results
+        query = query.order('full_name', { ascending: true }).limit(500)
+      } else {
+        // When no search term, load more profiles (up to 2000) for browsing
+        query = query.order('full_name', { ascending: true }).limit(2000)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      
+      // Process profiles to extract professional titles and add client-side title search
+      const processedProfiles = (data || []).map(p => {
+        const professionalTitle = p.professional_titles
+          ? (Array.isArray(p.professional_titles) ? p.professional_titles[0] : p.professional_titles)
+          : null
+        
+        return {
+          ...p,
+          professional_title: professionalTitle?.title || null,
+          professional_title_category: professionalTitle?.category || null
+        }
+      })
+      
+      // If search term exists, also filter by professional title client-side
+      if (searchTerm && searchTerm.trim()) {
+        const searchLower = searchTerm.trim().toLowerCase()
+        const filtered = processedProfiles.filter(p => 
+          p.full_name.toLowerCase().includes(searchLower) ||
+          p.email?.toLowerCase().includes(searchLower) ||
+          p.professional_title?.toLowerCase().includes(searchLower)
+        )
+        setProfiles(filtered)
+      } else {
+        setProfiles(processedProfiles)
+      }
+    } catch (error) {
+      console.error('Error loading profiles:', error)
+      setProfiles([])
+    }
   }
 
   const handleProfileSelect = (profileId: string) => {
@@ -369,54 +469,141 @@ export default function AdminCommitteePage() {
     e.dataTransfer.effectAllowed = 'move'
   }
 
-  const handleDragOver = (e: React.DragEvent, targetPositionId?: string) => {
+  const handleDragOver = (e: React.DragEvent, targetPositionId?: string | null) => {
     e.preventDefault()
     e.dataTransfer.dropEffect = 'move'
-    setDragOverPosition(targetPositionId || null)
+    setDragOverPosition(targetPositionId !== undefined ? targetPositionId : null)
   }
 
-  const handleDragEnd = () => {
-    setDraggedMember(null)
-    setDragOverPosition(null)
+  const handleDragEnd = (e: React.DragEvent) => {
+    // Clear drag state after a short delay to allow drop handler to complete
+    // This prevents race conditions
+    setTimeout(() => {
+      setDraggedMember(null)
+      setDragOverPosition(null)
+      setDragOverIndex(null)
+    }, 100)
   }
 
-  const handleDrop = async (e: React.DragEvent, targetPositionId?: string, targetIndex?: number) => {
+  const handleDrop = async (e: React.DragEvent, targetPositionId?: string | null, targetIndex?: number) => {
     e.preventDefault()
-    if (!draggedMember) return
+    e.stopPropagation()
+    
+    if (!draggedMember) {
+      return
+    }
 
     try {
-      // Get all members in the same group (same position or no position)
-      const sameGroupMembers = currentMembers
-        .filter(m => 
-          m.committee_type === draggedMember.committee_type &&
-          (targetPositionId 
-            ? m.position_type_id === targetPositionId 
-            : !m.position_type_id)
-        )
-        .filter(m => m.id !== draggedMember.id)
+      // Determine target position (null means General Members, undefined means same position)
+      const isMovingToGeneral = targetPositionId === null
+      const isMovingToPosition = targetPositionId !== undefined && targetPositionId !== null
+      
+      // Get ALL members in the target group (including dragged member if already there)
+      // Use the same filtering logic as the UI uses for display
+      const allTargetGroupMembers = members
+        .filter(m => {
+          // Match committee type and current status
+          if (m.committee_type !== draggedMember.committee_type || !m.is_current) {
+            return false
+          }
+          
+          if (isMovingToGeneral) {
+            // General Members: no position
+            return !m.position_type_id
+          } else if (isMovingToPosition) {
+            // Specific position
+            return m.position_type_id === targetPositionId
+          } else {
+            // Same position - keep in current position group
+            return m.position_type_id === draggedMember.position_type_id
+          }
+        })
         .sort((a, b) => a.display_order - b.display_order)
+
+      // Find the dragged member's current index in the target group (if it's already there)
+      const draggedMemberCurrentIndex = allTargetGroupMembers.findIndex(m => m.id === draggedMember.id)
+      const isMovingWithinSameGroup = draggedMemberCurrentIndex >= 0
+
+      // Get members excluding the dragged member (for calculating insertion point)
+      const targetGroupMembersWithoutDragged = allTargetGroupMembers.filter(m => m.id !== draggedMember.id)
+
+      // Calculate the correct insertion index
+      // The targetIndex from UI is the visual position (including dragged member)
+      // We need to convert it to the position in the list without the dragged member
+      let insertionIndex: number
+      
+      if (targetIndex === undefined || targetIndex === null) {
+        // No specific index - append to end
+        insertionIndex = targetGroupMembersWithoutDragged.length
+      } else if (isMovingWithinSameGroup) {
+        // Dragging within the same group - need to adjust for the removed item
+        if (draggedMemberCurrentIndex < targetIndex) {
+          // Moving forward: targetIndex already accounts for the dragged member's position
+          // But when we remove it, everything shifts left by 1
+          insertionIndex = targetIndex - 1
+        } else {
+          // Moving backward: targetIndex doesn't account for the dragged member yet
+          insertionIndex = targetIndex
+        }
+      } else {
+        // Moving to a different group - index is correct as-is
+        insertionIndex = targetIndex
+      }
+      
+      // Ensure insertionIndex is within valid bounds
+      insertionIndex = Math.max(0, Math.min(insertionIndex, targetGroupMembersWithoutDragged.length))
 
       // Calculate new display order
       let newDisplayOrder: number
-      if (targetIndex !== undefined) {
-        // Insert at specific index
-        if (targetIndex === 0) {
-          newDisplayOrder = sameGroupMembers[0]?.display_order ? sameGroupMembers[0].display_order - 1 : 0
-        } else if (targetIndex >= sameGroupMembers.length) {
-          newDisplayOrder = sameGroupMembers[sameGroupMembers.length - 1]?.display_order 
-            ? sameGroupMembers[sameGroupMembers.length - 1].display_order + 1 
-            : sameGroupMembers.length
-        } else {
-          const prevOrder = sameGroupMembers[targetIndex - 1]?.display_order || 0
-          const nextOrder = sameGroupMembers[targetIndex]?.display_order || prevOrder + 1
-          newDisplayOrder = Math.floor((prevOrder + nextOrder) / 2)
-        }
+      
+      if (insertionIndex <= 0) {
+        // Insert at beginning
+        const firstMember = targetGroupMembersWithoutDragged[0]
+        newDisplayOrder = firstMember ? Math.max(0, firstMember.display_order - 10) : 0
+      } else if (insertionIndex >= targetGroupMembersWithoutDragged.length) {
+        // Insert at end
+        const lastMember = targetGroupMembersWithoutDragged[targetGroupMembersWithoutDragged.length - 1]
+        newDisplayOrder = lastMember ? lastMember.display_order + 10 : 0
       } else {
-        // Append to end
-        const maxOrder = sameGroupMembers.length > 0 
-          ? Math.max(...sameGroupMembers.map(m => m.display_order))
-          : 0
-        newDisplayOrder = maxOrder + 1
+        // Insert between two members
+        const prevMember = targetGroupMembersWithoutDragged[insertionIndex - 1]
+        const nextMember = targetGroupMembersWithoutDragged[insertionIndex]
+        
+        if (prevMember && nextMember) {
+          const prevOrder = prevMember.display_order
+          const nextOrder = nextMember.display_order
+          const gap = nextOrder - prevOrder
+          
+          if (gap > 1) {
+            // There's space between them - use the middle
+            newDisplayOrder = Math.floor((prevOrder + nextOrder) / 2)
+          } else {
+            // No space - need to shift members after insertion point
+            // First, update the dragged member with a temporary high order
+            newDisplayOrder = nextOrder
+            
+            // Shift all members from insertion point onwards
+            const membersToShift = targetGroupMembersWithoutDragged.slice(insertionIndex)
+            if (membersToShift.length > 0) {
+              // Update all members after insertion to have higher display_order
+              const shiftAmount = 10
+              for (const member of membersToShift) {
+                await supabase
+                  .from('committee_members')
+                  .update({ display_order: member.display_order + shiftAmount })
+                  .eq('id', member.id)
+              }
+              // Recalculate newDisplayOrder after shift
+              newDisplayOrder = prevOrder + Math.floor(shiftAmount / 2)
+            }
+          }
+        } else if (prevMember) {
+          newDisplayOrder = prevMember.display_order + 10
+        } else if (nextMember) {
+          newDisplayOrder = Math.max(0, nextMember.display_order - 10)
+        } else {
+          newDisplayOrder = 0
+        }
       }
 
       // Update member
@@ -424,27 +611,43 @@ export default function AdminCommitteePage() {
         display_order: newDisplayOrder
       }
 
-      // If position changed
-      if (targetPositionId !== undefined) {
-        if (targetPositionId && targetPositionId !== draggedMember.position_type_id) {
-          updateData.position_type_id = targetPositionId
-        } else if (!targetPositionId && draggedMember.position_type_id) {
-          updateData.position_type_id = null
-        }
+      // Update position if moving to a different position or General Members
+      if (isMovingToGeneral) {
+        // Moving to General Members (no position)
+        updateData.position_type_id = null
+      } else if (isMovingToPosition) {
+        // Moving to a specific position
+        updateData.position_type_id = targetPositionId
       }
+      // If isSamePosition, we only update display_order (position stays the same)
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('committee_members')
         .update(updateData)
         .eq('id', draggedMember.id)
 
+      if (updateError) {
+        console.error('Update error:', updateError)
+        throw updateError
+      }
+
+      // Clear drag state immediately to prevent visual glitches
+      setDraggedMember(null)
+      setDragOverPosition(null)
+      setDragOverIndex(null)
+
+      // Reload data to refresh UI
       await loadData()
+      
+      // Force a small delay to ensure state updates propagate
+      await new Promise(resolve => setTimeout(resolve, 100))
     } catch (error: any) {
       console.error('Error moving member:', error)
       alert(`Error moving member: ${error.message}`)
-    } finally {
+      // Clear drag state even on error
       setDraggedMember(null)
       setDragOverPosition(null)
+      setDragOverIndex(null)
     }
   }
 
@@ -482,6 +685,7 @@ export default function AdminCommitteePage() {
       await loadData()
       setShowAddMemberModal(false)
       setProfileSearchTerm('')
+      loadProfiles() // Reset profile list
     } catch (error: any) {
       console.error('Error adding member:', error)
       alert(`Error adding member: ${error.message}`)
@@ -490,10 +694,12 @@ export default function AdminCommitteePage() {
 
   const filteredMembers = members.filter(m => {
     const matchesType = m.committee_type === selectedType
+    const searchLower = searchTerm.toLowerCase()
     const matchesSearch = !searchTerm || 
-      m.profile?.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.position_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.profile?.email?.toLowerCase().includes(searchTerm.toLowerCase())
+      m.profile?.full_name.toLowerCase().includes(searchLower) ||
+      m.profile?.professional_title?.toLowerCase().includes(searchLower) ||
+      m.position_name?.toLowerCase().includes(searchLower) ||
+      m.profile?.email?.toLowerCase().includes(searchLower)
     return matchesType && matchesSearch
   })
 
@@ -518,13 +724,9 @@ export default function AdminCommitteePage() {
   const membersWithoutPosition = currentMembers.filter(m => !m.position_type_id)
 
   // Filter available profiles (exclude already added members)
+  // Note: Server-side search is already applied in loadProfiles, so we just filter out existing members
   const existingMemberProfileIds = new Set(members.filter(m => m.is_current && m.committee_type === selectedType).map(m => m.profile_id))
-  const availableProfiles = profiles.filter(p => !existingMemberProfileIds.has(p.id))
-  const filteredAvailableProfiles = availableProfiles.filter(p => 
-    !profileSearchTerm || 
-    p.full_name.toLowerCase().includes(profileSearchTerm.toLowerCase()) ||
-    p.email?.toLowerCase().includes(profileSearchTerm.toLowerCase())
-  )
+  const filteredAvailableProfiles = profiles.filter(p => !existingMemberProfileIds.has(p.id))
 
   if (loading) {
     return (
@@ -589,7 +791,11 @@ export default function AdminCommitteePage() {
         {/* Actions */}
         <div className="mb-6 flex gap-4">
           <button
-            onClick={() => setShowAddMemberModal(true)}
+            onClick={() => {
+              setShowAddMemberModal(true)
+              setProfileSearchTerm('')
+              loadProfiles() // Load all profiles when opening modal
+            }}
             className="btn-primary flex items-center gap-2"
           >
             <Plus className="h-4 w-4" />
@@ -614,42 +820,158 @@ export default function AdminCommitteePage() {
                       <Award className="h-5 w-5 text-primary-600" />
                       {position.name}
                     </h3>
-                    <div 
-                      className="space-y-2"
-                      onDragOver={(e) => handleDragOver(e, position.id)}
-                      onDrop={(e) => handleDrop(e, position.id)}
-                    >
+                    <div className="space-y-2">
                       {group.members.map((member, index) => (
-                        <MemberCardDraggable
-                          key={member.id}
-                          member={member}
-                          index={index}
-                          onDragStart={handleDragStart}
-                          onDragEnd={handleDragEnd}
-                          onEdit={() => {
-                            setEditingMember(member)
-                            setMemberForm({
-                              profile_id: member.profile_id,
-                              committee_type: member.committee_type,
-                              position_type_id: member.position_type_id || '',
-                              start_date: member.start_date,
-                              end_date: member.end_date || '',
-                              is_current: member.is_current,
-                              display_order: member.display_order
-                            })
-                            setShowMemberForm(true)
-                          }}
-                          onDelete={() => handleDeleteMember(member.id)}
-                          onEndTenure={() => handleEndTenure(member)}
-                          isDragging={draggedMember?.id === member.id}
-                          isDragOver={dragOverPosition === position.id}
-                        />
+                        <div key={member.id} className="relative">
+                          {/* Drop zone before this member (for reordering) - More visible */}
+                          <div
+                            className={`absolute -top-3 left-0 right-0 h-6 z-20 transition-all rounded pointer-events-auto ${
+                              dragOverPosition === position.id && 
+                              dragOverIndex === index && 
+                              draggedMember?.id !== member.id
+                                ? 'bg-primary-200 border-2 border-primary-500 border-dashed' 
+                                : draggedMember ? 'bg-transparent' : 'bg-transparent'
+                            }`}
+                            onDragEnter={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (draggedMember && draggedMember.id !== member.id) {
+                                setDragOverPosition(position.id)
+                                setDragOverIndex(index)
+                              }
+                            }}
+                            onDragOver={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (draggedMember && draggedMember.id !== member.id) {
+                                setDragOverPosition(position.id)
+                                setDragOverIndex(index)
+                              }
+                            }}
+                            onDragLeave={(e) => {
+                              // Only clear if we're actually leaving the drop zone
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              const x = e.clientX
+                              const y = e.clientY
+                              if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                                setDragOverIndex(null)
+                              }
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              if (draggedMember) {
+                                handleDrop(e, position.id, index)
+                              }
+                            }}
+                          >
+                            {dragOverPosition === position.id && 
+                             dragOverIndex === index && 
+                             draggedMember?.id !== member.id && (
+                              <div className="flex items-center justify-center h-full">
+                                <div className="w-full h-0.5 bg-primary-500"></div>
+                              </div>
+                            )}
+                          </div>
+                          <div
+                            onDragOver={(e) => {
+                              if (draggedMember && draggedMember.id !== member.id) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setDragOverPosition(position.id)
+                                setDragOverIndex(index + 1) // Insert after this card
+                              }
+                            }}
+                            onDrop={(e) => {
+                              if (draggedMember && draggedMember.id !== member.id) {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                handleDrop(e, position.id, index + 1)
+                              }
+                            }}
+                          >
+                            <MemberCardDraggable
+                              member={member}
+                              index={index}
+                              onDragStart={handleDragStart}
+                              onDragEnd={(e) => handleDragEnd(e)}
+                              onEdit={() => {
+                                setEditingMember(member)
+                                setMemberForm({
+                                  profile_id: member.profile_id,
+                                  committee_type: member.committee_type,
+                                  position_type_id: member.position_type_id || '',
+                                  start_date: member.start_date,
+                                  end_date: member.end_date || '',
+                                  is_current: member.is_current,
+                                  display_order: member.display_order
+                                })
+                                setShowMemberForm(true)
+                              }}
+                              onDelete={() => handleDeleteMember(member.id)}
+                              onEndTenure={() => handleEndTenure(member)}
+                              isDragging={draggedMember?.id === member.id}
+                              isDragOver={dragOverPosition === position.id && (dragOverIndex === index || dragOverIndex === index + 1)}
+                            />
+                          </div>
+                        </div>
                       ))}
-                      {/* Drop zone for adding to this position */}
+                      {/* Drop zone at the end of this position (for reordering) - More visible */}
+                      <div
+                        className={`relative h-8 transition-all rounded ${
+                          dragOverPosition === position.id && 
+                          dragOverIndex === group.members.length
+                            ? 'bg-primary-200 border-2 border-primary-500 border-dashed' 
+                            : 'bg-transparent'
+                        }`}
+                        onDragEnter={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setDragOverPosition(position.id)
+                          setDragOverIndex(group.members.length)
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          setDragOverPosition(position.id)
+                          setDragOverIndex(group.members.length)
+                        }}
+                        onDragLeave={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const x = e.clientX
+                          const y = e.clientY
+                          if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                            setDragOverIndex(null)
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (draggedMember) {
+                            handleDrop(e, position.id, group.members.length)
+                          }
+                        }}
+                      >
+                        {dragOverPosition === position.id && 
+                         dragOverIndex === group.members.length && (
+                          <div className="flex items-center justify-center h-full">
+                            <div className="w-full h-0.5 bg-primary-500"></div>
+                          </div>
+                        )}
+                      </div>
+                      {/* Drop zone for adding to this position from other positions */}
                       <div
                         className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-gray-500 text-sm hover:border-primary-400 transition-colors"
-                        onDragOver={(e) => handleDragOver(e, position.id)}
-                        onDrop={(e) => handleDrop(e, position.id)}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDragOver(e, position.id)
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          handleDrop(e, position.id)
+                        }}
                       >
                         Drop member here to add to {position.name}
                       </div>
@@ -665,37 +987,158 @@ export default function AdminCommitteePage() {
                     <Users className="h-5 w-5 text-gray-600" />
                     General Members
                   </h3>
-                  <div 
-                    className="space-y-2"
-                    onDragOver={(e) => handleDragOver(e)}
-                    onDrop={(e) => handleDrop(e)}
-                  >
+                  <div className="space-y-2">
                     {membersWithoutPosition.map((member, index) => (
-                      <MemberCardDraggable
-                        key={member.id}
-                        member={member}
-                        index={index}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                        onEdit={() => {
-                          setEditingMember(member)
-                          setMemberForm({
-                            profile_id: member.profile_id,
-                            committee_type: member.committee_type,
-                            position_type_id: member.position_type_id || '',
-                            start_date: member.start_date,
-                            end_date: member.end_date || '',
-                            is_current: member.is_current,
-                            display_order: member.display_order
-                          })
-                          setShowMemberForm(true)
-                        }}
-                        onDelete={() => handleDeleteMember(member.id)}
-                        onEndTenure={() => handleEndTenure(member)}
-                        isDragging={draggedMember?.id === member.id}
-                        isDragOver={dragOverPosition === null}
-                      />
+                      <div key={member.id} className="relative">
+                        {/* Drop zone before this member (for reordering) - More visible */}
+                        <div
+                          className={`absolute -top-3 left-0 right-0 h-6 z-10 transition-all rounded ${
+                            dragOverPosition === null && 
+                            dragOverIndex === index && 
+                            draggedMember?.id !== member.id
+                              ? 'bg-primary-200 border-2 border-primary-500 border-dashed' 
+                              : 'bg-transparent'
+                          }`}
+                          onDragEnter={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDragOverPosition(null)
+                            setDragOverIndex(index)
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDragOverPosition(null)
+                            setDragOverIndex(index)
+                          }}
+                          onDragLeave={(e) => {
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            const x = e.clientX
+                            const y = e.clientY
+                            if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                              setDragOverIndex(null)
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            handleDrop(e, null, index)
+                          }}
+                        >
+                          {dragOverPosition === null && 
+                           dragOverIndex === index && 
+                           draggedMember?.id !== member.id && (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="w-full h-0.5 bg-primary-500"></div>
+                            </div>
+                          )}
+                        </div>
+                        <div
+                          onDragOver={(e) => {
+                            if (draggedMember && draggedMember.id !== member.id) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setDragOverPosition(null)
+                              setDragOverIndex(index + 1) // Insert after this card
+                            }
+                          }}
+                          onDrop={(e) => {
+                            if (draggedMember && draggedMember.id !== member.id) {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              handleDrop(e, null, index + 1)
+                            }
+                          }}
+                        >
+                          <MemberCardDraggable
+                            member={member}
+                            index={index}
+                            onDragStart={handleDragStart}
+                            onDragEnd={(e) => handleDragEnd(e)}
+                            onEdit={() => {
+                              setEditingMember(member)
+                              setMemberForm({
+                                profile_id: member.profile_id,
+                                committee_type: member.committee_type,
+                                position_type_id: member.position_type_id || '',
+                                start_date: member.start_date,
+                                end_date: member.end_date || '',
+                                is_current: member.is_current,
+                                display_order: member.display_order
+                              })
+                              setShowMemberForm(true)
+                            }}
+                            onDelete={() => handleDeleteMember(member.id)}
+                            onEndTenure={() => handleEndTenure(member)}
+                            isDragging={draggedMember?.id === member.id}
+                            isDragOver={dragOverPosition === null && (dragOverIndex === index || dragOverIndex === index + 1)}
+                          />
+                        </div>
+                      </div>
                     ))}
+                    {/* Drop zone at the end of General Members - More visible */}
+                      <div
+                        className={`relative h-8 transition-all rounded pointer-events-auto ${
+                          dragOverPosition === null && 
+                          dragOverIndex === membersWithoutPosition.length
+                            ? 'bg-primary-200 border-2 border-primary-500 border-dashed' 
+                            : draggedMember ? 'bg-transparent' : 'bg-transparent'
+                        }`}
+                        onDragEnter={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (draggedMember) {
+                            setDragOverPosition(null)
+                            setDragOverIndex(membersWithoutPosition.length)
+                          }
+                        }}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (draggedMember) {
+                            setDragOverPosition(null)
+                            setDragOverIndex(membersWithoutPosition.length)
+                          }
+                        }}
+                        onDragLeave={(e) => {
+                          const rect = e.currentTarget.getBoundingClientRect()
+                          const x = e.clientX
+                          const y = e.clientY
+                          if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+                            setDragOverIndex(null)
+                          }
+                        }}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (draggedMember) {
+                            handleDrop(e, null, membersWithoutPosition.length)
+                          }
+                        }}
+                      >
+                      {dragOverPosition === null && 
+                       dragOverIndex === membersWithoutPosition.length && (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="w-full h-0.5 bg-primary-500"></div>
+                        </div>
+                      )}
+                    </div>
+                    {/* Drop zone for moving from positions to General Members */}
+                    <div
+                      className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center text-gray-500 text-sm hover:border-primary-400 transition-colors"
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleDragOver(e, null)
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        handleDrop(e, null)
+                      }}
+                    >
+                      Drop member here to move to General Members
+                    </div>
                   </div>
                 </div>
               )}
@@ -757,7 +1200,9 @@ export default function AdminCommitteePage() {
                     {member.profile?.avatar_url ? (
                       <Image
                         src={member.profile.avatar_url}
-                        alt={member.profile.full_name}
+                        alt={member.profile.professional_title 
+                          ? `${member.profile.professional_title} ${member.profile.full_name}`
+                          : member.profile.full_name}
                         width={48}
                         height={48}
                         className="rounded-full object-cover"
@@ -768,7 +1213,11 @@ export default function AdminCommitteePage() {
                       </div>
                     )}
                     <div>
-                      <h3 className="font-semibold text-gray-900">{member.profile?.full_name}</h3>
+                      <h3 className="font-semibold text-gray-900">
+                        {member.profile?.professional_title 
+                          ? `${member.profile.professional_title} ${member.profile.full_name}`
+                          : member.profile?.full_name}
+                      </h3>
                       {member.position_name && (
                         <p className="text-sm text-primary-600">{member.position_name}</p>
                       )}
@@ -794,6 +1243,7 @@ export default function AdminCommitteePage() {
                 <button onClick={() => {
                   setShowAddMemberModal(false)
                   setProfileSearchTerm('')
+                  loadProfiles() // Reset to show all profiles when closing
                 }}>
                   <X className="h-5 w-5" />
                 </button>
@@ -806,7 +1256,10 @@ export default function AdminCommitteePage() {
                       type="text"
                       placeholder="Search alumni by name or email..."
                       value={profileSearchTerm}
-                      onChange={(e) => setProfileSearchTerm(e.target.value)}
+                      onChange={(e) => {
+                        setProfileSearchTerm(e.target.value)
+                        // Search will be triggered by useEffect with debounce
+                      }}
                       className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
@@ -851,7 +1304,9 @@ export default function AdminCommitteePage() {
                         {profile.avatar_url ? (
                           <Image
                             src={profile.avatar_url}
-                            alt={profile.full_name}
+                            alt={profile.professional_title 
+                              ? `${profile.professional_title} ${profile.full_name}`
+                              : profile.full_name}
                             width={48}
                             height={48}
                             className="rounded-full object-cover flex-shrink-0"
@@ -862,12 +1317,18 @@ export default function AdminCommitteePage() {
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{profile.full_name}</p>
+                          <p className="font-medium text-gray-900 truncate">
+                            {profile.professional_title 
+                              ? `${profile.professional_title} ${profile.full_name}`
+                              : profile.full_name}
+                          </p>
                           {profile.email && (
                             <p className="text-sm text-gray-500 truncate">{profile.email}</p>
                           )}
-                          {profile.profession && (
-                            <p className="text-xs text-gray-400 truncate">{profile.profession}</p>
+                          {profile.professional_title_category && (
+                            <p className="text-xs text-blue-600 truncate">
+                              {profile.professional_title_category}
+                            </p>
                           )}
                         </div>
                         <button
@@ -918,7 +1379,9 @@ export default function AdminCommitteePage() {
                     <option value="">Select alumni profile...</option>
                     {profiles.map(profile => (
                       <option key={profile.id} value={profile.id}>
-                        {profile.full_name} {profile.email ? `(${profile.email})` : ''}
+                        {profile.professional_title 
+                          ? `${profile.professional_title} ${profile.full_name}`
+                          : profile.full_name} {profile.email ? `(${profile.email})` : ''}
                       </option>
                     ))}
                   </select>
@@ -1097,7 +1560,7 @@ function MemberCardDraggable({
   member: CommitteeMember
   index: number
   onDragStart: (e: React.DragEvent, member: CommitteeMember) => void
-  onDragEnd: () => void
+  onDragEnd: (e: React.DragEvent) => void
   onEdit: () => void
   onDelete: () => void
   onEndTenure: () => void
@@ -1123,7 +1586,9 @@ function MemberCardDraggable({
       {member.profile?.avatar_url ? (
         <Image
           src={member.profile.avatar_url}
-          alt={member.profile.full_name}
+          alt={member.profile.professional_title 
+            ? `${member.profile.professional_title} ${member.profile.full_name}`
+            : member.profile.full_name}
           width={56}
           height={56}
           className="rounded-full object-cover flex-shrink-0"
@@ -1135,7 +1600,11 @@ function MemberCardDraggable({
       )}
 
       <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-gray-900 truncate">{member.profile?.full_name}</h3>
+        <h3 className="font-semibold text-gray-900 truncate">
+          {member.profile?.professional_title 
+            ? `${member.profile.professional_title} ${member.profile.full_name}`
+            : member.profile?.full_name}
+        </h3>
         {member.position_name && (
           <p className="text-sm text-primary-600 font-medium">{member.position_name}</p>
         )}

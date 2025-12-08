@@ -148,3 +148,4 @@ For processing multiple images repeatedly, you can use the generic extraction sc
 But for this specific image, the CSV was created manually from the image description data.
 
 
+

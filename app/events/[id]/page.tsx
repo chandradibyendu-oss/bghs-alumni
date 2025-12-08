@@ -280,7 +280,7 @@ function SponsorMarquee({
       }
     }
   }, [isPaused])
-
+  
   return (
     <div className={`relative ${style.container} rounded-lg py-4`}>
       {/* Gradient fade edges - fixed position, outside scrollable area */}
@@ -328,7 +328,7 @@ function SponsorMarquee({
             <div
               key={`${sponsor.name}-${index}`}
               className={`flex-shrink-0 mx-2 sm:mx-4 ${style.card} transition-all duration-300 min-w-[240px] sm:min-w-[280px] ${isLargeTier ? 'sm:min-w-[320px]' : 'sm:min-w-[200px]'} shadow-lg`}
-            >
+              >
               <div className={`relative ${style.imageContainer} bg-gray-50 rounded-lg overflow-hidden mb-3`}>
                 {imageUrl ? (
                   <>
@@ -349,26 +349,26 @@ function SponsorMarquee({
                       <Maximize2 size={14} />
                     </button>
                   </>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-gray-400">
-                    <div className="text-center">
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                      <div className="text-center">
                       <div className={`${isLargeTier ? 'text-4xl mb-2' : 'text-2xl mb-1'}`}>🏢</div>
                       <div className={`${isLargeTier ? 'text-sm' : 'text-xs'} font-medium`}>{sponsor.name}</div>
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
               
-              <div className="text-center">
+                <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <h4 className={`font-semibold text-gray-900 ${isLargeTier ? 'text-base' : 'text-sm'}`}>
                     {sponsor.name}
                   </h4>
                   {hasWebsite && (
-                    <Link
+              <Link
                       href={sponsor.website_url}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow sponsored"
+                target="_blank"
+                rel="noopener noreferrer nofollow sponsored"
                       className="text-primary-600 hover:text-primary-700 transition-colors"
                       onClick={(e) => e.stopPropagation()}
                       aria-label={`Visit ${sponsor.name} website`}
@@ -376,17 +376,17 @@ function SponsorMarquee({
                       <ExternalLink size={isLargeTier ? 16 : 14} />
                     </Link>
                   )}
-                </div>
+                      </div>
                 {sponsor.description && isLargeTier && (
                   <p className="text-xs text-gray-600 line-clamp-2">{sponsor.description}</p>
-                )}
-              </div>
+                  )}
+                </div>
             </div>
           )
         })}
         </div>
-      </div>
-    </div>
+                    </div>
+                </div>
   )
 }
 
@@ -1427,17 +1427,17 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
               </div>
             ) : event.metadata?.program_schedule && Array.isArray(event.metadata.program_schedule) && event.metadata.program_schedule.length > 0 ? (
               // Legacy flat array format (backward compatibility)
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
                 {event.metadata.program_schedule.map((item: any, index: number) => (
                   <div key={index} className="flex items-start sm:items-center justify-between p-4 gap-4">
                     <div className="flex items-center gap-3 text-gray-700 flex-shrink-0">
                       <Clock className="h-4 w-4 text-gray-400 flex-shrink-0" />
                       <span className="font-medium whitespace-nowrap">{item.time || item.t}</span>
-                    </div>
-                    <div className="text-gray-600 text-right sm:text-left flex-1">{item.description || item.d || item.title}</div>
                   </div>
-                ))}
-              </div>
+                    <div className="text-gray-600 text-right sm:text-left flex-1">{item.description || item.d || item.title}</div>
+                </div>
+              ))}
+            </div>
             ) : event.metadata?.schedule && Array.isArray(event.metadata.schedule) && event.metadata.schedule.length > 0 ? (
               // Alternative schedule format
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y">
@@ -1477,9 +1477,9 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
                         event.metadata.address.postal_code,
                         event.metadata.address.country
                       ].filter(Boolean).join(', ')}
-                    </div>
+              </div>
                   )}
-                </div>
+              </div>
               </div>
               
               {/* Map - Interactive with Google Maps */}

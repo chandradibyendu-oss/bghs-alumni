@@ -206,3 +206,4 @@ ON events USING GIN (metadata);
 
 The program schedule data persists in the database and is retrieved when viewing or editing events.
 
+

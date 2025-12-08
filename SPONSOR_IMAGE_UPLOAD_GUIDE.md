@@ -202,3 +202,4 @@ Logo Display:
 
 All images are automatically optimized for web performance while maintaining quality!
 
+
