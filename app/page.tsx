@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
+import NoticesSection from '@/app/components/NoticesSection'
 
 // Blog posts will be fetched from database
 
@@ -433,6 +434,7 @@ export default function Home() {
               <Link href="/committee" className="text-gray-700 hover:text-primary-600 transition-colors">Committee</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
+              <Link href="/notices" className="text-gray-700 hover:text-primary-600 transition-colors">Notices</Link>
               {userEmail ? (
                 <div className="relative">
                   <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
@@ -482,6 +484,7 @@ export default function Home() {
               <Link href="/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
+              <Link href="/notices" className="block px-2 py-2 rounded hover:bg-gray-50">Notices</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>
@@ -680,6 +683,9 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent"></div>
       </section>
 
+      {/* Notices Section */}
+      <NoticesSection limit={3} showHeader={true} />
+
       {/* School Info */}
       <section className="py-16 bg-white relative">
         <div className="absolute inset-0 bg-gradient-to-b from-primary-50/30 to-transparent"></div>
@@ -795,7 +801,9 @@ export default function Home() {
                  <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                  <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
                  <li><Link href="/committee" className="text-gray-400 hover:text-white transition-colors">Committee</Link></li>
+                 <li><Link href="/gallery" className="text-gray-400 hover:text-white transition-colors">Gallery</Link></li>
                  <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
+                 <li><Link href="/notices" className="text-gray-400 hover:text-white transition-colors">Notices</Link></li>
                </ul>
              </div>
             <div>

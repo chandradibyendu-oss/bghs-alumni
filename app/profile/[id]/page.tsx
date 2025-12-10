@@ -134,7 +134,7 @@ export default function ProfileViewPage() {
 
       // Determine access level based on user permissions
       const perms = await getUserPermissions(user.id)
-      if (hasPermission(perms, 'can_manage_users') || hasPermission(perms, 'can_access_admin')) {
+      if (hasPermission(perms, 'can_manage_user_profiles') || hasPermission(perms, 'can_access_admin')) {
         setAccessLevel('admin')
       } else if (user.id === profileId) {
         setAccessLevel('self')

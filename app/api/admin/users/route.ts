@@ -352,7 +352,10 @@ export async function PUT(request: NextRequest) {
     if (bio !== undefined) updates.bio = bio || null
     if (linkedin_url !== undefined) updates.linkedin_url = linkedin_url || null
     if (website_url !== undefined) updates.website_url = website_url || null
-    if (role !== undefined) updates.role = role
+    if (role !== undefined) {
+      updates.role = role
+      console.log(`[Role Update] Updating role for user ${id} to: ${role}`)
+    }
     if (typeof is_approved === 'boolean') updates.is_approved = is_approved
     if (typeof is_deceased === 'boolean') {
       updates.is_deceased = is_deceased
@@ -361,14 +364,25 @@ export async function PUT(request: NextRequest) {
     }
     if (deceased_year !== undefined) updates.deceased_year = deceased_year === null ? null : Number(deceased_year)
 
-    const { error: updateError } = await supabaseAdmin
+    const { data: updateResult, error: updateError } = await supabaseAdmin
       .from('profiles')
       .update(updates)
       .eq('id', id)
+      .select('id, role')
 
     if (updateError) {
       console.error('Error updating profile:', updateError)
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
+    }
+
+    // Verify the update was successful
+    if (role !== undefined && updateResult && updateResult.length > 0) {
+      const updatedRole = updateResult[0]?.role
+      console.log(`[Role Update] Verification - User ${id} role is now: ${updatedRole}`)
+      if (updatedRole !== role) {
+        console.error(`[Role Update] MISMATCH! Expected ${role}, but got ${updatedRole}`)
+        return NextResponse.json({ error: 'Role update did not persist correctly' }, { status: 500 })
+      }
     }
 
     // Update auth email/phone if provided
@@ -391,17 +405,29 @@ export async function PUT(request: NextRequest) {
     }
 
     // If role provided, also update permissions from user_roles table (if exists)
+    // Note: This is optional - permissions are now dynamically looked up from user_roles table
     if (role !== undefined) {
-      const { data: roleData } = await supabaseAdmin
+      const { data: roleData, error: roleError } = await supabaseAdmin
         .from('user_roles')
         .select('permissions')
         .eq('name', role)
         .single()
-      if (roleData?.permissions) {
-        await supabaseAdmin
+      
+      if (roleError) {
+        console.warn(`[Role Update] Could not fetch permissions for role ${role}:`, roleError)
+        // Don't fail - permissions are dynamically looked up anyway
+      } else if (roleData?.permissions) {
+        const { error: permUpdateError } = await supabaseAdmin
           .from('profiles')
           .update({ permissions: roleData.permissions })
           .eq('id', id)
+        
+        if (permUpdateError) {
+          console.warn(`[Role Update] Could not update permissions column:`, permUpdateError)
+          // Don't fail - permissions are dynamically looked up anyway
+        } else {
+          console.log(`[Role Update] Permissions column updated for user ${id}`)
+        }
       }
     }
 

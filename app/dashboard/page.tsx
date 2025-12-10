@@ -3,17 +3,26 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail, Upload, Award } from 'lucide-react'
+import { GraduationCap, LogOut, User, Calendar, Users, BookOpen, Heart, Shield, CreditCard, Mail, Upload, Award, Download, Bell } from 'lucide-react'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import { supabase } from '@/lib/supabase'
 
 export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [userProfile, setUserProfile] = useState<any>(null)
-  const [canManageUsers, setCanManageUsers] = useState(false)
+  // Granular permission states for each dashboard card
+  const [canManageUserProfiles, setCanManageUserProfiles] = useState(false)
+  const [canManagePaymentSettings, setCanManagePaymentSettings] = useState(false)
+  const [canViewPaymentQueue, setCanViewPaymentQueue] = useState(false)
+  const [canManageAlumniMigration, setCanManageAlumniMigration] = useState(false)
+  const [canManageNotices, setCanManageNotices] = useState(false)
+  const [canExportAlumniData, setCanExportAlumniData] = useState(false)
   const [canManageRoles, setCanManageRoles] = useState(false)
+  const [canTakeAttendance, setCanTakeAttendance] = useState(false)
+  const [canManageEvents, setCanManageEvents] = useState(false)
   const [canManageBlog, setCanManageBlog] = useState(false)
   const [canManageCommittee, setCanManageCommittee] = useState(false)
+  const [userPermissions, setUserPermissions] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
@@ -38,16 +47,24 @@ export default function DashboardPage() {
         
         // Check permissions using the permission system
         const perms = await getUserPermissions(user.id)
+        setUserPermissions(perms)
         
-        // Quick permission check based on role (no additional database queries)
-        const isSuperAdmin = profile?.role === 'super_admin'
-        const isAdmin = isSuperAdmin || profile?.role === 'alumni_premium' || profile?.role === 'content_moderator'
+        // Clean granular permission checks - each card has its own permission
+        // NO can_access_admin bypass - cards only show if specific permission is granted
+        // User Management Group
+        setCanManageUserProfiles(hasPermission(perms, 'can_manage_user_profiles'))
+        setCanManagePaymentSettings(hasPermission(perms, 'can_manage_payment_settings'))
+        setCanViewPaymentQueue(hasPermission(perms, 'can_view_payment_queue'))
+        setCanManageAlumniMigration(hasPermission(perms, 'can_manage_alumni_migration'))
+        setCanManageNotices(hasPermission(perms, 'can_manage_notices'))
+        setCanExportAlumniData(hasPermission(perms, 'can_export_alumni_data'))
         
-        setCanManageUsers(isAdmin)
-        setCanManageRoles(isSuperAdmin)
-        setCanManageBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_moderate_blog') || hasPermission(perms, 'can_access_admin'))
-        // Committee management: super_admin, event_manager, or content_moderator
-        setCanManageCommittee(isSuperAdmin || profile?.role === 'event_manager' || profile?.role === 'content_moderator')
+        // Other Admin Cards
+        setCanManageRoles(hasPermission(perms, 'can_manage_roles'))
+        setCanManageEvents(hasPermission(perms, 'can_create_events') || hasPermission(perms, 'can_manage_events'))
+        setCanTakeAttendance(hasPermission(perms, 'can_take_attendance') || hasPermission(perms, 'can_manage_events'))
+        setCanManageBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_moderate_blog'))
+        setCanManageCommittee(hasPermission(perms, 'can_manage_committee') || hasPermission(perms, 'can_manage_events'))
       } else {
         router.push('/login')
       }
@@ -162,32 +179,91 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {canManageUsers && (
-            <>
-              <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
-                <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
-                <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
-              </Link>
-              
-              <Link href="/admin/payments" className="card text-center hover:shadow-lg transition-shadow group">
-                <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Settings</h3>
-                <p className="text-gray-600">Configure payment amounts and categories</p>
-              </Link>
-              
-              <Link href="/admin/payment-queue" className="card text-center hover:shadow-lg transition-shadow group">
-                <Mail className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Queue</h3>
-                <p className="text-gray-600">View queued payment emails (testing)</p>
-              </Link>
-              
-              <Link href="/admin/alumni-migration" className="card text-center hover:shadow-lg transition-shadow group">
-                <Upload className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Alumni Migration</h3>
-                <p className="text-gray-600">Upload Excel files to migrate alumni data</p>
-              </Link>
-            </>
+          {/* User Management Card */}
+          {canManageUserProfiles && (
+            <Link href="/admin/users" className="card text-center hover:shadow-lg transition-shadow group">
+              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">User Management</h3>
+              <p className="text-gray-600">Add, edit, and manage alumni profiles</p>
+            </Link>
+          )}
+          
+          {/* Payment Settings Card */}
+          {canManagePaymentSettings && (
+            <Link href="/admin/payments" className="card text-center hover:shadow-lg transition-shadow group">
+              <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Settings</h3>
+              <p className="text-gray-600">Configure payment amounts and categories</p>
+            </Link>
+          )}
+          
+          {/* Payment Queue Card */}
+          {canViewPaymentQueue && (
+            <Link href="/admin/payment-queue" className="card text-center hover:shadow-lg transition-shadow group">
+              <Mail className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Payment Queue</h3>
+              <p className="text-gray-600">View queued payment emails (testing)</p>
+            </Link>
+          )}
+          
+          {/* Alumni Migration Card */}
+          {canManageAlumniMigration && (
+            <Link href="/admin/alumni-migration" className="card text-center hover:shadow-lg transition-shadow group">
+              <Upload className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Alumni Migration</h3>
+              <p className="text-gray-600">Upload Excel files to migrate alumni data</p>
+            </Link>
+          )}
+          
+          {/* Notices Management Card */}
+          {canManageNotices && (
+            <div className="card text-center hover:shadow-lg transition-shadow group">
+              <Bell className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Notices Management</h3>
+              <p className="text-gray-600 mb-4">Create and manage notices and announcements</p>
+              <div className="flex gap-2">
+                <Link href="/admin/notices/new" className="btn-primary flex-1 text-sm">
+                  Create Notice
+                </Link>
+                <Link href="/admin/notices" className="btn-secondary flex-1 text-sm">
+                  View All
+                </Link>
+              </div>
+            </div>
+          )}
+          
+          {/* Export Alumni Data Card */}
+          {canExportAlumniData && (
+            <div className="card text-center hover:shadow-lg transition-shadow group">
+              <Download className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Export Alumni Data</h3>
+              <p className="text-gray-600 mb-4">Download all alumni in migration template format</p>
+              <button
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/admin/alumni-export')
+                    if (!response.ok) {
+                      throw new Error('Export failed')
+                    }
+                    const blob = await response.blob()
+                    const url = window.URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url
+                    a.download = `alumni-export-${new Date().toISOString().split('T')[0]}.csv`
+                    document.body.appendChild(a)
+                    a.click()
+                    window.URL.revokeObjectURL(url)
+                    document.body.removeChild(a)
+                  } catch (error) {
+                    alert('Failed to export alumni data. Please try again.')
+                    console.error('Export error:', error)
+                  }
+                }}
+                className="btn-primary w-full"
+              >
+                Download CSV
+              </button>
+            </div>
           )}
           
           {canManageRoles && (
@@ -204,7 +280,15 @@ export default function DashboardPage() {
             <p className="text-gray-600">View and register for upcoming events</p>
           </Link>
 
-          {(userProfile?.role === 'super_admin' || userProfile?.role === 'event_manager') && (
+          {canManageEvents && (
+            <Link href="/admin/events" className="card text-center hover:shadow-lg transition-shadow group">
+              <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Event Management</h3>
+              <p className="text-gray-600">Create, edit, and manage events</p>
+            </Link>
+          )}
+
+          {canTakeAttendance && (
             <Link href="/admin/events/attendance" className="card text-center hover:shadow-lg transition-shadow group">
               <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Take Attendance</h3>
@@ -239,14 +323,6 @@ export default function DashboardPage() {
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog</h3>
             <p className="text-gray-600">Read latest news and stories</p>
           </Link>
-
-          {canManageBlog && (
-            <Link href="/admin/blog" className="card text-center hover:shadow-lg transition-shadow group">
-              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog Management</h3>
-              <p className="text-gray-600">Create, edit, and moderate blog posts</p>
-            </Link>
-          )}
           
           <Link href="/profile/payments" className="card text-center hover:shadow-lg transition-shadow group">
             <CreditCard className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />

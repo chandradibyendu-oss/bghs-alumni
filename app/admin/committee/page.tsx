@@ -122,8 +122,11 @@ export default function AdminCommitteePage() {
         router.push('/login')
         return
       }
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      const canAccess = data?.role === 'super_admin' || data?.role === 'event_manager' || data?.role === 'content_moderator'
+      const { getUserPermissions, hasPermission } = await import('@/lib/auth-utils')
+      const perms = await getUserPermissions(user.id)
+      const canAccess = hasPermission(perms, 'can_manage_committee') || 
+                       hasPermission(perms, 'can_manage_events') || 
+                       hasPermission(perms, 'can_access_admin')
       if (!canAccess) {
         alert('You do not have permission to access Committee Management.')
         router.push('/dashboard')

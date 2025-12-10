@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
   Shield, Users, Key, Plus, Edit, Trash2, Save, X, 
   Eye, EyeOff, CheckCircle, XCircle, AlertCircle 
@@ -35,24 +36,56 @@ export default function SimpleRoleManagementPage() {
   const [user, setUser] = useState<any>(null)
   const router = useRouter()
 
-  // Define available permissions
+  // Define available permissions (all permissions from UserPermissions interface)
   const availablePermissions: Permission[] = [
+    // Basic Access Permissions
     { name: 'can_view_landing', description: 'View landing page', category: 'General' },
     { name: 'can_view_directory', description: 'View alumni directory', category: 'General' },
     { name: 'can_edit_profile', description: 'Edit own profile', category: 'General' },
+    { name: 'can_access_premium', description: 'Access premium features', category: 'General' },
+    { name: 'can_download_directory', description: 'Download alumni directory', category: 'General' },
+    
+    // Event Permissions
     { name: 'can_view_events', description: 'View events', category: 'Events' },
     { name: 'can_register_events', description: 'Register for events', category: 'Events' },
-    { name: 'can_create_events', description: 'Create events', category: 'Events' },
-    { name: 'can_manage_events', description: 'Manage events', category: 'Events' },
+    { name: 'can_create_events', description: 'Create events → Shows "Event Management" card', category: 'Events' },
+    { name: 'can_manage_events', description: 'Manage events (create/edit/delete) → Shows "Event Management" card', category: 'Events' },
+    { name: 'can_send_notifications', description: 'Send event notifications', category: 'Events' },
+    { name: 'can_take_attendance', description: 'Take attendance at events → Shows "Take Attendance" card', category: 'Events' },
+    { name: 'can_manage_committee', description: 'Manage committee members → Shows "Committee Management" card', category: 'Events' },
+    
+    // Blog/Content Permissions
     { name: 'can_view_blog', description: 'View blog posts', category: 'Content' },
-    { name: 'can_comment_blog', description: 'Comment on blog', category: 'Content' },
-    { name: 'can_create_blog', description: 'Create blog posts', category: 'Content' },
+    { name: 'can_comment_blog', description: 'Comment on blog posts', category: 'Content' },
+    { name: 'can_create_blog', description: 'Create blog posts → Shows "Blog Management" card', category: 'Content' },
     { name: 'can_edit_blog', description: 'Edit blog posts', category: 'Content' },
-    { name: 'can_moderate_comments', description: 'Moderate comments', category: 'Content' },
-    { name: 'can_manage_users', description: 'Manage users', category: 'Admin' },
-    { name: 'can_manage_roles', description: 'Manage roles', category: 'Admin' },
-    { name: 'can_access_admin', description: 'Access admin panel', category: 'Admin' },
-    { name: 'can_view_analytics', description: 'View analytics', category: 'Admin' }
+    { name: 'can_moderate_blog', description: 'Moderate blog posts (approve/reject) → Shows "Blog Management" card', category: 'Content' },
+    { name: 'can_publish_blog', description: 'Publish blog posts directly', category: 'Content' },
+    { name: 'can_delete_blog', description: 'Delete blog posts', category: 'Content' },
+    { name: 'can_upload_media', description: 'Upload images and media files', category: 'Content' },
+    
+    // Comment Moderation Permissions
+    { name: 'can_moderate_comments', description: 'Moderate comments (approve/reject/delete)', category: 'Moderation' },
+    { name: 'can_edit_public_content', description: 'Edit public-facing content', category: 'Moderation' },
+    
+    // Donation Permissions
+    { name: 'can_view_donations', description: 'View donation records and reports', category: 'Donations' },
+    { name: 'can_manage_campaigns', description: 'Create and manage donation campaigns', category: 'Donations' },
+    { name: 'can_generate_reports', description: 'Generate donation and system reports', category: 'Donations' },
+    
+    // Administrative Permissions - Dashboard Card Access (Granular)
+    { name: 'can_manage_user_profiles', description: 'Manage user profiles → Shows "User Management" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_manage_payment_settings', description: 'Configure payment settings → Shows "Payment Settings" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_view_payment_queue', description: 'View payment queue → Shows "Payment Queue" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_manage_alumni_migration', description: 'Manage alumni data migration → Shows "Alumni Migration" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_manage_notices', description: 'Manage notices and announcements → Shows "Notices Management" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_export_alumni_data', description: 'Export alumni data to CSV → Shows "Export Alumni Data" card', category: 'Admin - Dashboard Cards' },
+    { name: 'can_manage_roles', description: 'Manage roles and permissions → Shows "Role Management" card', category: 'Admin - Dashboard Cards' },
+    
+    // Administrative Permissions - Page-Level Access
+    { name: 'can_manage_content', description: 'Manage content (used within pages for content management)', category: 'Admin - Page Access' },
+    { name: 'can_access_admin', description: 'Access admin panel (grants ALL admin features and cards)', category: 'Admin - Page Access' },
+    { name: 'can_view_analytics', description: 'View website analytics and statistics', category: 'Admin - Page Access' }
   ]
 
   useEffect(() => {
@@ -234,6 +267,16 @@ export default function SimpleRoleManagementPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <nav className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/bghs-logo.png" alt="BGHS Alumni" className="h-10 w-auto object-contain" />
+            <span className="text-xl font-bold text-gray-900">Admin - Role Management</span>
+          </div>
+          <Link href="/dashboard" className="text-gray-600 hover:text-gray-800">← Back to Dashboard</Link>
+        </div>
+      </nav>
+
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -392,27 +435,47 @@ export default function SimpleRoleManagementPage() {
                         </div>
                         <div className="p-4">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {permissions.map((permission) => (
-                              <label
-                                key={permission.name}
-                                className="flex items-center space-x-3 cursor-pointer"
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={selectedPermissions.has(permission.name)}
-                                  onChange={() => togglePermission(permission.name)}
-                                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-                                />
-                                <div className="flex-1">
-                                  <div className="text-sm font-medium text-gray-900">
-                                    {permission.name.replace('can_', '').replace(/_/g, ' ')}
+                            {permissions.map((permission) => {
+                              const isDashboardCard = permission.description.includes('→ Shows')
+                              const cardName = isDashboardCard 
+                                ? permission.description.split('→ Shows "')[1]?.split('"')[0] 
+                                : null
+                              return (
+                                <label
+                                  key={permission.name}
+                                  className={`flex items-start space-x-3 cursor-pointer p-2 rounded ${
+                                    isDashboardCard ? 'bg-blue-50 border border-blue-200' : ''
+                                  }`}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedPermissions.has(permission.name)}
+                                    onChange={() => togglePermission(permission.name)}
+                                    className="mt-1 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                  />
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="text-sm font-medium text-gray-900">
+                                        {permission.name.replace('can_', '').replace(/_/g, ' ')}
+                                      </div>
+                                      {isDashboardCard && (
+                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                                          Dashboard Card
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {permission.description}
+                                    </div>
+                                    {cardName && (
+                                      <div className="text-xs text-blue-600 font-medium mt-1">
+                                        📋 Card: {cardName}
+                                      </div>
+                                    )}
                                   </div>
-                                  <div className="text-xs text-gray-500">
-                                    {permission.description}
-                                  </div>
-                                </div>
-                              </label>
-                            ))}
+                                </label>
+                              )
+                            })}
                           </div>
                         </div>
                       </div>

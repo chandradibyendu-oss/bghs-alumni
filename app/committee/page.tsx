@@ -83,7 +83,7 @@ export default function CommitteePage() {
     if (user) {
       try {
         const perms = await getUserPermissions(user.id)
-        setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+        setIsAdmin(hasPermission(perms, 'can_access_admin'))
       } catch {
         // ignore if RPC not available
       }
@@ -374,7 +374,7 @@ export default function CommitteePage() {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                       {membersInPosition.map((member) => (
-                        <MemberCard key={member.id} member={member} />
+                        <MemberCard key={member.id} member={member} positions={positions} />
                       ))}
                     </div>
                   </div>
@@ -392,7 +392,7 @@ export default function CommitteePage() {
                       .filter(m => !m.position_type_id)
                       .sort((a, b) => a.display_order - b.display_order)
                       .map((member) => (
-                        <MemberCard key={member.id} member={member} />
+                        <MemberCard key={member.id} member={member} positions={positions} />
                       ))}
                   </div>
                 </div>
@@ -416,7 +416,7 @@ export default function CommitteePage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {advisoryMembers.map((member) => (
-                <MemberCard key={member.id} member={member} />
+                <MemberCard key={member.id} member={member} positions={positions} />
               ))}
             </div>
           )}
@@ -450,7 +450,21 @@ const formatNameWithTitle = (fullName: string, professionalTitle?: string | null
   return fullName
 }
 
-function MemberCard({ member }: { member: CommitteeMemberWithProfile }) {
+function MemberCard({ member, positions }: { member: CommitteeMemberWithProfile, positions?: CommitteePosition[] }) {
+  // Get position name - first try from member.position_name, then from positions array if position_type_id exists
+  const getPositionName = () => {
+    if (member.position_name) {
+      return member.position_name
+    }
+    // Fallback: if position_name is missing but position_type_id exists, look it up in positions array
+    if (member.position_type_id && positions) {
+      const position = positions.find(p => p.id === member.position_type_id)
+      return position?.name || null
+    }
+    return null
+  }
+
+  const positionName = getPositionName()
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
@@ -476,8 +490,8 @@ function MemberCard({ member }: { member: CommitteeMemberWithProfile }) {
         <h3 className="text-xl font-semibold text-gray-900 mb-1">
           {formatNameWithTitle(member.profile.full_name, member.profile.professional_title)}
         </h3>
-        {member.position_name && (
-          <p className="text-primary-600 font-medium mb-3">{member.position_name}</p>
+        {positionName && (
+          <p className="text-primary-600 font-medium mb-3">{positionName}</p>
         )}
         {member.profile.profession && (
           <p className="text-sm text-gray-500 mb-2">{member.profile.profession}</p>
@@ -515,14 +529,6 @@ function MemberCard({ member }: { member: CommitteeMemberWithProfile }) {
         >
           View Full Profile →
         </Link>
-
-        {/* Tenure */}
-        <div className="mt-4 pt-4 border-t border-gray-100 w-full">
-          <div className="flex items-center justify-center gap-2 text-xs text-gray-500">
-            <Calendar className="h-3 w-3" />
-            <span>Member since {new Date(member.start_date).getFullYear()}</span>
-          </div>
-        </div>
       </div>
     </div>
   )

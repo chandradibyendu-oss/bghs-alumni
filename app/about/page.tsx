@@ -339,7 +339,7 @@ export default function About() {
       if (user) {
         try {
           const perms = await getUserPermissions(user.id)
-          setIsAdmin(hasPermission(perms, 'can_access_admin') || hasPermission(perms, 'can_manage_users'))
+          setIsAdmin(hasPermission(perms, 'can_access_admin'))
         } catch {
           // ignore if RPC not available
         }

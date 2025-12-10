@@ -139,7 +139,7 @@ export default function AdminRolesPage() {
           name: 'Administration',
           description: 'Administrative permissions',
           permissions: [
-            { id: 13, name: 'can_manage_users', description: 'Manage users', category: 'admin', display_order: 1 },
+            { id: 13, name: 'can_manage_user_profiles', description: 'Manage user profiles', category: 'admin', display_order: 1 },
             { id: 14, name: 'can_manage_roles', description: 'Manage roles', category: 'admin', display_order: 2 },
             { id: 15, name: 'can_access_admin', description: 'Access admin panel', category: 'admin', display_order: 3 },
             { id: 16, name: 'can_view_analytics', description: 'View analytics', category: 'admin', display_order: 4 }

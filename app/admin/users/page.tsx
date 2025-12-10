@@ -23,8 +23,7 @@ import {
   KeyRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-// Removed getUserPermissions import - using direct role check for performance
-import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
+import { UserRole, getAvailableRoles, updateUserRole, getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
 interface UserProfile {
   id: string
@@ -91,6 +90,15 @@ export default function AdminUsersPage() {
     fetchAvailableRoles()
   }, [])
 
+  // Refetch roles when window regains focus (in case new roles were created in another tab)
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchAvailableRoles()
+    }
+    window.addEventListener('focus', handleFocus)
+    return () => window.removeEventListener('focus', handleFocus)
+  }, [])
+
   const checkAdminAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -98,9 +106,9 @@ export default function AdminUsersPage() {
         router.push('/login')
         return
       }
-      // Enforce admin permission based on profiles.role (optimized - no redundant queries)
-      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-      const canAccess = data?.role === 'super_admin' || data?.role === 'donation_manager' || data?.role === 'event_manager' || data?.role === 'content_moderator'
+      // Check granular permission for user management
+      const perms = await getUserPermissions(user.id)
+      const canAccess = hasPermission(perms, 'can_manage_user_profiles') || hasPermission(perms, 'can_access_admin')
       if (!canAccess) {
         alert('You do not have permission to access User Management.')
         router.push('/dashboard')
@@ -115,6 +123,7 @@ export default function AdminUsersPage() {
   const fetchAvailableRoles = async () => {
     try {
       const roles = await getAvailableRoles()
+      console.log('Fetched available roles:', roles.length, roles.map(r => ({ name: r.name, description: r.description })))
       setAvailableRoles(roles)
     } catch (error) {
       console.error('Error fetching roles:', error)
@@ -291,7 +300,8 @@ export default function AdminUsersPage() {
           location: formData.location,
           bio: formData.bio,
           linkedin_url: formData.linkedin_url,
-          website_url: formData.website_url
+          website_url: formData.website_url,
+          role: selectedRole // Include the role in the update
         })
       })
 
@@ -318,6 +328,8 @@ export default function AdminUsersPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
 
+      console.log(`[Frontend] Updating role for user ${userId} to: ${newRole}`)
+      
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: {
@@ -326,14 +338,35 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({ id: userId, role: newRole })
       })
+      
+      const responseData = await res.json()
+      
       if (!res.ok) {
-        const data = await res.json(); throw new Error(data.error || 'Failed')
+        console.error('[Frontend] Role update failed:', responseData)
+        throw new Error(responseData.error || 'Failed to update role')
       }
-      fetchUsers()
+      
+      console.log('[Frontend] Role update response:', responseData)
+      
+      // Refresh users list to get updated data
+      await fetchUsers()
+      
+      // Wait a bit for state to update, then verify
+      setTimeout(() => {
+        const updatedUser = users.find(u => u.id === userId)
+        if (updatedUser) {
+          console.log(`[Frontend] Verification - User ${userId} role is now: ${updatedUser.role}`)
+          if (updatedUser.role !== newRole) {
+            console.warn(`[Frontend] Role mismatch! Expected ${newRole}, but user has ${updatedUser.role}. Refreshing...`)
+            fetchUsers()
+          }
+        }
+      }, 1000)
+      
       alert('User role updated successfully!')
     } catch (error) {
       console.error('Error updating user role:', error)
-      alert('Error updating user role')
+      alert(`Error updating user role: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -491,6 +524,7 @@ export default function AdminUsersPage() {
 
   const startEdit = (user: UserProfile) => {
     setEditingUser(user)
+    setSelectedRole(user.role || 'alumni_member') // Set the role from the user
     setFormData({
       email: user.email,
       phone: (user as any).phone || '',

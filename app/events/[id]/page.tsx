@@ -1638,8 +1638,25 @@ export default function EventDetailPage({ params }: { params: { id: string } }) 
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h3 className="text-base font-semibold text-gray-900 mb-3">Contact</h3>
             <div className="space-y-2 text-sm text-gray-700">
-              <p className="flex items-center gap-2"><Phone className="h-4 w-4 text-gray-400" /> +91 98765 43210</p>
-              <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-gray-400" /> events@alumnibghs.org</p>
+              {event.metadata?.contact_phone && (
+                <p className="flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-gray-400" /> 
+                  <a href={`tel:${event.metadata.contact_phone}`} className="hover:text-primary-600">
+                    {event.metadata.contact_phone}
+                  </a>
+                </p>
+              )}
+              {event.metadata?.contact_email && (
+                <p className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-gray-400" /> 
+                  <a href={`mailto:${event.metadata.contact_email}`} className="hover:text-primary-600">
+                    {event.metadata.contact_email}
+                  </a>
+                </p>
+              )}
+              {!event.metadata?.contact_phone && !event.metadata?.contact_email && (
+                <p className="text-gray-500 text-sm">Contact information not available</p>
+              )}
             </div>
           </div>
         </aside>

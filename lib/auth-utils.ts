@@ -1,33 +1,52 @@
 import { createClient } from '@supabase/supabase-js'
 
 export interface UserPermissions {
+  // General Access Permissions
   can_view_landing: boolean
   can_view_directory: boolean
   can_edit_profile: boolean
-  can_view_events: boolean
-  can_register_events: boolean
-  can_view_blog: boolean
-  can_comment_blog: boolean
   can_access_premium: boolean
   can_download_directory: boolean
-  can_moderate_comments: boolean
-  can_edit_public_content: boolean
+  
+  // Event Permissions
+  can_view_events: boolean
+  can_register_events: boolean
   can_create_events: boolean
   can_manage_events: boolean
   can_send_notifications: boolean
+  can_take_attendance: boolean
+  can_manage_committee: boolean
+  
+  // Blog/Content Permissions
+  can_view_blog: boolean
+  can_comment_blog: boolean
   can_create_blog: boolean
   can_edit_blog: boolean
   can_delete_blog: boolean
   can_moderate_blog: boolean
   can_publish_blog: boolean
   can_upload_media: boolean
+  
+  // Moderation Permissions
+  can_moderate_comments: boolean
+  can_edit_public_content: boolean
+  
+  // Donation Permissions
   can_view_donations: boolean
   can_manage_campaigns: boolean
   can_generate_reports: boolean
-  can_manage_users: boolean
-  can_manage_roles: boolean
-  can_access_admin: boolean
-  can_view_analytics: boolean
+  
+  // Administrative Permissions (Granular - Dashboard Card Access)
+  can_manage_user_profiles: boolean      // User Management card
+  can_manage_payment_settings: boolean   // Payment Settings card
+  can_view_payment_queue: boolean        // Payment Queue card
+  can_manage_alumni_migration: boolean   // Alumni Migration card
+  can_manage_notices: boolean           // Notices Management card
+  can_export_alumni_data: boolean       // Export Alumni Data card
+  can_manage_roles: boolean             // Role Management card
+  can_manage_content: boolean           // Used for content management within pages
+  can_access_admin: boolean             // Special: Grants all admin features
+  can_view_analytics: boolean           // Analytics page access
 }
 
 export interface UserRole {
