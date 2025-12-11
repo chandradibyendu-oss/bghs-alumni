@@ -59,6 +59,7 @@ export async function PUT(
       start_date,
       end_date,
       is_active,
+      is_public,
       link_url,
       icon
     } = body
@@ -72,6 +73,7 @@ export async function PUT(
     if (start_date !== undefined) updateData.start_date = start_date
     if (end_date !== undefined) updateData.end_date = end_date || null
     if (is_active !== undefined) updateData.is_active = is_active
+    if (is_public !== undefined) updateData.is_public = is_public
     if (link_url !== undefined) updateData.link_url = link_url || null
     if (icon !== undefined) updateData.icon = icon
 

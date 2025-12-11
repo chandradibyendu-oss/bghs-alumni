@@ -22,6 +22,7 @@ export default function CreateNoticePage() {
     start_date: '',
     end_date: '',
     is_active: true,
+    is_public: true,
     link_url: '',
     icon: 'info'
   })
@@ -143,6 +144,7 @@ export default function CreateNoticePage() {
           start_date: formData.start_date,
           end_date: formData.end_date || null,
           is_active: formData.is_active,
+          is_public: formData.is_public,
           link_url: formData.link_url || null,
           icon: formData.icon
         })
@@ -374,21 +376,44 @@ export default function CreateNoticePage() {
             </div>
           </div>
 
-          {/* Status */}
+          {/* Visibility & Status */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-6">Status</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-6">Visibility & Status</h2>
             
-            <div className="flex items-center gap-3">
-              <input
-                type="checkbox"
-                id="is_active"
-                checked={formData.is_active}
-                onChange={(e) => handleInputChange('is_active', e.target.checked)}
-                className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
-              />
-              <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
-                Active (Notice will be visible to users)
-              </label>
+            <div className="space-y-4">
+              {/* Visibility */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Visibility
+                </label>
+                <select
+                  value={formData.is_public ? 'public' : 'members'}
+                  onChange={(e) => handleInputChange('is_public', e.target.value === 'public')}
+                  className="input-field"
+                >
+                  <option value="public">Public (Visible to everyone, including non-registered users)</option>
+                  <option value="members">Members Only (Visible only to registered members)</option>
+                </select>
+                <p className="mt-1 text-xs text-gray-500">
+                  {formData.is_public 
+                    ? 'This notice will be visible to all visitors, including those not logged in.'
+                    : 'This notice will only be visible to registered and logged-in members.'}
+                </p>
+              </div>
+
+              {/* Active Status */}
+              <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
+                <input
+                  type="checkbox"
+                  id="is_active"
+                  checked={formData.is_active}
+                  onChange={(e) => handleInputChange('is_active', e.target.checked)}
+                  className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                />
+                <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+                  Active (Notice will be visible to users)
+                </label>
+              </div>
             </div>
           </div>
 

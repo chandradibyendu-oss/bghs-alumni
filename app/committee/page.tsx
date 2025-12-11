@@ -236,23 +236,21 @@ export default function CommitteePage() {
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-3">
-              <button className="md:hidden p-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
-                <MenuIcon className="h-6 w-6 text-gray-700" />
-              </button>
-              <Link href="/" className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+              <Link href="/" className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
                 <img 
                   src="/bghs-logo.png" 
                   alt="BGHS Alumni Association" 
-                  className="h-14 w-auto object-contain shrink-0 flex-none"
+                  className="h-12 sm:h-14 w-auto object-contain shrink-0 flex-none"
                 />
-                <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
-                  <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
-                  <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
+                <div className="flex flex-col min-w-0 flex-1 pr-2">
+                  <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
+                  <span className="text-[10px] sm:text-sm text-gray-600 leading-tight line-clamp-2">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
                 </div>
               </Link>
             </div>
-            <div className="hidden md:flex items-center space-x-8">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <div className="hidden md:flex items-center space-x-8">
               <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
               <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
               <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
@@ -287,6 +285,11 @@ export default function CommitteePage() {
               ) : (
                 <Link href="/login" className="btn-primary">Login</Link>
               )}
+              </div>
+              {/* Mobile menu button - moved to top right */}
+              <button className="md:hidden p-2 -mr-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
+                <MenuIcon className="h-6 w-6 text-gray-700" />
+              </button>
             </div>
           </div>
         </div>

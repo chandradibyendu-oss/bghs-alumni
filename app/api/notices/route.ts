@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
       start_date,
       end_date,
       is_active = true,
+      is_public = true,
       link_url,
       icon = 'info'
     } = body
@@ -122,6 +123,7 @@ export async function POST(request: NextRequest) {
         start_date,
         end_date: end_date || null,
         is_active,
+        is_public: is_public !== false, // Default to true if not specified
         link_url: link_url || null,
         icon,
         created_by: createdBy

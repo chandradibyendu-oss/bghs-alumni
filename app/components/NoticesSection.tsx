@@ -155,7 +155,104 @@ export default function NoticesSection({ limit = 3, showHeader = true }: Notices
             </div>
           )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Mobile: Horizontal Scrollable Cards */}
+          <div className="md:hidden">
+            <div className="flex gap-4 overflow-x-auto pb-4 -mx-4 px-4 snap-x snap-mandatory scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+              {notices.map((notice) => {
+                const priority = priorityConfig[notice.priority as keyof typeof priorityConfig] || priorityConfig[3]
+                const IconComponent = iconMap[notice.icon || 'info'] || Info
+                const noticeLink = getNoticeLink(notice)
+
+                return (
+                  <div
+                    key={notice.id}
+                    className={`flex-shrink-0 w-[85vw] max-w-sm bg-white rounded-lg shadow-sm border-2 ${priority.borderColor} p-4 hover:shadow-md transition-all duration-200 cursor-pointer relative overflow-hidden snap-start`}
+                    onClick={() => handleNoticeClick(notice)}
+                  >
+                    {/* Priority Badge - Compact */}
+                    <div className={`absolute top-0 left-0 ${priority.color} text-white text-[10px] font-bold px-2 py-0.5 rounded-br-md`}>
+                      {priority.label}
+                    </div>
+
+                    {/* Content */}
+                    <div className="pt-6">
+                      {/* Title and Icon - Inline */}
+                      <div className="flex items-start gap-2 mb-2">
+                        <IconComponent className={`h-4 w-4 ${priority.textColor} flex-shrink-0 mt-0.5`} />
+                        <h3 className="text-base font-semibold text-gray-900 line-clamp-1 flex-1">
+                          {notice.title}
+                        </h3>
+                      </div>
+
+                      {/* Description - Single Line */}
+                      <p className="text-xs text-gray-600 mb-3 line-clamp-1">
+                        {notice.content}
+                      </p>
+
+                      {/* Date - Compact */}
+                      <div className="flex items-center gap-1.5 text-[10px] text-gray-500 mb-3">
+                        <Calendar className="h-3 w-3" />
+                        <span>{formatDate(notice.start_date)}</span>
+                        {notice.events && (
+                          <>
+                            <span>•</span>
+                            <span className="text-primary-600">Event</span>
+                          </>
+                        )}
+                      </div>
+
+                      {/* Single Action Button */}
+                      {noticeLink ? (
+                        <Link
+                          href={noticeLink}
+                          onClick={(e) => e.stopPropagation()}
+                          className={`w-full text-center px-3 py-2 rounded-lg text-xs font-medium transition-colors block ${
+                            notice.event_id
+                              ? 'bg-primary-600 text-white hover:bg-primary-700'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                          }`}
+                        >
+                          {notice.event_id ? 'View Event' : 'View Details'}
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleNoticeClick(notice)
+                          }}
+                          className="w-full text-center px-3 py-2 rounded-lg text-xs font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200"
+                        >
+                          Read More
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+              {/* View All Card - Last in scroll */}
+              {notices.length >= limit && (
+                <div className="flex-shrink-0 w-[85vw] max-w-sm flex items-center justify-center snap-start">
+                  <Link
+                    href="/notices"
+                    className="w-full h-full min-h-[200px] flex flex-col items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg border-2 border-primary-200 p-6 hover:from-primary-100 hover:to-primary-200 transition-all"
+                  >
+                    <ExternalLink className="h-8 w-8 text-primary-600 mb-3" />
+                    <span className="text-primary-700 font-semibold text-sm">View All Notices</span>
+                    <span className="text-primary-600 text-xs mt-1">See all announcements</span>
+                  </Link>
+                </div>
+              )}
+            </div>
+            {/* Scroll Hint */}
+            {notices.length > 1 && (
+              <div className="text-center mt-2">
+                <p className="text-xs text-gray-500">← Swipe to see more →</p>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: Grid Layout */}
+          <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {notices.map((notice) => {
               const priority = priorityConfig[notice.priority as keyof typeof priorityConfig] || priorityConfig[3]
               const IconComponent = iconMap[notice.icon || 'info'] || Info
@@ -233,9 +330,9 @@ export default function NoticesSection({ limit = 3, showHeader = true }: Notices
             })}
           </div>
 
-          {/* View All Link */}
+          {/* View All Link - Desktop Only */}
           {notices.length >= limit && (
-            <div className="text-center mt-8">
+            <div className="hidden md:block text-center mt-8">
               <Link
                 href="/notices"
                 className="inline-flex items-center gap-2 text-primary-600 hover:text-primary-700 font-medium"
