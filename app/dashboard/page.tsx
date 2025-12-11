@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [canManageEvents, setCanManageEvents] = useState(false)
   const [canManageBlog, setCanManageBlog] = useState(false)
   const [canManageCommittee, setCanManageCommittee] = useState(false)
+  const [canManageContent, setCanManageContent] = useState(false)
   const [userPermissions, setUserPermissions] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
@@ -65,6 +66,7 @@ export default function DashboardPage() {
         setCanTakeAttendance(hasPermission(perms, 'can_take_attendance') || hasPermission(perms, 'can_manage_events'))
         setCanManageBlog(hasPermission(perms, 'can_create_blog') || hasPermission(perms, 'can_moderate_blog'))
         setCanManageCommittee(hasPermission(perms, 'can_manage_committee') || hasPermission(perms, 'can_manage_events'))
+        setCanManageContent(hasPermission(perms, 'can_manage_content') || hasPermission(perms, 'can_access_admin'))
       } else {
         router.push('/login')
       }
@@ -309,6 +311,14 @@ export default function DashboardPage() {
               <Award className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Committee Management</h3>
               <p className="text-gray-600">Manage advisory and executive committee members</p>
+            </Link>
+          )}
+
+          {canManageContent && (
+            <Link href="/admin/souvenirs" className="card text-center hover:shadow-lg transition-shadow group">
+              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Souvenir Books</h3>
+              <p className="text-gray-600">Upload and manage annual souvenir publications</p>
             </Link>
           )}
           

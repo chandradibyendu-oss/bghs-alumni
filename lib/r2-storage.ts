@@ -509,6 +509,66 @@ class R2Storage {
       throw new Error(`Failed to delete event image: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
+
+  /**
+   * Upload souvenir book PDF to R2
+   * @param pdfBuffer PDF file buffer
+   * @param year Year of the souvenir book
+   * @param originalFileName Original filename
+   * @returns PDF URL
+   */
+  async uploadSouvenirPDF(
+    pdfBuffer: Buffer, 
+    year: number, 
+    originalFileName: string
+  ): Promise<string> {
+    try {
+      // Generate filename: souvenir-{year}-{timestamp}.pdf
+      const timestamp = Date.now()
+      const fileName = `souvenir-${year}-${timestamp}.pdf`
+      
+      // Upload to souvenirs/{year}/ folder
+      const result = await this.uploadFile(
+        pdfBuffer, 
+        fileName, 
+        'application/pdf', 
+        `souvenirs/${year}`
+      )
+      
+      return result.url
+    } catch (error) {
+      console.error('Failed to upload souvenir PDF:', error)
+      throw new Error(`Failed to upload PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  /**
+   * Upload souvenir book cover image to R2
+   * @param imageBuffer Image buffer (PNG/JPEG)
+   * @param year Year of the souvenir book
+   * @returns Cover image URL
+   */
+  async uploadSouvenirCover(
+    imageBuffer: Buffer,
+    year: number
+  ): Promise<string> {
+    try {
+      const timestamp = Date.now()
+      const fileName = `cover-${year}-${timestamp}.jpg`
+      
+      const result = await this.uploadFile(
+        imageBuffer,
+        fileName,
+        'image/jpeg',
+        `souvenirs/${year}/covers`
+      )
+      
+      return result.url
+    } catch (error) {
+      console.error('Failed to upload souvenir cover:', error)
+      throw new Error(`Failed to upload cover: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
 }
 
 export const r2Storage = new R2Storage()

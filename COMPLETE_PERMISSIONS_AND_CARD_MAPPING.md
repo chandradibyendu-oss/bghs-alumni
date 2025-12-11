@@ -340,3 +340,4 @@ During migration period:
 - **Dashboard Cards**: 14 (10 permission-based + 4 always visible)
 - **Special Permission**: `can_access_admin` (grants all admin features)
 
+

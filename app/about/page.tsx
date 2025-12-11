@@ -5,6 +5,7 @@ import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, Award, Clock, 
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
+import SouvenirBooksSection from '@/app/components/SouvenirBooksSection'
 
 // Language content
 const content = {
@@ -736,6 +737,9 @@ export default function About() {
           </div>
         </div>
       </section>
+
+      {/* Souvenir Books */}
+      <SouvenirBooksSection showHeader={true} />
 
       {/* Mission & Vision */}
       <section className="py-16 bg-white">

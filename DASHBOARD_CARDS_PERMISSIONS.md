@@ -206,3 +206,4 @@ To see specific card groups, a role needs:
 
 4. The dashboard uses permission-based checks (not role-based) for most cards, allowing custom roles with appropriate permissions to see the relevant cards.
 
+

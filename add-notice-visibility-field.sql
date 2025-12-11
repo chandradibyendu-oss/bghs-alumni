@@ -47,3 +47,4 @@ CREATE POLICY "Authenticated users can view all active notices" ON notices
 -- Success message
 SELECT 'Notice visibility field added successfully!' as message;
 
+

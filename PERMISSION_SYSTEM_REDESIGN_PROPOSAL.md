@@ -348,3 +348,4 @@ If full refactoring is not feasible immediately, a **quick fix** would be:
 4. **UI Complexity**: How to present 20+ permissions in role management UI?
 5. **Documentation**: How to help admins understand new permission structure?
 
+

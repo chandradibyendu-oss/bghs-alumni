@@ -82,3 +82,4 @@ ORDER BY name;
 -- 2. Verify that dashboard cards appear for users with updated roles
 -- 3. Update any custom roles manually if needed
 
+

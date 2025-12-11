@@ -18,3 +18,4 @@ CREATE POLICY "Anyone can view active notices" ON notices
 -- Success message
 SELECT 'RLS policy updated successfully! Notices with future start dates will now be visible.' as message;
 
+
