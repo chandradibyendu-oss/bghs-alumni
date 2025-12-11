@@ -2,10 +2,11 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon, ArrowRight } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import NoticesSection from '@/app/components/NoticesSection'
+import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
 
 // Blog posts will be fetched from database
 
@@ -105,7 +106,7 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
@@ -113,9 +114,41 @@ export default function Home() {
   const [latestBlog, setLatestBlog] = useState<any>(null)
   const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
   const imageRefs = useRef<Map<string, HTMLImageElement>>(new Map())
+  const [upcomingEventsCount, setUpcomingEventsCount] = useState<number | null>(null)
+  const [alumniCount, setAlumniCount] = useState<number | null>(null)
+  const [blogPostsCount, setBlogPostsCount] = useState<number | null>(null)
 
-  // Fetch latest blog post
+  // Fetch stats and latest blog post
   useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        // Fetch upcoming events count
+        const now = new Date().toISOString()
+        const { count: eventsCount } = await supabase
+          .from('events')
+          .select('*', { count: 'exact', head: true })
+          .gte('date', now)
+        setUpcomingEventsCount(eventsCount || 0)
+
+        // Fetch total alumni count (approved members)
+        const { count: alumniCount } = await supabase
+          .from('profiles')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_approved', true)
+        setAlumniCount(alumniCount || 0)
+
+        // Fetch published blog posts count
+        const { count: blogCount } = await supabase
+          .from('blog_posts')
+          .select('*', { count: 'exact', head: true })
+          .eq('published', true)
+          .eq('status', 'published')
+        setBlogPostsCount(blogCount || 0)
+      } catch (error) {
+        console.error('Error fetching stats:', error)
+      }
+    }
+
     const fetchLatestBlog = async () => {
       try {
         // First try to get featured blog, if none, get the latest published blog
@@ -167,6 +200,7 @@ export default function Home() {
       }
     }
 
+    fetchStats()
     fetchLatestBlog()
   }, [])
 
@@ -363,38 +397,30 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser()
       setUserEmail(user?.email ?? null)
       if (user) {
-        // Quick admin check based on role (no additional database queries)
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-        
-        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator' || profile?.role === 'blog_moderator' || profile?.role === 'content_creator'
-        setIsAdmin(isAdmin)
+        try {
+          const perms = await getUserPermissions(user.id)
+          setUserPermissions(perms)
+        } catch (error) {
+          console.error('Error fetching permissions:', error)
+          setUserPermissions(null)
+        }
       } else {
-        setIsAdmin(false)
+        setUserPermissions(null)
       }
     }
     init()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUserEmail(session?.user?.email ?? null)
       if (session?.user) {
-        // Quick admin check based on role (no additional database queries)
         try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single()
-          
-          const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
-          setIsAdmin(isAdmin)
-        } catch {
-          setIsAdmin(false)
+          const perms = await getUserPermissions(session.user.id)
+          setUserPermissions(perms)
+        } catch (error) {
+          console.error('Error fetching permissions:', error)
+          setUserPermissions(null)
         }
       } else {
-        setIsAdmin(false)
+        setUserPermissions(null)
       }
     })
 
@@ -406,6 +432,54 @@ export default function Home() {
     setUserEmail(null)
     window.location.href = '/'
   }
+
+  // Admin menu items configuration with permission requirements
+  const getAdminMenuItems = () => {
+    if (!userPermissions) return []
+    
+    const menuItems = []
+    
+    // User Management
+    if (hasPermission(userPermissions, 'can_manage_user_profiles') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Users', href: '/admin/users' })
+    }
+    
+    // Event Management
+    if (hasPermission(userPermissions, 'can_create_events') || 
+        hasPermission(userPermissions, 'can_manage_events') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Events', href: '/admin/events' })
+    }
+    
+    // Committee Management
+    if (hasPermission(userPermissions, 'can_manage_committee') || 
+        hasPermission(userPermissions, 'can_manage_events') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Committee Management', href: '/admin/committee' })
+    }
+    
+    // Blog Management
+    if (hasPermission(userPermissions, 'can_create_blog') || 
+        hasPermission(userPermissions, 'can_moderate_blog') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Blog Management', href: '/admin/blog' })
+    }
+    
+    // Role Management
+    if (hasPermission(userPermissions, 'can_manage_roles') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Role Management', href: '/admin/roles-simple' })
+    }
+    
+    // Notices Management
+    if (hasPermission(userPermissions, 'can_manage_notices') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Notices Management', href: '/admin/notices' })
+    }
+    
+    return menuItems
+  }
+
+  const adminMenuItems = getAdminMenuItems()
+  const hasAdminAccess = adminMenuItems.length > 0
 
   return (
     <div className="min-h-screen">
@@ -445,13 +519,14 @@ export default function Home() {
                         <div className="py-1">
                           <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
                           <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
-                          {isAdmin && (
+                          {hasAdminAccess && (
                             <>
                               <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
-                              <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
-                              <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
-                              <Link href="/admin/committee" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Committee Management</Link>
-                              <Link href="/admin/blog" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Blog Management</Link>
+                              {adminMenuItems.map((item) => (
+                                <Link key={item.href} href={item.href} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                  {item.label}
+                                </Link>
+                              ))}
                             </>
                           )}
                           <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
@@ -475,7 +550,7 @@ export default function Home() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
-          <div className="absolute top-0 left-0 h-full w-72 bg-white shadow-lg p-4">
+          <div className="absolute top-0 right-0 h-full w-72 bg-white shadow-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-lg font-semibold">Menu</span>
               <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
@@ -493,13 +568,14 @@ export default function Home() {
                   <>
                     <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
                     <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
-                    {isAdmin && (
+                    {hasAdminAccess && (
                       <>
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
-                        <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
-                        <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
-                        <Link href="/admin/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee Management</Link>
-                        <Link href="/admin/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog Management</Link>
+                        {adminMenuItems.map((item) => (
+                          <Link key={item.href} href={item.href} className="block px-2 py-2 rounded hover:bg-gray-50">
+                            {item.label}
+                          </Link>
+                        ))}
                       </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
@@ -734,26 +810,87 @@ export default function Home() {
             <p className="text-lg text-gray-600">Discover the features that make our alumni community special</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="card text-center hover:shadow-lg transition-shadow">
-              <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+            {/* Events & Reunions Card */}
+            <Link 
+              href="/events" 
+              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
+            >
+              <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Events & Reunions</h3>
-              <p className="text-gray-600">Stay updated with school events, reunions, and networking opportunities</p>
-            </div>
-            <div className="card text-center hover:shadow-lg transition-shadow">
-              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+              <p className="text-gray-600 mb-3">Stay updated with school events, reunions, and networking opportunities</p>
+              {upcomingEventsCount !== null && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-sm font-semibold text-primary-600">
+                    {upcomingEventsCount} {upcomingEventsCount === 1 ? 'Upcoming Event' : 'Upcoming Events'}
+                  </p>
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-sm font-medium">Explore</span>
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            {/* Alumni Directory Card */}
+            <Link 
+              href="/directory" 
+              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
+            >
+              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Alumni Directory</h3>
-              <p className="text-gray-600">Connect with former classmates and expand your professional network</p>
-            </div>
-            <div className="card text-center hover:shadow-lg transition-shadow">
-              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+              <p className="text-gray-600 mb-3">Connect with former classmates and expand your professional network</p>
+              {alumniCount !== null && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-sm font-semibold text-primary-600">
+                    {alumniCount.toLocaleString()} {alumniCount === 1 ? 'Alumni Member' : 'Alumni Members'}
+                  </p>
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-sm font-medium">Explore</span>
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            {/* Blog & News Card */}
+            <Link 
+              href="/blog" 
+              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
+            >
+              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog & News</h3>
-              <p className="text-gray-600">Read stories, achievements, and updates from our alumni community</p>
-            </div>
-            <div className="card text-center hover:shadow-lg transition-shadow">
-              <Heart className="h-12 w-12 text-primary-600 mx-auto mb-4" />
+              <p className="text-gray-600 mb-3">Read stories, achievements, and updates from our alumni community</p>
+              {blogPostsCount !== null && (
+                <div className="mt-4 pt-3 border-t border-gray-200">
+                  <p className="text-sm font-semibold text-primary-600">
+                    {blogPostsCount} {blogPostsCount === 1 ? 'Article' : 'Articles'}
+                  </p>
+                </div>
+              )}
+              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-sm font-medium">Explore</span>
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
+
+            {/* Donations Card */}
+            <Link 
+              href="/donate" 
+              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
+            >
+              <Heart className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Donations</h3>
-              <p className="text-gray-600">Support your alma mater through various donation programs</p>
-            </div>
+              <p className="text-gray-600 mb-3">Support your alma mater through various donation programs</p>
+              <div className="mt-4 pt-3 border-t border-gray-200">
+                <p className="text-sm font-semibold text-primary-600">
+                  Support Your School
+                </p>
+              </div>
+              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-sm font-medium">Donate Now</span>
+                <ArrowRight className="h-4 w-4" />
+              </div>
+            </Link>
           </div>
         </div>
       </section>

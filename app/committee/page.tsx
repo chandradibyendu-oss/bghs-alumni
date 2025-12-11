@@ -5,7 +5,7 @@ import { Users, Award, Calendar, Mail, Phone, MapPin, Building, History, Menu as
 import { supabase } from '@/lib/supabase'
 import Image from 'next/image'
 import Link from 'next/link'
-import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
 
 interface CommitteePosition {
   id: string
@@ -53,7 +53,7 @@ export default function CommitteePage() {
   const [showHistory, setShowHistory] = useState(false)
   const [selectedYear, setSelectedYear] = useState<number | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [isAdmin, setIsAdmin] = useState(false)
+  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
 
@@ -83,16 +83,27 @@ export default function CommitteePage() {
     if (user) {
       try {
         const perms = await getUserPermissions(user.id)
-        setIsAdmin(hasPermission(perms, 'can_access_admin'))
-      } catch {
-        // ignore if RPC not available
+        setUserPermissions(perms)
+      } catch (error) {
+        console.error('Error fetching permissions:', error)
+        setUserPermissions(null)
       }
     } else {
-      setIsAdmin(false)
+      setUserPermissions(null)
     }
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUserEmail(session?.user?.email ?? null)
-      setIsAdmin(false)
+      if (session?.user) {
+        try {
+          const perms = await getUserPermissions(session.user.id)
+          setUserPermissions(perms)
+        } catch (error) {
+          console.error('Error fetching permissions:', error)
+          setUserPermissions(null)
+        }
+      } else {
+        setUserPermissions(null)
+      }
     })
     return () => subscription.unsubscribe()
   }
@@ -102,6 +113,54 @@ export default function CommitteePage() {
     setUserEmail(null)
     window.location.href = '/'
   }
+
+  // Admin menu items configuration with permission requirements
+  const getAdminMenuItems = () => {
+    if (!userPermissions) return []
+    
+    const menuItems = []
+    
+    // User Management
+    if (hasPermission(userPermissions, 'can_manage_user_profiles') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Users', href: '/admin/users' })
+    }
+    
+    // Event Management
+    if (hasPermission(userPermissions, 'can_create_events') || 
+        hasPermission(userPermissions, 'can_manage_events') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Events', href: '/admin/events' })
+    }
+    
+    // Committee Management
+    if (hasPermission(userPermissions, 'can_manage_committee') || 
+        hasPermission(userPermissions, 'can_manage_events') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Committee Management', href: '/admin/committee' })
+    }
+    
+    // Blog Management
+    if (hasPermission(userPermissions, 'can_create_blog') || 
+        hasPermission(userPermissions, 'can_moderate_blog') || 
+        hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Blog Management', href: '/admin/blog' })
+    }
+    
+    // Role Management
+    if (hasPermission(userPermissions, 'can_manage_roles') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Role Management', href: '/admin/roles-simple' })
+    }
+    
+    // Notices Management
+    if (hasPermission(userPermissions, 'can_manage_notices') || hasPermission(userPermissions, 'can_access_admin')) {
+      menuItems.push({ label: 'Notices Management', href: '/admin/notices' })
+    }
+    
+    return menuItems
+  }
+
+  const adminMenuItems = getAdminMenuItems()
+  const hasAdminAccess = adminMenuItems.length > 0
 
   const loadPositions = async () => {
     try {
@@ -269,12 +328,14 @@ export default function CommitteePage() {
                       <div className="py-1">
                         <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
                         <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
-                        {isAdmin && (
+                        {hasAdminAccess && (
                           <>
                             <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
-                            <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
-                            <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
-                            <Link href="/admin/committee" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Committee Management</Link>
+                            {adminMenuItems.map((item) => (
+                              <Link key={item.href} href={item.href} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+                                {item.label}
+                              </Link>
+                            ))}
                           </>
                         )}
                         <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
@@ -298,7 +359,7 @@ export default function CommitteePage() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
-          <div className="absolute top-0 left-0 h-full w-72 bg-white shadow-lg p-4">
+          <div className="absolute top-0 right-0 h-full w-72 bg-white shadow-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-lg font-semibold">Menu</span>
               <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
@@ -316,12 +377,14 @@ export default function CommitteePage() {
                     <div className="px-2 py-2 text-sm text-gray-600">{userEmail}</div>
                     <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
                     <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
-                    {isAdmin && (
+                    {hasAdminAccess && (
                       <>
                         <div className="px-2 py-2 text-xs font-semibold text-gray-500 uppercase">Admin</div>
-                        <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
-                        <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
-                        <Link href="/admin/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee Management</Link>
+                        {adminMenuItems.map((item) => (
+                          <Link key={item.href} href={item.href} className="block px-2 py-2 rounded hover:bg-gray-50">
+                            {item.label}
+                          </Link>
+                        ))}
                       </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
