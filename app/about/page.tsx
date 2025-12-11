@@ -91,7 +91,7 @@ const content = {
       },
       {
         title: '5000+ Alumni',
-        description: 'Thousands of successful graduates across various professions',
+        description: 'Thousands of successful alumni across various professions',
         icon: Users
       },
       {
@@ -108,7 +108,7 @@ const content = {
     
     // Notable Alumni
     alumniTitle: 'Notable Alumni',
-    alumniSubtitle: 'Our distinguished graduates who have made significant contributions to society',
+    alumniSubtitle: 'Our distinguished alumni who have made significant contributions to society',
     alumni: [
       {
         name: 'Soumitra Chatterjee',
@@ -248,7 +248,7 @@ const content = {
       },
       {
         title: '৫০০০+ প্রাক্তন ছাত্র',
-        description: 'বিভিন্ন পেশায় হাজার হাজার সফল স্নাতক',
+        description: 'বিভিন্ন পেশায় হাজার হাজার সফল প্রাক্তন ছাত্র',
         icon: Users
       },
       {
@@ -265,7 +265,7 @@ const content = {
     
     // Notable Alumni
     alumniTitle: 'উল্লেখযোগ্য প্রাক্তন ছাত্র',
-    alumniSubtitle: 'আমাদের বিশিষ্ট স্নাতক যারা সমাজে গুরুত্বপূর্ণ অবদান রেখেছেন',
+    alumniSubtitle: 'আমাদের বিশিষ্ট প্রাক্তন ছাত্র যারা সমাজে গুরুত্বপূর্ণ অবদান রেখেছেন',
     alumni: [
       {
         name: 'ডাঃ রাজেশ কুমার',
@@ -447,6 +447,7 @@ export default function About() {
               <Link href="/committee" className="text-gray-700 hover:text-primary-600 transition-colors">Committee</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
+              <Link href="/notices" className="text-gray-700 hover:text-primary-600 transition-colors">Notices</Link>
               {userEmail ? (
                 <div className="relative">
                   <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
@@ -499,8 +500,10 @@ export default function About() {
               <Link href="/about" className="block px-2 py-2 rounded bg-primary-50 text-primary-600 font-semibold">About</Link>
               <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
+              <Link href="/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
+              <Link href="/notices" className="block px-2 py-2 rounded hover:bg-gray-50">Notices</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>

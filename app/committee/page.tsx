@@ -316,6 +316,7 @@ export default function CommitteePage() {
               <Link href="/committee" className="text-primary-600 font-semibold">Committee</Link>
               <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
               <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
+              <Link href="/notices" className="text-gray-700 hover:text-primary-600 transition-colors">Notices</Link>
               {userEmail ? (
                 <div className="relative account-dropdown-container">
                   <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
@@ -371,6 +372,7 @@ export default function CommitteePage() {
               <Link href="/committee" className="block px-2 py-2 rounded bg-primary-50 text-primary-600 font-semibold">Committee</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
+              <Link href="/notices" className="block px-2 py-2 rounded hover:bg-gray-50">Notices</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>

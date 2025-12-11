@@ -612,7 +612,7 @@ export default function DirectoryPage() {
               <h2 className="text-2xl font-bold mb-4">🎓 Find Your BGHS Batchmates & Alumni</h2>
               <p className="text-primary-100 mb-6">
                 The profiles above are sample examples. Join our exclusive alumni network to discover and connect with 
-                <strong> real BGHS graduates</strong>, find your batchmates, and expand your professional network!
+                <strong> real BGHS alumni</strong>, find your batchmates, and expand your professional network!
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link href="/register" className="bg-white text-primary-600 hover:bg-gray-100 font-semibold py-3 px-8 rounded-lg transition-colors duration-200 flex items-center justify-center">

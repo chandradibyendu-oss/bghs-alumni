@@ -770,9 +770,10 @@ export default function Home() {
         <div className="absolute inset-0 bg-gradient-to-b from-primary-50/30 to-transparent"></div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Barasat Govt. High School</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Barasat Govt. High School</h2>
+            <p className="text-lg text-gray-700 mb-4 font-medium">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</p>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Established in 1856, BGHS has been shaping young minds and building character for over 165 years. 
+              Established in 1856, Barasat Govt. High School has been shaping young minds and building character for over 165 years. 
               Our alumni network spans across the globe, representing excellence in various fields. Barasat Government High School's name was officially changed to Barasat Peary Charan Sarkar Government High School in 1996 to honor its founder, Peary Charan Sarkar. The change was made by the order of the Governor, to immortalize his contribution to the school, and it coincided with the institution's 150th anniversary
             </p>
           </div>
