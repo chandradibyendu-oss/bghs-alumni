@@ -59,13 +59,29 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
-      const { data, error } = await supabase
+      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
+      
+      // Fetch upcoming events (date >= today) ordered ascending (earliest first)
+      const { data: upcomingEvents, error: upcomingError } = await supabase
         .from('events')
         .select('*')
+        .gte('date', today)
         .order('date', { ascending: true })
 
-      if (error) throw error
-      setEvents(data || [])
+      if (upcomingError) throw upcomingError
+
+      // Fetch past events (date < today) ordered descending (most recent first)
+      const { data: pastEvents, error: pastError } = await supabase
+        .from('events')
+        .select('*')
+        .lt('date', today)
+        .order('date', { ascending: false })
+
+      if (pastError) throw pastError
+
+      // Combine: upcoming events first, then past events
+      const allEvents = [...(upcomingEvents || []), ...(pastEvents || [])]
+      setEvents(allEvents)
     } catch (error) {
       console.error('Error fetching events:', error)
     } finally {
