@@ -6,6 +6,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { ArrowLeft, Calendar, User, Tag, BookOpen, TrendingUp, Heart, MessageCircle, Share2, Clock } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import DOMPurify from 'isomorphic-dompurify'
 
 type BlogPost = {
   id: string
@@ -281,7 +282,14 @@ export default function BlogDetailPage() {
           {/* Main Content */}
           <div
             className="blog-content"
-            dangerouslySetInnerHTML={{ __html: blog.content }}
+            dangerouslySetInnerHTML={{ 
+              __html: DOMPurify.sanitize(blog.content, {
+                ALLOWED_TAGS: ['p', 'br', 'strong', 'em', 'u', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'ul', 'ol', 'li', 'a', 'img', 'blockquote', 'code', 'pre', 'span', 'div'],
+                ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'class', 'id'],
+                ALLOW_DATA_ATTR: false,
+                ALLOW_ARIA_ATTR: true
+              })
+            }}
           />
           
           <style jsx global>{`

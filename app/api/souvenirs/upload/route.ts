@@ -166,26 +166,17 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Souvenir upload error:', error)
-    return NextResponse.json(
-      { 
-        error: error instanceof Error ? error.message : 'Failed to upload souvenir book',
-        success: false 
-      },
-      { status: 500 }
-    )
+    const { handleApiError } = await import('@/lib/error-handler')
+    return handleApiError(error, 'Souvenir upload')
   }
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS() {
+export async function OPTIONS(request: NextRequest) {
+  const { getCorsHeaders } = await import('@/lib/cors-utils')
   return new NextResponse(null, {
     status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type',
-    },
+    headers: getCorsHeaders(request),
   })
 }
 
