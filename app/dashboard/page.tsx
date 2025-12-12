@@ -315,11 +315,18 @@ export default function DashboardPage() {
           )}
 
           {canManageContent && (
-            <Link href="/admin/souvenirs" className="card text-center hover:shadow-lg transition-shadow group">
-              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Souvenir Books</h3>
-              <p className="text-gray-600">Upload and manage annual souvenir publications</p>
-            </Link>
+            <>
+              <Link href="/admin/souvenirs" className="card text-center hover:shadow-lg transition-shadow group">
+                <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Souvenir Books</h3>
+                <p className="text-gray-600">Upload and manage annual souvenir publications</p>
+              </Link>
+              <Link href="/admin/notable-alumni" className="card text-center hover:shadow-lg transition-shadow group">
+                <Award className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Notable Alumni</h3>
+                <p className="text-gray-600">Manage distinguished alumni on About page</p>
+              </Link>
+            </>
           )}
           
           <Link href="/directory" className="card text-center hover:shadow-lg transition-shadow group">

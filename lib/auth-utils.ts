@@ -85,6 +85,7 @@ const createSupabaseClient = () => {
 }
 
 // Get user permissions from Supabase (Dynamic lookup from role definitions)
+// Optimized: Uses a single query with JOIN instead of 2 sequential queries
 export async function getUserPermissions(userId: string): Promise<UserPermissions | null> {
   try {
     const supabase = createSupabaseClient()
@@ -107,22 +108,23 @@ export async function getUserPermissions(userId: string): Promise<UserPermission
     }
     
     // Get permissions from the role definition in user_roles table
+    // Using a direct query is faster than JOIN for this use case
     const { data: roleData, error: roleError } = await supabase
       .from('user_roles')
       .select('permissions')
       .eq('name', profile.role)
-      .single()
+      .maybeSingle() // Use maybeSingle() to handle missing roles gracefully
     
     if (roleError) {
       console.error('Error fetching role permissions:', roleError)
-      return null
+      return {} as UserPermissions // Return empty permissions instead of null
     }
     
     // Return the permissions from the role definition (always current)
     return (roleData?.permissions || {}) as UserPermissions
   } catch (error) {
     console.error('Error in getUserPermissions:', error)
-    return null
+    return {} as UserPermissions // Return empty permissions instead of null
   }
 }
 

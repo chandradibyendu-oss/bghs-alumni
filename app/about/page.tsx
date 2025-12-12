@@ -331,7 +331,39 @@ export default function About() {
   const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  const [notableAlumni, setNotableAlumni] = useState<any[]>([])
+  const [loadingAlumni, setLoadingAlumni] = useState(true)
   const t = content.en
+
+  const fetchNotableAlumni = async () => {
+    try {
+      setLoadingAlumni(true)
+      const { data, error } = await supabase
+        .from('notable_alumni')
+        .select('id, name, batch_year, achievement, field, description, photo_url, display_order')
+        .eq('is_active', true)
+        .order('display_order', { ascending: true })
+        .limit(20) // Limit to first 20 for performance
+
+      if (error) throw error
+      setNotableAlumni(data || [])
+    } catch (error) {
+      console.error('Error fetching notable alumni:', error)
+      // Fallback to hardcoded data if database fetch fails
+      setNotableAlumni(t.alumni.map((a, i) => ({
+        id: `fallback-${i}`,
+        name: a.name,
+        batch_year: a.batch ? parseInt(a.batch) : null,
+        achievement: a.achievement,
+        field: a.field,
+        description: a.description,
+        photo_url: a.photo,
+        display_order: i
+      })))
+    } finally {
+      setLoadingAlumni(false)
+    }
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -350,6 +382,7 @@ export default function About() {
       }
     }
     init()
+    fetchNotableAlumni()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUserEmail(session?.user?.email ?? null)
       if (session?.user) {
@@ -685,47 +718,71 @@ export default function About() {
               {t.alumniSubtitle}
             </p>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {t.alumni.map((alumnus, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
-                {/* Profile Photo */}
-                <div className="relative h-48 bg-gradient-to-br from-primary-100 to-primary-200">
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                      <img 
-                        src={alumnus.photo} 
-                        alt={alumnus.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          // Fallback to graduation cap icon if image fails to load
-                          const target = e.target as HTMLImageElement;
-                          target.style.display = 'none';
-                          const parent = target.parentElement;
-                          if (parent) {
-                            parent.innerHTML = '<div class="w-full h-full bg-primary-100 flex items-center justify-center"><svg class="h-12 w-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg></div>';
-                          }
-                        }}
-                      />
+          {loadingAlumni ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+            </div>
+          ) : notableAlumni.length > 0 ? (
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {notableAlumni.map((alumnus) => (
+                <div key={alumnus.id} className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow">
+                  {/* Profile Photo */}
+                  <div className="relative h-48 bg-gradient-to-br from-primary-100 to-primary-200">
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
+                        {alumnus.photo_url ? (
+                          <img 
+                            src={alumnus.photo_url} 
+                            alt={alumnus.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              // Fallback to graduation cap icon if image fails to load
+                              const target = e.target as HTMLImageElement;
+                              target.style.display = 'none';
+                              const parent = target.parentElement;
+                              if (parent) {
+                                parent.innerHTML = '<div class="w-full h-full bg-primary-100 flex items-center justify-center"><svg class="h-12 w-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z"></path></svg></div>';
+                              }
+                            }}
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-primary-100 flex items-center justify-center">
+                            <GraduationCap className="h-12 w-12 text-primary-600" />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Achievement Badge */}
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1">
+                        <span className="text-xs font-semibold text-primary-600">★</span>
+                      </div>
                     </div>
                   </div>
-                  {/* Achievement Badge */}
-                  <div className="absolute top-4 right-4">
-                    <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1">
-                      <span className="text-xs font-semibold text-primary-600">★</span>
-                    </div>
+                  
+                  {/* Content */}
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{alumnus.name}</h3>
+                    <p className="text-sm text-gray-600 font-semibold mb-2">{alumnus.achievement}</p>
+                    {alumnus.field && (
+                      <p className="text-xs text-gray-500 mb-3">{alumnus.field}</p>
+                    )}
+                    {alumnus.batch_year && (
+                      <p className="text-xs text-gray-500 mb-3">Batch: {alumnus.batch_year}</p>
+                    )}
+                    {alumnus.description && (
+                      <p className="text-sm text-gray-600 leading-relaxed">{alumnus.description}</p>
+                    )}
                   </div>
                 </div>
-                
-                {/* Content */}
-                <div className="p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-1">{alumnus.name}</h3>
-                  <p className="text-sm text-gray-600 font-semibold mb-2">{alumnus.achievement}</p>
-                  <p className="text-xs text-gray-500 mb-3">{alumnus.field}</p>
-                  <p className="text-sm text-gray-600 leading-relaxed">{alumnus.description}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12">
+              <Award className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">No notable alumni to display at this time.</p>
+            </div>
+          )}
           <div className="text-center mt-8">
             <Link 
               href="/hall-of-fame" 
