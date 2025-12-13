@@ -128,121 +128,18 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
 
-    // First, get the total count from database
-    const { count: totalCount, error: countError } = await supabaseAdmin
+    // Fetch all users
+    const { data: users, error } = await supabaseAdmin
       .from('profiles')
-      .select('*', { count: 'exact', head: true })
-    
-    if (countError) {
-      console.error('[API] Error getting total count:', countError)
-    } else {
-      console.log('[API] Total records in database (from count):', totalCount)
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      console.error('Error fetching users:', error)
+      return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 })
     }
 
-    // Fetch all users - use service role to bypass RLS
-    // Supabase has a default limit of 1000, so we need to fetch in batches if needed
-    let allUsers: any[] = []
-    let page = 0
-    const pageSize = 1000
-    let hasMore = true
-
-    while (hasMore) {
-      const { data: users, error } = await supabaseAdmin
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-
-      if (error) {
-        console.error(`[API] Error fetching users (page ${page}):`, error)
-        break
-      }
-
-      if (users && users.length > 0) {
-        allUsers = allUsers.concat(users)
-        console.log(`[API] Fetched page ${page}: ${users.length} records (total so far: ${allUsers.length})`)
-        
-        // If we got fewer records than pageSize, we've reached the end
-        if (users.length < pageSize) {
-          hasMore = false
-        } else {
-          page++
-        }
-      } else {
-        hasMore = false
-      }
-    }
-
-    let finalUsers = allUsers
-    
-    // Verify count matches
-    console.log('[API] Total users fetched from database:', finalUsers.length)
-    if (totalCount !== null && totalCount !== undefined) {
-      if (finalUsers.length !== totalCount) {
-        console.error(`[API] COUNT MISMATCH! Database has ${totalCount} records, but API returned ${finalUsers.length} records`)
-      } else {
-        console.log('[API] ✓ Count matches database:', finalUsers.length, 'records')
-      }
-    }
-    
-    // Direct check for the specific emails
-    const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
-    const foundTargets = finalUsers.filter((u: any) => 
-      targetEmails.some(e => u.email?.toLowerCase() === e.toLowerCase())
-    )
-    
-    console.log('[API] Target emails found in main query:', foundTargets.length, 'out of', targetEmails.length)
-    foundTargets.forEach((u: any) => {
-      console.log('[API] ✓ Found target:', { id: u.id, email: u.email, full_name: u.full_name })
-    })
-    
-    // Check for missing emails and fetch them separately if needed
-    const missingEmails = targetEmails.filter(targetEmail => 
-      !finalUsers.some((u: any) => u.email?.toLowerCase() === targetEmail.toLowerCase())
-    )
-    
-    if (missingEmails.length > 0) {
-      console.warn('[API] Missing emails in main query:', missingEmails)
-      
-      // Fetch missing records individually
-      for (const missingEmail of missingEmails) {
-        const { data: missingUser, error: missingError } = await supabaseAdmin
-          .from('profiles')
-          .select('*')
-          .eq('email', missingEmail)
-          .maybeSingle()
-        
-        if (missingError) {
-          console.error(`[API] Error fetching ${missingEmail}:`, missingError)
-        } else if (missingUser) {
-          // Check if it's already in the array (case-insensitive check)
-          const exists = finalUsers.some((u: any) => 
-            u.id === missingUser.id || 
-            u.email?.toLowerCase() === missingUser.email?.toLowerCase()
-          )
-          
-          if (!exists) {
-            finalUsers.push(missingUser)
-            console.log(`[API] ✓ Added missing user: ${missingUser.email}`)
-          } else {
-            console.log(`[API] User ${missingEmail} already exists in array (duplicate check)`)
-          }
-        } else {
-          console.warn(`[API] User ${missingEmail} not found in database`)
-        }
-      }
-    }
-    
-    // Final verification
-    const finalCheck = finalUsers.filter((u: any) => 
-      targetEmails.some(e => u.email?.toLowerCase() === e.toLowerCase())
-    )
-    console.log('[API] Final count of target emails:', finalCheck.length, 'out of', targetEmails.length)
-    finalCheck.forEach((u: any) => {
-      console.log('[API] Final check - Found:', { id: u.id, email: u.email, full_name: u.full_name })
-    })
-
-    return NextResponse.json({ users: finalUsers })
+    return NextResponse.json({ users })
 
   } catch (error) {
     console.error('Error in users fetch API:', error)
@@ -352,10 +249,7 @@ export async function PUT(request: NextRequest) {
     if (bio !== undefined) updates.bio = bio || null
     if (linkedin_url !== undefined) updates.linkedin_url = linkedin_url || null
     if (website_url !== undefined) updates.website_url = website_url || null
-    if (role !== undefined) {
-      updates.role = role
-      console.log(`[Role Update] Updating role for user ${id} to: ${role}`)
-    }
+    if (role !== undefined) updates.role = role
     if (typeof is_approved === 'boolean') updates.is_approved = is_approved
     if (typeof is_deceased === 'boolean') {
       updates.is_deceased = is_deceased
@@ -364,25 +258,14 @@ export async function PUT(request: NextRequest) {
     }
     if (deceased_year !== undefined) updates.deceased_year = deceased_year === null ? null : Number(deceased_year)
 
-    const { data: updateResult, error: updateError } = await supabaseAdmin
+    const { error: updateError } = await supabaseAdmin
       .from('profiles')
       .update(updates)
       .eq('id', id)
-      .select('id, role')
 
     if (updateError) {
       console.error('Error updating profile:', updateError)
       return NextResponse.json({ error: 'Failed to update user' }, { status: 500 })
-    }
-
-    // Verify the update was successful
-    if (role !== undefined && updateResult && updateResult.length > 0) {
-      const updatedRole = updateResult[0]?.role
-      console.log(`[Role Update] Verification - User ${id} role is now: ${updatedRole}`)
-      if (updatedRole !== role) {
-        console.error(`[Role Update] MISMATCH! Expected ${role}, but got ${updatedRole}`)
-        return NextResponse.json({ error: 'Role update did not persist correctly' }, { status: 500 })
-      }
     }
 
     // Update auth email/phone if provided
@@ -405,29 +288,17 @@ export async function PUT(request: NextRequest) {
     }
 
     // If role provided, also update permissions from user_roles table (if exists)
-    // Note: This is optional - permissions are now dynamically looked up from user_roles table
     if (role !== undefined) {
-      const { data: roleData, error: roleError } = await supabaseAdmin
+      const { data: roleData } = await supabaseAdmin
         .from('user_roles')
         .select('permissions')
         .eq('name', role)
         .single()
-      
-      if (roleError) {
-        console.warn(`[Role Update] Could not fetch permissions for role ${role}:`, roleError)
-        // Don't fail - permissions are dynamically looked up anyway
-      } else if (roleData?.permissions) {
-        const { error: permUpdateError } = await supabaseAdmin
+      if (roleData?.permissions) {
+        await supabaseAdmin
           .from('profiles')
           .update({ permissions: roleData.permissions })
           .eq('id', id)
-        
-        if (permUpdateError) {
-          console.warn(`[Role Update] Could not update permissions column:`, permUpdateError)
-          // Don't fail - permissions are dynamically looked up anyway
-        } else {
-          console.log(`[Role Update] Permissions column updated for user ${id}`)
-        }
       }
     }
 

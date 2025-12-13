@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Calendar, Clock, MapPin, Users, ArrowLeft, Filter, Search, Plus, Eye } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
 
 const categories = ["All", "Reunion", "Workshop", "Sports", "Fundraiser", "Cultural"]
 
@@ -39,17 +39,15 @@ export default function EventsPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUserId(user.id)
-        // Check permissions for event management
-        const perms = await getUserPermissions(user.id)
-        const canManage = hasPermission(perms, 'can_create_events') || hasPermission(perms, 'can_manage_events')
-        setIsAdmin(canManage)
-        
-        // Also get role for other purposes
+        // Quick admin check based on role (no additional database queries)
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', user.id)
           .single()
+        
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'event_manager'
+        setIsAdmin(isAdmin)
         setUserRole(profile?.role || null)
       }
     } catch (error) {
@@ -59,29 +57,42 @@ export default function EventsPage() {
 
   const fetchEvents = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
-      
-      // Fetch upcoming events (date >= today) ordered ascending (earliest first)
-      const { data: upcomingEvents, error: upcomingError } = await supabase
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser()
+      const isAuthenticated = !!user
+
+      // Fetch all events
+      const { data, error } = await supabase
         .from('events')
         .select('*')
-        .gte('date', today)
         .order('date', { ascending: true })
 
-      if (upcomingError) throw upcomingError
+      if (error) throw error
 
-      // Fetch past events (date < today) ordered descending (most recent first)
-      const { data: pastEvents, error: pastError } = await supabase
-        .from('events')
-        .select('*')
-        .lt('date', today)
-        .order('date', { ascending: false })
+      // Filter events based on visibility
+      const filteredEvents = (data || []).filter((event: any) => {
+        const visibility = event.metadata?.visibility || 'public'
+        
+        // Public events: visible to everyone
+        if (visibility === 'public') {
+          return true
+        }
+        
+        // Alumni only events: visible only to authenticated users
+        if (visibility === 'alumni_only') {
+          return isAuthenticated
+        }
+        
+        // Invite only events: visible only to authenticated users (can be enhanced later with actual invite system)
+        if (visibility === 'invite_only') {
+          return isAuthenticated
+        }
+        
+        // Default: show public events only
+        return visibility === 'public'
+      })
 
-      if (pastError) throw pastError
-
-      // Combine: upcoming events first, then past events
-      const allEvents = [...(upcomingEvents || []), ...(pastEvents || [])]
-      setEvents(allEvents)
+      setEvents(filteredEvents)
     } catch (error) {
       console.error('Error fetching events:', error)
     } finally {
@@ -433,9 +444,20 @@ export default function EventsPage() {
               </div>
               
               <div className="mb-4">
-                <span className="inline-block bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-0.5 rounded-full mb-2">
-                  {event.category}
-                </span>
+                <div className="flex flex-wrap items-center gap-2 mb-2">
+                  <span className="inline-block bg-primary-100 text-primary-800 text-xs font-medium px-2.5 py-0.5 rounded-full">
+                    {event.category}
+                  </span>
+                  {event.metadata?.visibility && event.metadata.visibility !== 'public' && (
+                    <span className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded-full ${
+                      event.metadata.visibility === 'alumni_only' 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : 'bg-purple-100 text-purple-800'
+                    }`}>
+                      {event.metadata.visibility === 'alumni_only' ? 'Alumni Only' : 'Invite Only'}
+                    </span>
+                  )}
+                </div>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">{event.title}</h3>
                 <p className="text-gray-600 text-sm mb-4">{event.description}</p>
               </div>

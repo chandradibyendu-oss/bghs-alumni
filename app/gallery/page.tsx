@@ -541,14 +541,6 @@ export default function GalleryPage() {
                       {/* Admin controls - only show for admins */}
                       {canManage && (
                         <div className="absolute top-2 right-2 flex gap-1">
-                          <Link
-                            href={`/admin/gallery/${photo.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="bg-blue-600 hover:bg-blue-700 text-white p-1 rounded"
-                            title="Edit"
-                          >
-                            <Edit className="h-3 w-3" />
-                          </Link>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -611,14 +603,6 @@ export default function GalleryPage() {
                       </div>
                       {canManage && (
                         <div className="flex gap-2 mt-3">
-                          <Link
-                            href={`/admin/gallery/${photo.id}/edit`}
-                            onClick={(e) => e.stopPropagation()}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                            title="Edit"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Link>
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
@@ -708,16 +692,6 @@ export default function GalleryPage() {
               </span>
             </div>
             <div className="flex items-center space-x-4">
-              {/* Edit Button for Admins */}
-              {canManage && (
-                <Link
-                  href={`/admin/gallery/${selectedPhoto.id}/edit`}
-                  className="p-2 rounded-full bg-black bg-opacity-50 hover:bg-opacity-75 transition-all"
-                  title="Edit Photo"
-                >
-                  <Edit className="h-5 w-5" />
-                </Link>
-              )}
               {/* Navigation Controls */}
               <div className="flex items-center space-x-2">
                 <button

@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies, headers } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { r2Storage } from '@/lib/r2-storage'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,31 +35,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use service role client for database operations to bypass RLS
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Check permissions - event managers and admins can upload
+    const perms = await getUserPermissions(user.id)
+    const canManage = hasPermission(perms, 'can_manage_events') || 
+                     hasPermission(perms, 'can_access_admin') ||
+                     hasPermission(perms, 'can_manage_content')
 
-    // Check if user is admin or event manager
-    const { data: profile } = await db
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const canUpload = profile?.role && ['super_admin', 'event_manager', 'content_creator'].includes(profile.role)
-
-    if (!canUpload) {
+    if (!canManage) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const eventId = formData.get('eventId') as string // Event ID for organization
-    const sponsorIndex = formData.get('sponsorIndex') as string // Sponsor index in the form
-    const imageType = formData.get('imageType') as string // 'logo' or 'banner'
-    const sponsorTier = formData.get('sponsorTier') as string // 'Platinum', 'Gold', 'Silver', 'Bronze'
+    const eventId = formData.get('eventId') as string | null
+    const sponsorIndex = formData.get('sponsorIndex') as string | null
+    const imageType = formData.get('imageType') as string | null // 'logo' or 'banner'
+    const sponsorTier = formData.get('sponsorTier') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -76,89 +68,28 @@ export async function POST(request: NextRequest) {
 
     // Convert file to buffer
     const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes) as Buffer
+    const buffer = Buffer.from(bytes)
 
-    // Generate unique filename
+    // Create unique filename
     const timestamp = Date.now()
-    const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-    const fileName = `sponsor-${eventId || 'temp'}-${sponsorIndex}-${imageType}-${timestamp}.${fileExtension}`
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const eventPrefix = eventId && eventId !== 'temp' ? `event-${eventId}-` : 'event-temp-'
+    const typePrefix = imageType || 'image'
+    const fileName = `${eventPrefix}sponsor-${sponsorIndex || '0'}-${typePrefix}-${timestamp}.${fileExtension}`
 
-    // Optimize image based on type and tier
-    let optimizedBuffer = buffer
-    try {
-      // Dynamically import sharp
-      const sharp = await import('sharp')
-      const sharpDefault = sharp.default || sharp
-      
-      if (imageType === 'logo') {
-        // Logo: Square format, max 800x800px for Silver/Bronze
-        optimizedBuffer = await sharpDefault(buffer)
-          .resize(800, 800, { 
-            fit: 'inside', 
-            withoutEnlargement: true 
-          })
-          .jpeg({ quality: 90 })
-          .toBuffer()
-      } else if (imageType === 'banner') {
-        // Banner: Optimize based on tier
-        if (sponsorTier === 'Platinum') {
-          // Platinum: 16:9 ratio, max 1920x1080px
-          optimizedBuffer = await sharpDefault(buffer)
-            .resize(1920, 1080, { 
-              fit: 'inside', 
-              withoutEnlargement: true 
-            })
-            .jpeg({ quality: 85 })
-            .toBuffer()
-        } else if (sponsorTier === 'Gold') {
-          // Gold: 4:3 ratio, max 1200x900px
-          optimizedBuffer = await sharpDefault(buffer)
-            .resize(1200, 900, { 
-              fit: 'inside', 
-              withoutEnlargement: true 
-            })
-            .jpeg({ quality: 85 })
-            .toBuffer()
-        } else {
-          // Default banner optimization
-          optimizedBuffer = await sharpDefault(buffer)
-            .resize(1200, 800, { 
-              fit: 'inside', 
-              withoutEnlargement: true 
-            })
-            .jpeg({ quality: 85 })
-            .toBuffer()
-        }
-      }
+    // Upload to R2 Storage in events folder
+    const r2Response = await r2Storage.uploadFile(
+      buffer,
+      fileName,
+      file.type,
+      'events'
+    )
 
-      // Upload optimized image
-      const optimizedFileName = fileName.replace(/\.[^.]+$/, '.jpg')
-      const result = await r2Storage.uploadFile(
-        optimizedBuffer, 
-        optimizedFileName, 
-        'image/jpeg', 
-        'events/sponsors'
-      )
-      return NextResponse.json({
-        success: true,
-        url: result.url,
-        message: 'Sponsor image uploaded successfully'
-      })
-    } catch (sharpError) {
-      // Sharp not available or error, upload original
-      console.warn('Sharp optimization failed, uploading original:', sharpError)
-      const result = await r2Storage.uploadFile(
-        buffer, 
-        fileName, 
-        `image/${fileExtension}`, 
-        'events/sponsors'
-      )
-      return NextResponse.json({
-        success: true,
-        url: result.url,
-        message: 'Sponsor image uploaded successfully'
-      })
-    }
+    return NextResponse.json({
+      success: true,
+      url: r2Response.url,
+      key: r2Response.key
+    })
 
   } catch (error) {
     console.error('Sponsor image upload error:', error)
@@ -173,11 +104,13 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS(request: NextRequest) {
-  const { getCorsHeaders } = await import('@/lib/cors-utils')
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request),
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
   })
 }
-

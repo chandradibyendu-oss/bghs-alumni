@@ -35,25 +35,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use service role client for database operations to bypass RLS
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
-
-    // Check if user can upload blog images
+    // Check permissions
     const perms = await getUserPermissions(user.id)
-    const canUpload = hasPermission(perms, 'can_create_blog') || 
-                     hasPermission(perms, 'can_edit_blog') || 
+    const canManage = hasPermission(perms, 'can_manage_content') || 
                      hasPermission(perms, 'can_access_admin')
 
-    if (!canUpload) {
+    if (!canManage) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const blogId = formData.get('blogId') as string // Optional - can be 'temp' for drafts
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -64,26 +56,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Only image files are allowed' }, { status: 400 })
     }
 
-    // Validate file size (max 10MB for blog images)
-    if (file.size > 10 * 1024 * 1024) {
-      return NextResponse.json({ error: 'File size must be less than 10MB' }, { status: 400 })
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 })
     }
 
     // Convert file to buffer
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Upload to R2
-    const imageUrl = await r2Storage.uploadBlogImage(
+    // Create unique filename
+    const timestamp = Date.now()
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileName = `blog-${timestamp}.${fileExtension}`
+
+    // Upload to R2 Storage in blog folder
+    const r2Response = await r2Storage.uploadFile(
       buffer,
-      blogId || `temp-${Date.now()}`,
-      file.name
+      fileName,
+      file.type,
+      'blog'
     )
 
     return NextResponse.json({
       success: true,
-      url: imageUrl,
-      message: 'Image uploaded successfully'
+      url: r2Response.url,
+      key: r2Response.key
     })
 
   } catch (error) {
@@ -99,11 +97,13 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS(request: NextRequest) {
-  const { getCorsHeaders } = await import('@/lib/cors-utils')
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request),
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
   })
 }
-

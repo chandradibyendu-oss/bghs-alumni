@@ -8,6 +8,12 @@ import { supabase } from '@/lib/supabase'
 import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 import ProgramScheduleEditor from '@/components/ProgramScheduleEditor'
 
+const VISIBILITY_OPTIONS = [
+  { value: 'public', label: 'Public (Everyone can see)' },
+  { value: 'alumni_only', label: 'Alumni Only' },
+  { value: 'invite_only', label: 'Invite Only' }
+]
+
 interface DaySchedule {
   date: string
   dayLabel: string
@@ -573,6 +579,21 @@ export default function EditEventPage() {
                   <option value="Sports">Sports</option>
                   <option value="Fundraiser">Fundraiser</option>
                   <option value="Cultural">Cultural</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Visibility
+                </label>
+                <select
+                  name="visibility"
+                  value={formData.visibility}
+                  onChange={handleInputChange}
+                  className="input-field"
+                >
+                  {VISIBILITY_OPTIONS.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
                 </select>
               </div>
               <div className="space-y-4">

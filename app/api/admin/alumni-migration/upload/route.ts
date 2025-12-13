@@ -39,10 +39,6 @@ interface AlumniRecord {
   role?: string
   professional_title?: string
   notes?: string
-  registration_id?: string
-  old_registration_id?: string
-  is_deceased?: boolean
-  deceased_year?: number
 }
 
 export async function POST(request: NextRequest) {
@@ -154,132 +150,22 @@ async function processBatch(batch: any[], supabaseAdmin: any) {
       // Validate and normalize the record
       const alumniRecord = validateAndNormalizeRecord(record)
       
-      // Check if user already exists by email or registration_id
-      let existingProfile = null
-      if (alumniRecord.email) {
-        const { data: emailProfile, error: emailError } = await supabaseAdmin
-          .from('profiles')
-          .select('id, registration_id')
-          .eq('email', alumniRecord.email)
-          .maybeSingle()
-        if (emailProfile && !emailError) {
-          existingProfile = emailProfile
-        }
-      }
+      // Check if user already exists
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id')
+        .eq('email', alumniRecord.email)
+        .single()
 
-      // Also check by registration_id if provided
-      if (!existingProfile && alumniRecord.registration_id) {
-        const { data: regProfile, error: regError } = await supabaseAdmin
-          .from('profiles')
-          .select('id, email, registration_id')
-          .eq('registration_id', alumniRecord.registration_id)
-          .maybeSingle()
-        if (regProfile && !regError) {
-          existingProfile = regProfile
-        }
-      }
-
-      // If profile exists, update it instead of creating new one
       if (existingProfile) {
-        try {
-          // Find professional title ID if provided
-          let professionalTitleId = null
-          if (alumniRecord.professional_title) {
-            const { data: titleData } = await supabaseAdmin
-              .from('professional_titles')
-              .select('id')
-              .eq('title', alumniRecord.professional_title)
-              .eq('is_active', true)
-              .single()
-            
-            if (titleData) {
-              professionalTitleId = titleData.id
-            }
-          }
-
-          // Prepare update data (exclude fields that shouldn't be updated)
-          const updateData: any = {
-            email: alumniRecord.email,
-            phone: alumniRecord.phone,
-            first_name: alumniRecord.first_name,
-            last_name: alumniRecord.last_name,
-            middle_name: alumniRecord.middle_name,
-            full_name: `${alumniRecord.first_name} ${alumniRecord.middle_name ? alumniRecord.middle_name + ' ' : ''}${alumniRecord.last_name}`.trim(),
-            last_class: alumniRecord.last_class,
-            year_of_leaving: alumniRecord.year_of_leaving,
-            start_class: alumniRecord.start_class,
-            start_year: alumniRecord.start_year,
-            batch_year: alumniRecord.batch_year,
-            profession: alumniRecord.profession,
-            company: alumniRecord.company,
-            location: alumniRecord.location,
-            bio: alumniRecord.bio,
-            linkedin_url: alumniRecord.linkedin_url,
-            website_url: alumniRecord.website_url,
-            role: alumniRecord.role || 'alumni_member',
-            professional_title_id: professionalTitleId,
-            updated_at: new Date().toISOString()
-          }
-
-          // Update registration_id if provided and different
-          if (alumniRecord.registration_id) {
-            updateData.registration_id = alumniRecord.registration_id.trim()
-          }
-
-          // Update old_registration_id if provided
-          if (alumniRecord.old_registration_id) {
-            updateData.old_registration_id = alumniRecord.old_registration_id.trim()
-          }
-
-          // Update is_deceased if provided
-          if (alumniRecord.is_deceased !== undefined) {
-            updateData.is_deceased = alumniRecord.is_deceased
-          }
-
-          // Update deceased_year if provided
-          if (alumniRecord.deceased_year !== undefined) {
-            updateData.deceased_year = alumniRecord.deceased_year
-          }
-
-          // Update import tracking
-          updateData.import_source = 'admin_migration'
-          updateData.imported_at = new Date().toISOString()
-
-          // Update the existing profile
-          const { error: updateError } = await supabaseAdmin
-            .from('profiles')
-            .update(updateData)
-            .eq('id', existingProfile.id)
-
-          if (updateError) {
-            results.failed++
-            results.errors.push(`Failed to update profile for ${alumniRecord.email}: ${updateError.message}`)
-            results.details.push({
-              email: alumniRecord.email,
-              status: 'failed',
-              error: updateError.message
-            })
-            continue
-          }
-
-          results.processed++
-          results.details.push({
-            email: alumniRecord.email,
-            status: 'success'
-          })
-          continue
-
-        } catch (updateErr) {
-          results.failed++
-          const errorMessage = updateErr instanceof Error ? updateErr.message : 'Unknown error'
-          results.errors.push(`Error updating ${alumniRecord.email}: ${errorMessage}`)
-          results.details.push({
-            email: alumniRecord.email,
-            status: 'failed',
-            error: errorMessage
-          })
-          continue
-        }
+        results.failed++
+        results.errors.push(`User with email ${alumniRecord.email} already exists`)
+        results.details.push({
+          email: alumniRecord.email,
+          status: 'failed',
+          error: 'User already exists'
+        })
+        continue
       }
 
       // Create auth user
@@ -315,61 +201,34 @@ async function processBatch(batch: any[], supabaseAdmin: any) {
         }
       }
 
-      // Prepare profile data
-      const profileData: any = {
-        id: authUser.user.id,
-        email: alumniRecord.email,
-        phone: alumniRecord.phone,
-        first_name: alumniRecord.first_name,
-        last_name: alumniRecord.last_name,
-        middle_name: alumniRecord.middle_name,
-        full_name: `${alumniRecord.first_name} ${alumniRecord.middle_name ? alumniRecord.middle_name + ' ' : ''}${alumniRecord.last_name}`.trim(),
-        last_class: alumniRecord.last_class,
-        year_of_leaving: alumniRecord.year_of_leaving,
-        start_class: alumniRecord.start_class,
-        start_year: alumniRecord.start_year,
-        batch_year: alumniRecord.batch_year,
-        profession: alumniRecord.profession,
-        company: alumniRecord.company,
-        location: alumniRecord.location,
-        bio: alumniRecord.bio,
-        linkedin_url: alumniRecord.linkedin_url,
-        website_url: alumniRecord.website_url,
-        role: alumniRecord.role || 'alumni_member',
-        professional_title_id: professionalTitleId,
-        is_approved: true, // Auto-approve migrated records
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }
-
-      // Add registration_id if provided (database trigger will only auto-generate if NULL)
-      if (alumniRecord.registration_id) {
-        profileData.registration_id = alumniRecord.registration_id.trim()
-      }
-
-      // Add old_registration_id if provided
-      if (alumniRecord.old_registration_id) {
-        profileData.old_registration_id = alumniRecord.old_registration_id.trim()
-      }
-
-      // Add is_deceased if provided
-      if (alumniRecord.is_deceased !== undefined) {
-        profileData.is_deceased = alumniRecord.is_deceased
-      }
-
-      // Add deceased_year if provided
-      if (alumniRecord.deceased_year !== undefined) {
-        profileData.deceased_year = alumniRecord.deceased_year
-      }
-
-      // Add import tracking
-      profileData.import_source = 'admin_migration'
-      profileData.imported_at = new Date().toISOString()
-
       // Create profile
       const { error: profileError } = await supabaseAdmin
         .from('profiles')
-        .insert(profileData)
+        .insert({
+          id: authUser.user.id,
+          email: alumniRecord.email,
+          phone: alumniRecord.phone,
+          first_name: alumniRecord.first_name,
+          last_name: alumniRecord.last_name,
+          middle_name: alumniRecord.middle_name,
+          full_name: `${alumniRecord.first_name} ${alumniRecord.middle_name ? alumniRecord.middle_name + ' ' : ''}${alumniRecord.last_name}`.trim(),
+          last_class: alumniRecord.last_class,
+          year_of_leaving: alumniRecord.year_of_leaving,
+          start_class: alumniRecord.start_class,
+          start_year: alumniRecord.start_year,
+          batch_year: alumniRecord.batch_year,
+          profession: alumniRecord.profession,
+          company: alumniRecord.company,
+          location: alumniRecord.location,
+          bio: alumniRecord.bio,
+          linkedin_url: alumniRecord.linkedin_url,
+          website_url: alumniRecord.website_url,
+          role: alumniRecord.role || 'alumni_member',
+          professional_title_id: professionalTitleId,
+          is_approved: true, // Auto-approve migrated records
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
 
       if (profileError) {
         // Clean up auth user if profile creation fails
@@ -458,24 +317,7 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     'role': 'role',
     'Professional Title': 'professional_title',
     'ProfessionalTitle': 'professional_title',
-    'professional_title': 'professional_title',
-    'Title Prefix': 'professional_title',
-    'TitlePrefix': 'professional_title',
-    'title_prefix': 'professional_title',
-    'Registration Number': 'registration_id',
-    'RegistrationNumber': 'registration_id',
-    'registration_number': 'registration_id',
-    'registration_id': 'registration_id',
-    'Old Registration Number': 'old_registration_id',
-    'OldRegistrationNumber': 'old_registration_id',
-    'old_registration_number': 'old_registration_id',
-    'old_registration_id': 'old_registration_id',
-    'Is Deceased': 'is_deceased',
-    'IsDeceased': 'is_deceased',
-    'is_deceased': 'is_deceased',
-    'Deceased Year': 'deceased_year',
-    'DeceasedYear': 'deceased_year',
-    'deceased_year': 'deceased_year'
+    'professional_title': 'professional_title'
   }
 
   // Apply field mappings
@@ -497,32 +339,8 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
   if (!normalized.last_class) {
     throw new Error('Last class is required')
   }
-
-  // Handle Year of Leaving with fallback strategy
-  // Priority: Year of Leaving > Batch Year > Start Year estimate > Placeholder
-  let yearOfLeaving: number
-  let yearSource = 'provided'
-  
-  if (normalized.year_of_leaving && normalized.year_of_leaving.toString().trim()) {
-    // Use provided Year of Leaving
-    yearOfLeaving = parseInt(normalized.year_of_leaving)
-  } else if (normalized.batch_year && normalized.batch_year.toString().trim()) {
-    // Fallback to Batch Year (often same as Year of Leaving)
-    yearOfLeaving = parseInt(normalized.batch_year)
-    yearSource = 'batch_year'
-  } else if (normalized.start_year && normalized.start_year.toString().trim() && normalized.last_class) {
-    // Estimate: Start Year + (Last Class - Start Class or 6 years for class 12)
-    const startYear = parseInt(normalized.start_year)
-    const lastClass = parseInt(normalized.last_class)
-    const startClass = normalized.start_class ? parseInt(normalized.start_class) : 1
-    const yearsAtSchool = lastClass - startClass + 1
-    yearOfLeaving = startYear + yearsAtSchool - 1
-    yearSource = 'estimated'
-  } else {
-    // Use minimum valid year (1900) as placeholder - indicates unknown
-    // This allows import but can be updated later
-    yearOfLeaving = 1900
-    yearSource = 'placeholder'
+  if (!normalized.year_of_leaving) {
+    throw new Error('Year of leaving is required')
   }
 
   // Validate and convert data types
@@ -533,10 +351,10 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     last_name: normalized.last_name.toString().trim(),
     middle_name: normalized.middle_name ? normalized.middle_name.toString().trim() : undefined,
     last_class: parseInt(normalized.last_class),
-    year_of_leaving: yearOfLeaving,
+    year_of_leaving: parseInt(normalized.year_of_leaving),
     start_class: normalized.start_class ? parseInt(normalized.start_class) : undefined,
     start_year: normalized.start_year ? parseInt(normalized.start_year) : undefined,
-    batch_year: normalized.batch_year ? parseInt(normalized.batch_year) : yearOfLeaving,
+    batch_year: normalized.batch_year ? parseInt(normalized.batch_year) : parseInt(normalized.year_of_leaving),
     profession: normalized.profession ? normalized.profession.toString().trim() : undefined,
     company: normalized.company ? normalized.company.toString().trim() : undefined,
     location: normalized.location ? normalized.location.toString().trim() : undefined,
@@ -544,25 +362,21 @@ function validateAndNormalizeRecord(record: any): AlumniRecord {
     linkedin_url: normalized.linkedin_url ? normalized.linkedin_url.toString().trim() : undefined,
     website_url: normalized.website_url ? normalized.website_url.toString().trim() : undefined,
     role: normalized.role ? normalized.role.toString().trim() : 'alumni_member',
-    professional_title: normalized.professional_title ? normalized.professional_title.toString().trim() : undefined,
-    registration_id: normalized.registration_id ? normalized.registration_id.toString().trim() : undefined,
-    old_registration_id: normalized.old_registration_id ? normalized.old_registration_id.toString().trim() : undefined,
-    is_deceased: normalized.is_deceased && normalized.is_deceased.toString().trim() ? parseBoolean(normalized.is_deceased) : undefined,
-    deceased_year: normalized.deceased_year && normalized.deceased_year.toString().trim() ? parseInt(normalized.deceased_year) : undefined
+    professional_title: normalized.professional_title ? normalized.professional_title.toString().trim() : undefined
   }
 
   // Validate data ranges
   if (alumniRecord.last_class < 1 || alumniRecord.last_class > 12) {
     throw new Error('Last class must be between 1 and 12')
   }
-  if (alumniRecord.year_of_leaving < 1900 || alumniRecord.year_of_leaving > new Date().getFullYear()) {
-    throw new Error('Year of leaving must be between 1900 and current year')
+  if (alumniRecord.year_of_leaving < 1950 || alumniRecord.year_of_leaving > new Date().getFullYear()) {
+    throw new Error('Year of leaving must be between 1950 and current year')
   }
   if (alumniRecord.start_class && (alumniRecord.start_class < 1 || alumniRecord.start_class > 12)) {
     throw new Error('Start class must be between 1 and 12')
   }
-  if (alumniRecord.start_year && (alumniRecord.start_year < 1900 || alumniRecord.start_year > new Date().getFullYear())) {
-    throw new Error('Start year must be between 1900 and current year')
+  if (alumniRecord.start_year && (alumniRecord.start_year < 1950 || alumniRecord.start_year > new Date().getFullYear())) {
+    throw new Error('Start year must be between 1950 and current year')
   }
 
   return alumniRecord
@@ -628,18 +442,4 @@ function generateTemporaryPassword(): string {
     password += chars.charAt(Math.floor(Math.random() * chars.length))
   }
   return password
-}
-
-function parseBoolean(value: any): boolean {
-  if (typeof value === 'boolean') {
-    return value
-  }
-  if (typeof value === 'string') {
-    const normalized = value.trim().toUpperCase()
-    return normalized === 'TRUE' || normalized === '1' || normalized === 'YES'
-  }
-  if (typeof value === 'number') {
-    return value !== 0
-  }
-  return false
 }

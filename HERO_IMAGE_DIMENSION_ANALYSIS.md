@@ -85,3 +85,4 @@ The event image (2x2 collage) has a **square/portrait aspect ratio**, but the he
 
 
 
+

@@ -45,15 +45,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Guest count must be between 1 and 10' }, { status: 400 })
     }
 
-    // Check if event exists and get event details
+    // Check if event exists and get event details (including metadata for visibility)
     const { data: event, error: eventError } = await supabaseAdmin
       .from('events')
-      .select('id, title, max_attendees, current_attendees')
+      .select('id, title, max_attendees, current_attendees, metadata')
       .eq('id', eventId)
       .single()
 
     if (eventError || !event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 })
+    }
+
+    // Check visibility and user access
+    const visibility = event.metadata?.visibility || 'public'
+    
+    // Public events: anyone can register (but must be authenticated to use API)
+    if (visibility === 'public') {
+      // Already authenticated (checked above), so allow
+    } 
+    // Alumni only events: only authenticated alumni can register
+    else if (visibility === 'alumni_only') {
+      // User is already authenticated (checked above), so allow
+      // In future, could add additional checks like is_approved status
+    }
+    // Invite only events: only invited users can register
+    else if (visibility === 'invite_only') {
+      // For now, allow authenticated users (can be enhanced with actual invite system later)
+      // User is already authenticated (checked above), so allow
+    }
+    else {
+      // Unknown visibility type, default to public access
     }
 
     // Calculate available spots

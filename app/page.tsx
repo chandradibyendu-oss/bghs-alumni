@@ -1,14 +1,43 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
-import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Menu as MenuIcon, X, User as UserIcon, LucideIcon, ArrowRight } from 'lucide-react'
-import { useState, useEffect, useRef } from 'react'
+import { Calendar, Users, BookOpen, Heart, GraduationCap, MapPin, ChevronLeft, ChevronRight, Star, Trophy, Award, Menu as MenuIcon, X, User as UserIcon, LucideIcon } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import NoticesSection from '@/app/components/NoticesSection'
-import { getUserPermissions, hasPermission, UserPermissions } from '@/lib/auth-utils'
 
-// Blog posts will be fetched from database
+// Blog posts data (can be moved to a shared file or fetched from API)
+const blogPosts = [
+  {
+    id: 1,
+    title: "BGHS Alumni Success Story: From Barasat to Silicon Valley",
+    excerpt: "Meet Priya Sen, a 2000 batch graduate who went from our humble school in Barasat to becoming a senior software engineer at Google in Silicon Valley. Her journey is an inspiration for all current students.",
+    author: "Alumni Association",
+    date: "2024-01-15",
+    readTime: "5 min read",
+    category: "Success Stories",
+    tags: ["Technology", "Career", "Inspiration"],
+    image: "/blog/priya-sen.jpg",
+    featured: true,
+    views: 1250,
+    likes: 89,
+    comments: 23
+  },
+  {
+    id: 2,
+    title: "The Evolution of BGHS: 165 Years of Educational Excellence",
+    excerpt: "From its establishment in 1856 to the present day, Barasat Govt. High School has been at the forefront of educational innovation and excellence in West Bengal.",
+    author: "Dr. Smita Banerjee",
+    date: "2024-01-10",
+    readTime: "8 min read",
+    category: "School History",
+    tags: ["History", "Education", "BGHS"],
+    image: "/blog/school-history.jpg",
+    featured: false,
+    views: 890,
+    likes: 67,
+    comments: 15
+  }
+]
 
 // Removed getUserPermissions import - using direct role check for performance
 
@@ -33,7 +62,6 @@ type EventSlide = BaseSlide & {
   eventDate?: string
   eventTime?: string
   eventId?: number | string
-  shortDescription?: string
 }
 
 type BlogSlide = BaseSlide & {
@@ -49,27 +77,28 @@ type RegularSlide = BaseSlide & {
 
 type Slide = EventSlide | BlogSlide | RegularSlide
 
-// Helper function to create blog slide from fetched blog data
-const createBlogSlide = (blog: any): BlogSlide | null => {
-  if (!blog) return null
+// Helper function to create blog slide
+const createBlogSlide = (): BlogSlide | null => {
+  const featuredBlog = blogPosts.find(blog => blog.featured)
+  const latestBlog = featuredBlog || blogPosts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
   
-  const readTime = blog.read_time ? `${blog.read_time} min read` : '5 min read'
+  if (!latestBlog) return null
   
   return {
-    id: 20000 + (typeof blog.id === 'string' ? parseInt(blog.id.slice(0, 8), 16) : blog.id || 0),
+    id: 20000 + latestBlog.id,
     type: 'blog',
-    title: blog.title,
-    subtitle: `📝 ${blog.category} • ${readTime}`,
-    description: blog.excerpt,
-    backgroundImage: blog.image_url || '/hero-images/hero-2.jpg',
+    title: latestBlog.title,
+    subtitle: `📝 ${latestBlog.category} • ${latestBlog.readTime}`,
+    description: latestBlog.excerpt,
+    backgroundImage: latestBlog.image || '/hero-images/hero-2.jpg',
     icon: BookOpen,
     cta: {
-      primary: { text: 'Read Article', href: `/blog/${blog.id}` },
+      primary: { text: 'Read Article', href: '/blog' },
       secondary: { text: 'View All Posts', href: '/blog' }
     },
-    blogId: blog.id,
-    author: blog.author?.full_name || 'Unknown Author',
-    date: blog.created_at
+    blogId: latestBlog.id,
+    author: latestBlog.author,
+    date: latestBlog.date
   }
 }
 
@@ -99,6 +128,32 @@ const slideshowData = [
       primary: { text: 'View Gallery', href: '/gallery' },
       secondary: { text: 'Upload Photos', href: '/gallery' }
     }
+  },
+  {
+    id: 3,
+    type: 'hall-of-fame',
+    title: 'Hall of Fame',
+    subtitle: 'Celebrating Our Distinguished Alumni',
+    description: 'Meet our alumni who have made significant contributions in their fields - from science and technology to arts and social service.',
+    backgroundImage: '/hero-images/hero-3.jpg',
+    icon: Trophy,
+    cta: {
+      primary: { text: 'View Hall of Fame', href: '/hall-of-fame' },
+      secondary: { text: 'Nominate Alumni', href: '/nominate' }
+    }
+  },
+  {
+    id: 4,
+    type: 'achievement',
+    title: 'Recent Achievements',
+    subtitle: 'Alumni Making Headlines',
+    description: 'Dr. Rajesh Kumar (Batch 1995) receives the prestigious Padma Shri award for his contributions to medical research.',
+    backgroundImage: '/hero-images/hero-4.jpg',
+    icon: Award,
+    cta: {
+      primary: { text: 'Read More', href: '/blog' },
+      secondary: { text: 'Share Achievement', href: '/share' }
+    }
   }
 ];
 
@@ -106,105 +161,13 @@ export default function Home() {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [userEmail, setUserEmail] = useState<string | null>(null)
-  const [userPermissions, setUserPermissions] = useState<UserPermissions | null>(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
   const [upcomingEvents, setUpcomingEvents] = useState<any[]>([])
   const [allSlides, setAllSlides] = useState<Slide[]>(slideshowData as Slide[])
-  const [latestBlog, setLatestBlog] = useState<any>(null)
-  const [loadedImages, setLoadedImages] = useState<Set<string>>(new Set())
-  const imageRefs = useRef<Map<string, HTMLImageElement>>(new Map())
-  const [upcomingEventsCount, setUpcomingEventsCount] = useState<number | null>(null)
-  const [alumniCount, setAlumniCount] = useState<number | null>(null)
-  const [blogPostsCount, setBlogPostsCount] = useState<number | null>(null)
 
-  // Fetch stats and latest blog post
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        // Fetch upcoming events count
-        const now = new Date().toISOString()
-        const { count: eventsCount } = await supabase
-          .from('events')
-          .select('*', { count: 'exact', head: true })
-          .gte('date', now)
-        setUpcomingEventsCount(eventsCount || 0)
-
-        // Fetch total alumni count (approved members)
-        const { count: alumniCount } = await supabase
-          .from('profiles')
-          .select('*', { count: 'exact', head: true })
-          .eq('is_approved', true)
-        setAlumniCount(alumniCount || 0)
-
-        // Fetch published blog posts count
-        const { count: blogCount } = await supabase
-          .from('blog_posts')
-          .select('*', { count: 'exact', head: true })
-          .eq('published', true)
-          .eq('status', 'published')
-        setBlogPostsCount(blogCount || 0)
-      } catch (error) {
-        console.error('Error fetching stats:', error)
-      }
-    }
-
-    const fetchLatestBlog = async () => {
-      try {
-        // First try to get featured blog, if none, get the latest published blog
-        let { data: featuredBlogs, error: featuredError } = await supabase
-          .from('blog_posts')
-          .select(`
-            *,
-            author:profiles!blog_posts_author_id_fkey(full_name)
-          `)
-          .eq('published', true)
-          .eq('status', 'published')
-          .eq('featured', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-
-        let featuredBlog = null
-        if (!featuredError && featuredBlogs && featuredBlogs.length > 0) {
-          featuredBlog = featuredBlogs[0]
-        }
-
-        // If no featured blog, get the latest published blog
-        if (!featuredBlog) {
-          const { data: latestBlogs, error: latestError } = await supabase
-            .from('blog_posts')
-            .select(`
-              *,
-              author:profiles!blog_posts_author_id_fkey(full_name)
-            `)
-            .eq('published', true)
-            .eq('status', 'published')
-            .order('created_at', { ascending: false })
-            .limit(1)
-          
-          if (!latestError && latestBlogs && latestBlogs.length > 0) {
-            featuredBlog = latestBlogs[0]
-          }
-        }
-
-        if (featuredBlog) {
-          // Process author data if it's an array
-          if (Array.isArray(featuredBlog.author) && featuredBlog.author.length > 0) {
-            featuredBlog.author = featuredBlog.author[0]
-          }
-          setLatestBlog(featuredBlog)
-        }
-      } catch (error) {
-        console.error('Error fetching latest blog:', error)
-        // If error, latestBlog remains null and no blog slide will be shown
-      }
-    }
-
-    fetchStats()
-    fetchLatestBlog()
-  }, [])
-
-  // Fetch upcoming events and build slides (can be disabled via env var)
+  // Fetch upcoming events (can be disabled via env var)
   useEffect(() => {
     const showEventsInHero = process.env.NEXT_PUBLIC_SHOW_EVENTS_IN_HERO !== 'false'
     
@@ -216,7 +179,7 @@ export default function Home() {
       const orderedSlides: Slide[] = []
       if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
       
-      const blogSlide = createBlogSlide(latestBlog)
+      const blogSlide = createBlogSlide()
       if (blogSlide) {
         orderedSlides.push(blogSlide)
       }
@@ -253,9 +216,6 @@ export default function Home() {
               day: 'numeric' 
             })} at ${event.time}`,
             description: event.description || `Join us at ${event.location}`,
-            shortDescription: event.short_description || (event.description && event.description.length > 150 
-              ? `${event.description.substring(0, 150)}...` 
-              : event.description) || `Join us at ${event.location}`,
             location: event.location,
             eventDate: event.date,
             eventTime: event.time,
@@ -270,7 +230,7 @@ export default function Home() {
           
           // Add blog slide if available
           let dynamicSlides: Slide[] = [...eventSlides] as Slide[]
-          const blogSlide = createBlogSlide(latestBlog)
+          const blogSlide = createBlogSlide()
           if (blogSlide) {
             dynamicSlides.push(blogSlide)
           }
@@ -294,7 +254,7 @@ export default function Home() {
           const orderedSlides: Slide[] = []
           if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
           
-          const blogSlide = createBlogSlide(latestBlog)
+          const blogSlide = createBlogSlide()
           if (blogSlide) {
             orderedSlides.push(blogSlide)
           }
@@ -311,7 +271,7 @@ export default function Home() {
         const orderedSlides: Slide[] = []
         if (welcomeSlide) orderedSlides.push(welcomeSlide as Slide)
         
-        const blogSlide = createBlogSlide(latestBlog)
+        const blogSlide = createBlogSlide()
         if (blogSlide) {
           orderedSlides.push(blogSlide)
         }
@@ -321,42 +281,7 @@ export default function Home() {
       }
     }
     fetchUpcomingEvents()
-  }, [latestBlog]) // Re-run when latestBlog changes
-
-  // Preload images for smooth transitions
-  useEffect(() => {
-    const preloadImages = async () => {
-      const imagePromises: Promise<void>[] = []
-      
-      allSlides.forEach((slide) => {
-        if (slide.backgroundImage && !loadedImages.has(slide.backgroundImage)) {
-          const img = new window.Image()
-          img.src = slide.backgroundImage
-          
-          const promise = new Promise<void>((resolve) => {
-            img.onload = () => {
-              setLoadedImages((prev) => {
-                const newSet = new Set(prev)
-                newSet.add(slide.backgroundImage)
-                return newSet
-              })
-              resolve()
-            }
-            img.onerror = () => resolve() // Continue even if image fails
-          })
-          
-          imagePromises.push(promise)
-          imageRefs.current.set(slide.backgroundImage, img)
-        }
-      })
-      
-      await Promise.all(imagePromises)
-    }
-    
-    if (allSlides.length > 0) {
-      preloadImages()
-    }
-  }, [allSlides])
+  }, [])
 
   // Auto-rotate slides
   useEffect(() => {
@@ -397,30 +322,38 @@ export default function Home() {
       const { data: { user } } = await supabase.auth.getUser()
       setUserEmail(user?.email ?? null)
       if (user) {
-        try {
-          const perms = await getUserPermissions(user.id)
-          setUserPermissions(perms)
-        } catch (error) {
-          console.error('Error fetching permissions:', error)
-          setUserPermissions(null)
-        }
+        // Quick admin check based on role (no additional database queries)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+        
+        const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
+        setIsAdmin(isAdmin)
       } else {
-        setUserPermissions(null)
+        setIsAdmin(false)
       }
     }
     init()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_e, session) => {
       setUserEmail(session?.user?.email ?? null)
       if (session?.user) {
+        // Quick admin check based on role (no additional database queries)
         try {
-          const perms = await getUserPermissions(session.user.id)
-          setUserPermissions(perms)
-        } catch (error) {
-          console.error('Error fetching permissions:', error)
-          setUserPermissions(null)
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single()
+          
+          const isAdmin = profile?.role === 'super_admin' || profile?.role === 'donation_manager' || profile?.role === 'event_manager' || profile?.role === 'content_moderator'
+          setIsAdmin(isAdmin)
+        } catch {
+          setIsAdmin(false)
         }
       } else {
-        setUserPermissions(null)
+        setIsAdmin(false)
       }
     })
 
@@ -433,115 +366,60 @@ export default function Home() {
     window.location.href = '/'
   }
 
-  // Admin menu items configuration with permission requirements
-  const getAdminMenuItems = () => {
-    if (!userPermissions) return []
-    
-    const menuItems = []
-    
-    // User Management
-    if (hasPermission(userPermissions, 'can_manage_user_profiles') || hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Users', href: '/admin/users' })
-    }
-    
-    // Event Management
-    if (hasPermission(userPermissions, 'can_create_events') || 
-        hasPermission(userPermissions, 'can_manage_events') || 
-        hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Events', href: '/admin/events' })
-    }
-    
-    // Committee Management
-    if (hasPermission(userPermissions, 'can_manage_committee') || 
-        hasPermission(userPermissions, 'can_manage_events') || 
-        hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Committee Management', href: '/admin/committee' })
-    }
-    
-    // Blog Management
-    if (hasPermission(userPermissions, 'can_create_blog') || 
-        hasPermission(userPermissions, 'can_moderate_blog') || 
-        hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Blog Management', href: '/admin/blog' })
-    }
-    
-    // Role Management
-    if (hasPermission(userPermissions, 'can_manage_roles') || hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Role Management', href: '/admin/roles-simple' })
-    }
-    
-    // Notices Management
-    if (hasPermission(userPermissions, 'can_manage_notices') || hasPermission(userPermissions, 'can_access_admin')) {
-      menuItems.push({ label: 'Notices Management', href: '/admin/notices' })
-    }
-    
-    return menuItems
-  }
-
-  const adminMenuItems = getAdminMenuItems()
-  const hasAdminAccess = adminMenuItems.length > 0
-
   return (
     <div className="min-h-screen">
       {/* Navigation */}
       <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-3">
+              <button className="md:hidden p-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
+                <MenuIcon className="h-6 w-6 text-gray-700" />
+              </button>
               <img 
                 src="/bghs-logo.png" 
                 alt="BGHS Alumni Association" 
-                className="h-12 sm:h-14 w-auto object-contain shrink-0 flex-none"
+                className="h-14 w-auto object-contain shrink-0 flex-none"
               />
-              <div className="flex flex-col min-w-0 flex-1 pr-2">
-                <span className="text-lg sm:text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
-                <span className="text-[10px] sm:text-sm text-gray-600 leading-tight line-clamp-2">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
+              <div className="flex flex-col min-w-0 max-w-[60vw] sm:max-w-none">
+                <span className="text-2xl font-bold text-gray-900 truncate">BGHS Alumni</span>
+                <span className="text-sm text-gray-600 truncate">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</span>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="hidden md:flex items-center space-x-8">
-                <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
-                <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
-                <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
-                <Link href="/committee" className="text-gray-700 hover:text-primary-600 transition-colors">Committee</Link>
-                <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
-                <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
-                <Link href="/notices" className="text-gray-700 hover:text-primary-600 transition-colors">Notices</Link>
-                {userEmail ? (
-                  <div className="relative">
-                    <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
-                      <UserIcon className="h-4 w-4" />
-                      <span className="text-sm">Account</span>
-                    </button>
-                    {accountOpen && (
-                      <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
-                        <div className="px-4 py-3 text-sm text-gray-600 border-b">{userEmail}</div>
-                        <div className="py-1">
-                          <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
-                          <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
-                          {hasAdminAccess && (
-                            <>
-                              <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
-                              {adminMenuItems.map((item) => (
-                                <Link key={item.href} href={item.href} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
-                                  {item.label}
-                                </Link>
-                              ))}
-                            </>
-                          )}
-                          <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
-                        </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <Link href="/about" className="text-gray-700 hover:text-primary-600 transition-colors">About</Link>
+              <Link href="/events" className="text-gray-700 hover:text-primary-600 transition-colors">Events</Link>
+              <Link href="/directory" className="text-gray-700 hover:text-primary-600 transition-colors">Directory</Link>
+              <Link href="/gallery" className="text-gray-700 hover:text-primary-600 transition-colors">Gallery</Link>
+              <Link href="/blog" className="text-gray-700 hover:text-primary-600 transition-colors">Blog</Link>
+              <Link href="/donate" className="text-gray-700 hover:text-primary-600 transition-colors">Donate</Link>
+              {userEmail ? (
+                <div className="relative">
+                  <button onClick={() => setAccountOpen(!accountOpen)} className="flex items-center space-x-2 px-3 py-1 border rounded-md text-gray-700 hover:text-gray-900">
+                    <UserIcon className="h-4 w-4" />
+                    <span className="text-sm">Account</span>
+                  </button>
+                  {accountOpen && (
+                    <div className="absolute right-0 mt-2 w-56 bg-white border border-gray-200 rounded-lg shadow-lg z-50">
+                      <div className="px-4 py-3 text-sm text-gray-600 border-b">{userEmail}</div>
+                      <div className="py-1">
+                        <Link href="/dashboard" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Dashboard</Link>
+                        <Link href="/profile" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">My Profile</Link>
+                        {isAdmin && (
+                          <>
+                            <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
+                            <Link href="/admin/users" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Users</Link>
+                            <Link href="/admin/events" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Events</Link>
+                          </>
+                        )}
+                        <button onClick={handleSignOut} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Logout</button>
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <Link href="/login" className="btn-primary">Login</Link>
-                )}
-              </div>
-              {/* Mobile menu button - moved to top right */}
-              <button className="md:hidden p-2 -mr-2" aria-label="Open menu" onClick={() => setMobileOpen(true)}>
-                <MenuIcon className="h-6 w-6 text-gray-700" />
-              </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link href="/login" className="btn-primary">Login</Link>
+              )}
             </div>
           </div>
         </div>
@@ -550,7 +428,7 @@ export default function Home() {
       {mobileOpen && (
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
-          <div className="absolute top-0 right-0 h-full w-72 bg-white shadow-lg p-4">
+          <div className="absolute top-0 left-0 h-full w-72 bg-white shadow-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-lg font-semibold">Menu</span>
               <button onClick={() => setMobileOpen(false)} aria-label="Close menu"><X className="h-6 w-6" /></button>
@@ -559,23 +437,19 @@ export default function Home() {
               <Link href="/about" className="block px-2 py-2 rounded hover:bg-gray-50">About</Link>
               <Link href="/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
               <Link href="/directory" className="block px-2 py-2 rounded hover:bg-gray-50">Directory</Link>
-              <Link href="/committee" className="block px-2 py-2 rounded hover:bg-gray-50">Committee</Link>
               <Link href="/gallery" className="block px-2 py-2 rounded hover:bg-gray-50">Gallery</Link>
               <Link href="/blog" className="block px-2 py-2 rounded hover:bg-gray-50">Blog</Link>
-              <Link href="/notices" className="block px-2 py-2 rounded hover:bg-gray-50">Notices</Link>
+              <Link href="/donate" className="block px-2 py-2 rounded hover:bg-gray-50">Donate</Link>
               <div className="pt-2 border-t mt-2">
                 {userEmail ? (
                   <>
                     <Link href="/dashboard" className="block px-2 py-2 rounded hover:bg-gray-50">Dashboard</Link>
                     <Link href="/profile" className="block px-2 py-2 rounded hover:bg-gray-50">My Profile</Link>
-                    {hasAdminAccess && (
+                    {isAdmin && (
                       <>
                         <div className="px-2 py-1 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admin</div>
-                        {adminMenuItems.map((item) => (
-                          <Link key={item.href} href={item.href} className="block px-2 py-2 rounded hover:bg-gray-50">
-                            {item.label}
-                          </Link>
-                        ))}
+                        <Link href="/admin/users" className="block px-2 py-2 rounded hover:bg-gray-50">Users</Link>
+                        <Link href="/admin/events" className="block px-2 py-2 rounded hover:bg-gray-50">Events</Link>
                       </>
                     )}
                     <button onClick={handleSignOut} className="w-full text-left px-2 py-2 rounded hover:bg-gray-50">Logout</button>
@@ -593,65 +467,23 @@ export default function Home() {
       <section className="relative h-[60vh] sm:h-[70vh] md:h-[75vh] lg:h-[80vh] xl:h-[85vh] overflow-hidden mt-0">
         {/* Background - Slide-specific images with smooth transitions */}
         <div className="absolute inset-0 z-0 -mt-0">
-          {/* Render all slides for preloading, but only show current one */}
+          {/* Show slide-specific background image with fade and zoom transitions (Ken Burns effect) */}
           <div className="relative w-full h-full overflow-hidden">
-            {allSlides.map((slide, index) => {
-              const isActive = index === currentSlide
-              const isLoaded = loadedImages.has(slide.backgroundImage) || slide.backgroundImage.startsWith('data:')
-              
-              return (
-                <div
-                  key={slide.id}
-                  className={`absolute inset-0 hero-slide-fade ${
-                    isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
-                  }`}
-                  style={{
-                    willChange: 'opacity, transform'
-                  }}
-                >
-                  {slide.backgroundImage && (
-                    <>
-                      {/* Preload image */}
-                      <img
-                        src={slide.backgroundImage}
-                        alt=""
-                        className="hidden"
-                        onLoad={() => {
-                          if (!loadedImages.has(slide.backgroundImage)) {
-                            setLoadedImages((prev) => {
-                              const newSet = new Set(prev)
-                              newSet.add(slide.backgroundImage)
-                              return newSet
-                            })
-                          }
-                        }}
-                        loading={index <= 2 ? 'eager' : 'lazy'}
-                        fetchPriority={index === 0 ? 'high' : index <= 2 ? 'high' : 'low'}
-                      />
-                      {/* Loading placeholder - shown while image is loading */}
-                      {!isLoaded && isActive && (
-                        <div className="absolute inset-0 hero-image-placeholder" />
-                      )}
-                      {/* Background image with Ken Burns effect */}
-                      <div
-                        className={`absolute inset-0 ken-burns-zoom-out ${
-                          isActive && isLoaded ? 'opacity-100' : 'opacity-0'
-                        }`}
+            {currentSlideData.backgroundImage && (
+              <div 
+                key={currentSlideData.id}
+                className="absolute inset-0 opacity-100 z-10 ken-burns-zoom-out"
                 style={{
-                          backgroundImage: `url('${slide.backgroundImage}')`,
+                  backgroundImage: `url('${currentSlideData.backgroundImage}')`,
                   backgroundSize: 'cover',
                   backgroundPosition: 'center',
                   backgroundRepeat: 'no-repeat',
                   backgroundColor: '#000',
-                          transition: isActive && isLoaded ? 'opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+                  transition: 'opacity 2s cubic-bezier(0.4, 0, 0.2, 1)',
                   willChange: 'transform, opacity'
                 }}
               />
-                    </>
             )}
-                </div>
-              )
-            })}
           </div>
           {/* Enhanced Overlay to match About page */}
           <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/40 to-black/50 z-20"></div>
@@ -669,7 +501,7 @@ export default function Home() {
         )}
         
         {/* Content */}
-        <div className={`relative z-10 h-full flex items-center justify-center pb-28 sm:pb-0 ${currentSlideData.type === 'upcoming-event' ? 'pt-16 sm:pt-20 md:pt-16' : 'pt-12 sm:pt-0'}`}>
+        <div className={`relative z-10 h-full flex items-center justify-center pb-28 sm:pb-0 ${currentSlideData.type === 'upcoming-event' ? 'pt-12 sm:pt-16' : 'pt-12 sm:pt-0'}`}>
           <div className="max-w-7xl mx-auto px-12 sm:px-6 lg:px-8 text-center w-full py-4 sm:py-0">
             {/* Icon for non-welcome slides (hide for event slides since we have the badge at top) */}
             {IconComponent && currentSlideData.type !== 'upcoming-event' && (
@@ -697,11 +529,8 @@ export default function Home() {
               </div>
             )}
             
-            {/* Short description for hero section - truncated on mobile */}
-            <p className="text-sm sm:text-base md:text-lg text-white mb-4 sm:mb-6 md:mb-8 max-w-3xl mx-auto drop-shadow-md px-2 line-clamp-3 sm:line-clamp-none">
-              {currentSlideData.type === 'upcoming-event' 
-                ? ((currentSlideData as EventSlide).shortDescription || currentSlideData.description)
-                : currentSlideData.description}
+            <p className="text-base sm:text-lg text-white mb-6 sm:mb-8 max-w-3xl mx-auto drop-shadow-md px-2">
+              {currentSlideData.description}
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -762,18 +591,14 @@ export default function Home() {
         <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-white to-transparent"></div>
       </section>
 
-      {/* Notices Section */}
-      <NoticesSection limit={3} showHeader={true} />
-
       {/* School Info */}
       <section className="py-16 bg-white relative">
         <div className="absolute inset-0 bg-gradient-to-b from-primary-50/30 to-transparent"></div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Barasat Govt. High School</h2>
-            <p className="text-lg text-gray-700 mb-4 font-medium">বারাসাত প্যারীচরণ সরকার রাষ্ট্রীয় উচ্চ বিদ্যালয়</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Barasat Govt. High School</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Established in 1856, Barasat Govt. High School has been shaping young minds and building character for over 165 years. 
+              Established in 1856, BGHS has been shaping young minds and building character for over 165 years. 
               Our alumni network spans across the globe, representing excellence in various fields. Barasat Government High School's name was officially changed to Barasat Peary Charan Sarkar Government High School in 1996 to honor its founder, Peary Charan Sarkar. The change was made by the order of the Governor, to immortalize his contribution to the school, and it coincided with the institution's 150th anniversary
             </p>
           </div>
@@ -811,87 +636,26 @@ export default function Home() {
             <p className="text-lg text-gray-600">Discover the features that make our alumni community special</p>
           </div>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {/* Events & Reunions Card */}
-            <Link 
-              href="/events" 
-              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
-            >
-              <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+            <div className="card text-center hover:shadow-lg transition-shadow">
+              <Calendar className="h-12 w-12 text-primary-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Events & Reunions</h3>
-              <p className="text-gray-600 mb-3">Stay updated with school events, reunions, and networking opportunities</p>
-              {upcomingEventsCount !== null && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <p className="text-sm font-semibold text-primary-600">
-                    {upcomingEventsCount} {upcomingEventsCount === 1 ? 'Upcoming Event' : 'Upcoming Events'}
-                  </p>
-                </div>
-              )}
-              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-sm font-medium">Explore</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
-
-            {/* Alumni Directory Card */}
-            <Link 
-              href="/directory" 
-              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
-            >
-              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <p className="text-gray-600">Stay updated with school events, reunions, and networking opportunities</p>
+            </div>
+            <div className="card text-center hover:shadow-lg transition-shadow">
+              <Users className="h-12 w-12 text-primary-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Alumni Directory</h3>
-              <p className="text-gray-600 mb-3">Connect with former classmates and expand your professional network</p>
-              {alumniCount !== null && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <p className="text-sm font-semibold text-primary-600">
-                    {alumniCount.toLocaleString()} {alumniCount === 1 ? 'Alumni Member' : 'Alumni Members'}
-                  </p>
-                </div>
-              )}
-              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-sm font-medium">Explore</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
-
-            {/* Blog & News Card */}
-            <Link 
-              href="/blog" 
-              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
-            >
-              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <p className="text-gray-600">Connect with former classmates and expand your professional network</p>
+            </div>
+            <div className="card text-center hover:shadow-lg transition-shadow">
+              <BookOpen className="h-12 w-12 text-primary-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Blog & News</h3>
-              <p className="text-gray-600 mb-3">Read stories, achievements, and updates from our alumni community</p>
-              {blogPostsCount !== null && (
-                <div className="mt-4 pt-3 border-t border-gray-200">
-                  <p className="text-sm font-semibold text-primary-600">
-                    {blogPostsCount} {blogPostsCount === 1 ? 'Article' : 'Articles'}
-                  </p>
-                </div>
-              )}
-              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-sm font-medium">Explore</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
-
-            {/* Donations Card */}
-            <Link 
-              href="/donate" 
-              className="card text-center hover:shadow-lg transition-all duration-200 hover:scale-105 group cursor-pointer"
-            >
-              <Heart className="h-12 w-12 text-primary-600 mx-auto mb-4 group-hover:scale-110 transition-transform" />
+              <p className="text-gray-600">Read stories, achievements, and updates from our alumni community</p>
+            </div>
+            <div className="card text-center hover:shadow-lg transition-shadow">
+              <Heart className="h-12 w-12 text-primary-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Donations</h3>
-              <p className="text-gray-600 mb-3">Support your alma mater through various donation programs</p>
-              <div className="mt-4 pt-3 border-t border-gray-200">
-                <p className="text-sm font-semibold text-primary-600">
-                  Support Your School
-                </p>
-              </div>
-              <div className="mt-3 flex items-center justify-center gap-2 text-primary-600 opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-sm font-medium">Donate Now</span>
-                <ArrowRight className="h-4 w-4" />
-              </div>
-            </Link>
+              <p className="text-gray-600">Support your alma mater through various donation programs</p>
+            </div>
           </div>
         </div>
       </section>
@@ -941,10 +705,8 @@ export default function Home() {
                  <li><Link href="/about" className="text-gray-400 hover:text-white transition-colors">About</Link></li>
                  <li><Link href="/events" className="text-gray-400 hover:text-white transition-colors">Events</Link></li>
                  <li><Link href="/directory" className="text-gray-400 hover:text-white transition-colors">Directory</Link></li>
-                 <li><Link href="/committee" className="text-gray-400 hover:text-white transition-colors">Committee</Link></li>
-                 <li><Link href="/gallery" className="text-gray-400 hover:text-white transition-colors">Gallery</Link></li>
                  <li><Link href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</Link></li>
-                 <li><Link href="/notices" className="text-gray-400 hover:text-white transition-colors">Notices</Link></li>
+                 <li><Link href="/donate" className="text-gray-400 hover:text-white transition-colors">Donate</Link></li>
                </ul>
              </div>
             <div>

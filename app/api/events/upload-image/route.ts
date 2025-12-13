@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies, headers } from 'next/headers'
 import { createClient } from '@supabase/supabase-js'
 import { r2Storage } from '@/lib/r2-storage'
+import { getUserPermissions, hasPermission } from '@/lib/auth-utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,28 +35,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Use service role client for database operations to bypass RLS
-    const db = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    )
+    // Check permissions - event managers and admins can upload
+    const perms = await getUserPermissions(user.id)
+    const canManage = hasPermission(perms, 'can_manage_events') || 
+                     hasPermission(perms, 'can_access_admin') ||
+                     hasPermission(perms, 'can_manage_content')
 
-    // Check if user is admin or event manager
-    const { data: profile } = await db
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const canUpload = profile?.role && ['super_admin', 'event_manager', 'content_creator'].includes(profile.role)
-
-    if (!canUpload) {
+    if (!canManage) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
     const formData = await request.formData()
     const file = formData.get('file') as File
-    const eventId = formData.get('eventId') as string // Optional - for existing events
+    const eventId = formData.get('eventId') as string | null
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
@@ -75,17 +67,25 @@ export async function POST(request: NextRequest) {
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Upload to R2
-    const imageUrl = await r2Storage.uploadEventImage(
+    // Create unique filename
+    const timestamp = Date.now()
+    const fileExtension = file.name.split('.').pop() || 'jpg'
+    const fileName = eventId 
+      ? `event-${eventId}-${timestamp}.${fileExtension}`
+      : `event-${timestamp}.${fileExtension}`
+
+    // Upload to R2 Storage in events folder
+    const r2Response = await r2Storage.uploadFile(
       buffer,
-      eventId || `temp-${Date.now()}`,
-      file.name
+      fileName,
+      file.type,
+      'events'
     )
 
     return NextResponse.json({
       success: true,
-      url: imageUrl,
-      message: 'Image uploaded successfully'
+      url: r2Response.url,
+      key: r2Response.key
     })
 
   } catch (error) {
@@ -101,11 +101,13 @@ export async function POST(request: NextRequest) {
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS(request: NextRequest) {
-  const { getCorsHeaders } = await import('@/lib/cors-utils')
+export async function OPTIONS() {
   return new NextResponse(null, {
     status: 200,
-    headers: getCorsHeaders(request),
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
   })
 }
-

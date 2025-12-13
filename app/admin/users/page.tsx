@@ -23,7 +23,8 @@ import {
   KeyRound
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { UserRole, getAvailableRoles, updateUserRole, getUserPermissions, hasPermission } from '@/lib/auth-utils'
+// Removed getUserPermissions import - using direct role check for performance
+import { UserRole, getAvailableRoles, updateUserRole } from '@/lib/auth-utils'
 
 interface UserProfile {
   id: string
@@ -90,15 +91,6 @@ export default function AdminUsersPage() {
     fetchAvailableRoles()
   }, [])
 
-  // Refetch roles when window regains focus (in case new roles were created in another tab)
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchAvailableRoles()
-    }
-    window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
-  }, [])
-
   const checkAdminAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -106,9 +98,9 @@ export default function AdminUsersPage() {
         router.push('/login')
         return
       }
-      // Check granular permission for user management
-      const perms = await getUserPermissions(user.id)
-      const canAccess = hasPermission(perms, 'can_manage_user_profiles') || hasPermission(perms, 'can_access_admin')
+      // Enforce admin permission based on profiles.role (optimized - no redundant queries)
+      const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+      const canAccess = data?.role === 'super_admin' || data?.role === 'donation_manager' || data?.role === 'event_manager' || data?.role === 'content_moderator'
       if (!canAccess) {
         alert('You do not have permission to access User Management.')
         router.push('/dashboard')
@@ -123,7 +115,6 @@ export default function AdminUsersPage() {
   const fetchAvailableRoles = async () => {
     try {
       const roles = await getAvailableRoles()
-      console.log('Fetched available roles:', roles.length, roles.map(r => ({ name: r.name, description: r.description })))
       setAvailableRoles(roles)
     } catch (error) {
       console.error('Error fetching roles:', error)
@@ -151,59 +142,7 @@ export default function AdminUsersPage() {
       }
 
       const { users } = await response.json()
-      const apiCount = users?.length || 0
-      console.log('[FETCH] Raw API response - users count:', apiCount)
-      
-      // Log count comparison (expected: 1303 based on user's query)
-      if (apiCount !== 1303) {
-        console.warn(`[FETCH] ⚠️ Count mismatch! API returned ${apiCount} records, expected 1303`)
-      } else {
-        console.log('[FETCH] ✓ Count matches expected: 1303 records')
-      }
-      
-      const mappedUsers = (users || []).map((u: any) => ({ ...u, is_approved: u.is_approved ?? false }))
-      
-      // Debug: Check for specific target emails
-      const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
-      const foundTargets = mappedUsers.filter((u: any) => 
-        targetEmails.some(email => u.email?.toLowerCase() === email.toLowerCase())
-      )
-      
-      console.log('[FETCH] Target emails found in response:', foundTargets.length, 'out of', targetEmails.length)
-      foundTargets.forEach((u: any) => {
-        console.log('[FETCH] ✓ Found:', { id: u.id, email: u.email, full_name: u.full_name })
-      })
-      
-      // Check for missing email
-      const chandraEmailUser = mappedUsers.find((u: any) => 
-        u.email?.toLowerCase() === 'chandra.dibyendu@gmail.com'
-      )
-      if (!chandraEmailUser) {
-        console.error('[FETCH] ✗ MISSING: chandra.dibyendu@gmail.com NOT in API response!')
-        console.log('[FETCH] Total users in response:', mappedUsers.length)
-        // Log first few emails to see what we got
-        console.log('[FETCH] Sample emails:', mappedUsers.slice(0, 10).map((u: any) => u.email))
-      } else {
-        console.log('[FETCH] ✓ Found chandra.dibyendu@gmail.com:', {
-          id: chandraEmailUser.id,
-          email: chandraEmailUser.email,
-          full_name: chandraEmailUser.full_name
-        })
-      }
-      
-      // Log all Dibyendu users
-      const dibyenduUsers = mappedUsers.filter((u: any) => 
-        u.email?.toLowerCase().includes('dibyendu') || 
-        u.full_name?.toLowerCase().includes('dibyendu') ||
-        (u.first_name && u.first_name.toLowerCase().includes('dibyendu'))
-      )
-      console.log('[FETCH] All Dibyendu users in state:', dibyenduUsers.length)
-      dibyenduUsers.forEach((u: any) => {
-        console.log('[FETCH] Dibyendu user:', { id: u.id, email: u.email, full_name: u.full_name })
-      })
-      
-      setUsers(mappedUsers)
-      console.log('[FETCH] State updated with', mappedUsers.length, 'users')
+      setUsers((users || []).map((u: any) => ({ ...u, is_approved: u.is_approved ?? false })))
     } catch (error) {
       console.error('Error fetching users:', error)
     } finally {
@@ -300,8 +239,7 @@ export default function AdminUsersPage() {
           location: formData.location,
           bio: formData.bio,
           linkedin_url: formData.linkedin_url,
-          website_url: formData.website_url,
-          role: selectedRole // Include the role in the update
+          website_url: formData.website_url
         })
       })
 
@@ -328,8 +266,6 @@ export default function AdminUsersPage() {
       const { data: { session } } = await supabase.auth.getSession()
       if (!session) { router.push('/login'); return }
 
-      console.log(`[Frontend] Updating role for user ${userId} to: ${newRole}`)
-      
       const res = await fetch('/api/admin/users', {
         method: 'PUT',
         headers: {
@@ -338,35 +274,14 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({ id: userId, role: newRole })
       })
-      
-      const responseData = await res.json()
-      
       if (!res.ok) {
-        console.error('[Frontend] Role update failed:', responseData)
-        throw new Error(responseData.error || 'Failed to update role')
+        const data = await res.json(); throw new Error(data.error || 'Failed')
       }
-      
-      console.log('[Frontend] Role update response:', responseData)
-      
-      // Refresh users list to get updated data
-      await fetchUsers()
-      
-      // Wait a bit for state to update, then verify
-      setTimeout(() => {
-        const updatedUser = users.find(u => u.id === userId)
-        if (updatedUser) {
-          console.log(`[Frontend] Verification - User ${userId} role is now: ${updatedUser.role}`)
-          if (updatedUser.role !== newRole) {
-            console.warn(`[Frontend] Role mismatch! Expected ${newRole}, but user has ${updatedUser.role}. Refreshing...`)
-            fetchUsers()
-          }
-        }
-      }, 1000)
-      
+      fetchUsers()
       alert('User role updated successfully!')
     } catch (error) {
       console.error('Error updating user role:', error)
-      alert(`Error updating user role: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      alert('Error updating user role')
     }
   }
 
@@ -524,7 +439,6 @@ export default function AdminUsersPage() {
 
   const startEdit = (user: UserProfile) => {
     setEditingUser(user)
-    setSelectedRole(user.role || 'alumni_member') // Set the role from the user
     setFormData({
       email: user.email,
       phone: (user as any).phone || '',
@@ -546,61 +460,17 @@ export default function AdminUsersPage() {
 
   const filteredUsers = users.filter(user => {
     const term = searchTerm.trim().toLowerCase()
-    if (!term) {
-      // If no search term, only filter by year
-      const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
-      return matchesYear
-    }
-    
-    // Search across multiple fields: full_name, first_name, last_name, middle_name, email, profession
-    const fullName = (user.full_name || '').toLowerCase()
-    const firstName = ((user as any).first_name || '').toLowerCase()
-    const lastName = ((user as any).last_name || '').toLowerCase()
-    const middleName = ((user as any).middle_name || '').toLowerCase()
-    const email = (user.email || '').toLowerCase()
-    const profession = (user.profession || '').toLowerCase()
-    
-    const matchesName = fullName.includes(term) ||
-                       firstName.includes(term) ||
-                       lastName.includes(term) ||
-                       middleName.includes(term) ||
-                       email.includes(term) ||
-                       profession.includes(term)
-    
+    const matchesNameEmailProfession = user.full_name.toLowerCase().includes(term) ||
+                         user.email.toLowerCase().includes(term) ||
+                         user.profession?.toLowerCase().includes(term)
     // Allow search by full or last 5 digits of registration_id
     const regId = (user.registration_id || '').toLowerCase()
-    const matchesRegId = regId.includes(term) || (term.length <= 5 && regId.endsWith(term))
-    
-    const matchesSearch = matchesName || matchesRegId
+    const matchesRegId = term
+      ? (regId.includes(term) || (term.length <= 5 && regId.endsWith(term)))
+      : true
+    const matchesSearch = matchesNameEmailProfession || matchesRegId
     const matchesYear = !filterYear || (user.year_of_leaving?.toString() === filterYear)
-    const result = matchesSearch && matchesYear
-    
-    // Debug logging for specific emails or Dibyendu users
-    const targetEmails = ['chandra.dibyendu@gmail.com', 'bghsa202501123@alumnibghs.org']
-    const isTargetUser = targetEmails.some(e => email === e.toLowerCase()) ||
-                        email.includes('dibyendu') || 
-                        email.includes('bghsa202501123') || 
-                        fullName.includes('dibyendu') || 
-                        firstName.includes('dibyendu')
-    
-    if (isTargetUser) {
-      console.log('[FILTER] Filter check for:', {
-        email: user.email,
-        full_name: user.full_name,
-        first_name: (user as any).first_name,
-        last_name: (user as any).last_name,
-        year_of_leaving: user.year_of_leaving,
-        filterYear,
-        term,
-        matchesName,
-        matchesRegId,
-        matchesSearch,
-        matchesYear,
-        result
-      })
-    }
-    
-    return result
+    return matchesSearch && matchesYear
   })
 
   const leavingYears = Array.from(new Set(users.map(u => u.year_of_leaving).filter(Boolean) as number[])).sort((a, b) => (b - a))
